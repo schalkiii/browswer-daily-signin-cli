@@ -1,0 +1,250 @@
+﻿{
+  "version": "v3.9",
+  "total": 39,
+  "baseline_file": "baseline.json",
+  "sites": [
+    {
+      "name": "13City",
+      "url": "https://13city.org/usercp.php?action=personal#signin",
+      "strategy": "web-read",
+      "note": "书签同步: 13City签到"
+    },
+    {
+      "name": "52pojie",
+      "url": "https://www.52pojie.cn/forum.php",
+      "strategy": "browser-open",
+      "note": "书签同步: 吾爱破解 - webbridge"
+    },
+    {
+      "name": "AsianDVDClub",
+      "url": "https://asiandvdclub.org/index.php",
+      "strategy": "browser-visit",
+      "note": "书签同步: AsianDVDClub 仅访问"
+    },
+    {
+      "name": "BiliDownload",
+      "url": "https://bilibili.download/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: RailgunPT签到"
+    },
+    {
+      "name": "BTSchool",
+      "url": "https://pt.btschool.club/torrents.php",
+      "strategy": "browser-open",
+      "note": "书签同步: BTSchool"
+    },
+    {
+      "name": "DepthStudio",
+      "url": "https://dstudio.me/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: DepthStudio签到"
+    },
+    {
+      "name": "DigitalCore",
+      "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
+      "strategy": "browser-visit",
+      "note": "书签同步: DigitalCore 仅访问"
+    },
+    {
+      "name": "GGPT",
+      "url": "https://www.gamegamept.com/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: GGPT签到"
+    },
+    {
+      "name": "HDBao",
+      "url": "https://hdbao.cc/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: HDBao签到"
+    },
+    {
+      "name": "HDClone",
+      "url": "https://pt.hdclone.top/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: HDClone签到"
+    },
+    {
+      "name": "HDDolby",
+      "url": "https://www.hddolby.com/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: HDDolby签到"
+    },
+    {
+      "name": "HDHome",
+      "url": "https://hdhome.org/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: HDHome签到"
+    },
+    {
+      "name": "HDKYL",
+      "url": "https://www.hdkyl.in/attendance.php",
+      "strategy": "browser-open",
+      "note": "书签同步: HDKYL - webbridge"
+    },
+    {
+      "name": "HDVideo",
+      "url": "https://hdvideo.top/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: HDVideo签到"
+    },
+    {
+      "name": "HHCLUB",
+      "url": "https://hhanclub.net/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: HHCLUB签到"
+    },
+    {
+      "name": "HTCPT",
+      "url": "https://www.htpt.cc/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: 海棠PT签到"
+    },
+    {
+      "name": "InvitesFun",
+      "url": "https://www.invites.fun/?sort=newest",
+      "strategy": "browser-eval-click",
+      "eval": "(function(){var t=document.body.innerText||'';if(t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1||t.indexOf('今日已签')>-1)return'SIGN_OK';var all=document.querySelectorAll('a,button,.btn,[class*=sign]');for(var i=0;i<all.length;i++){var v=all[i].textContent||'';if(v.indexOf('签到')>-1||v.indexOf('Sign')>-1||v.indexOf('Check')>-1){all[i].click();return'CLICKED'}}var header=document.querySelector('.header,header,#header,.navbar');if(header){var links=header.querySelectorAll('a');for(var j=0;j<links.length;j++){var t2=links[j].textContent||'';if(t2.indexOf('签到')>-1||t2.indexOf('Sign')>-1){links[j].click();return'CLICKED'}}}return'NO_BTN'})()",
+      "note": "书签同步: InvitesFun 左上角签到按钮"
+    },
+    {
+      "name": "Kufirc",
+      "url": "https://kufirc.com/index.php",
+      "strategy": "browser-visit",
+      "note": "书签同步: Kufirc 仅访问"
+    },
+    {
+      "name": "M-Team",
+      "url": "https://kp.m-team.cc/index",
+      "strategy": "browser-visit",
+      "note": "书签同步: M-Team 仅访问"
+    },
+    {
+      "name": "Moment",
+      "url": "https://www.momentpt.top/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: Moment签到"
+    },
+    {
+      "name": "Musopia",
+      "url": "https://www.musopia.vip/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: 音乐乌托邦签到"
+    },
+    {
+      "name": "NewInsane",
+      "url": "https://newinsane.info/browse.php",
+      "strategy": "browser-visit",
+      "note": "书签同步: NewInsane 仅访问"
+    },
+    {
+      "name": "NodeSeek",
+      "url": "https://www.nodeseek.com/board",
+      "strategy": "browser-open",
+      "note": "书签同步: NodeSeek - webbridge"
+    },
+    {
+      "name": "OurBits",
+      "url": "https://ourbits.club/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: OurBits签到"
+    },
+    {
+      "name": "PigGo",
+      "url": "https://piggo.me/attendance.php?id=18989",
+      "strategy": "browser-open",
+      "note": "书签同步: PigGo - webbridge"
+    },
+    {
+      "name": "FreeFarm",
+      "url": "https://pt.0ff.cc/attendance.php",
+      "strategy": "browser-open",
+      "note": "书签同步: FreeFarm - webbridge"
+    },
+    {
+      "name": "PTLAO",
+      "url": "https://ptlao.top/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: PTLAO签到"
+    },
+    {
+      "name": "Rousi",
+      "url": "https://rousi.pro/points",
+      "strategy": "browser-eval-click",
+      "eval": "(function(){var t=document.body.innerText||'';if(t.indexOf('签到成功')>-1||t.indexOf('已签到')>-1||t.indexOf('连续签到')>-1)return'SIGN_OK';var all=document.querySelectorAll('a,button,.sign-btn,.checkin-btn');for(var i=0;i<all.length;i++){var v=all[i].textContent||'';if(v.indexOf('签到')>-1&&v.indexOf('数')==-1){all[i].click();return'CLICKED'}}return'NO_BTN'})()",
+      "note": "书签同步: Rousi签到"
+    },
+    {
+      "name": "SBPT",
+      "url": "https://sbpt.link/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: SBPT签到"
+    },
+    {
+      "name": "SpeedApp",
+      "url": "https://speedapp.io/adult",
+      "strategy": "browser-visit",
+      "note": "书签同步: SpeedApp 仅访问"
+    },
+    {
+      "name": "TJUPT",
+      "url": "https://www.tjupt.org/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: 北洋园PT签到"
+    },
+    {
+      "name": "Tokyo",
+      "url": "https://www.tokyo-manga.top/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: Tokyo签到"
+    },
+    {
+      "name": "UBits",
+      "url": "https://ubits.club/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: UBits签到"
+    },
+    {
+      "name": "UsefulTrash",
+      "url": "https://usefultrash.net/browse.php",
+      "strategy": "browser-visit",
+      "note": "书签同步: UsefulTrash 仅访问"
+    },
+    {
+      "name": "V2EX",
+      "url": "https://www.v2ex.com/",
+      "strategy": "browser-open",
+      "note": "书签同步: V2EX - webbridge"
+    },
+    {
+      "name": "xloli",
+      "url": "https://mua.xloli.cc/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: xloli签到"
+    },
+    {
+      "name": "Yemapt",
+      "url": "https://www.yemapt.org/#/consumer/checkIn",
+      "strategy": "browser-open",
+      "note": "书签同步: Yemapt签到"
+    },
+    {
+      "name": "YHPP",
+      "url": "https://www.yhpp.cc/attendance.php",
+      "strategy": "web-read",
+      "note": "书签同步: YHPP签到"
+    },
+    {
+      "name": "远景论坛",
+      "url": "https://bbs.pcbeta.com/forum-win11-1.html",
+      "strategy": "browser-eval-click",
+      "eval": "(function(){var t=document.body.innerText||'';if(t.indexOf('签到成功')>-1||t.indexOf('签到完成')>-1||t.indexOf('已签到')>-1||t.indexOf('签到领奖')>-1)return'SIGN_OK';var b=document.querySelector('button.check-in');if(b){b.click();return'CLICKED'}var all=document.querySelectorAll('button');for(var i=0;i<all.length;i++){var v=all[i].textContent||'';if(v.indexOf('每日签到')>-1){all[i].click();return'CLICKED'}}return'NO_BTN'})()",
+      "note": "书签同步: 远景论坛签到"
+    }
+  ],
+  "batch": {
+    "concurrency": 1,
+    "waitOpenMs": 6000,
+    "waitEvalMs": 8000,
+    "timeoutSec": 90
+  }
+}
