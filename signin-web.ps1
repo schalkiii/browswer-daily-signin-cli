@@ -15,11 +15,11 @@ $WebSignInConfigs = @{
   var btn = document.querySelector('button.custom-function-button.check-in');
   if(btn){
     var txt = (btn.textContent||'').trim();
-    if(txt.indexOf('今日已签到')>-1||txt.indexOf('已签到')>-1) return 'SIGN_OK';
+    if(txt.indexOf('今日已签到')>-1||txt.indexOf('已签到')>-1||txt.indexOf('签到完成')>-1) return 'SIGN_OK';
     if(txt==='每日签到') return 'NEED_SIGN';
   }
   var t = document.body.innerText||'';
-  if(t.indexOf('今日已签到')>-1||t.indexOf('签到成功')>-1||t.indexOf('领取今日签到奖励')>-1) return 'SIGN_OK';
+  if(t.indexOf('今日已签到')>-1||t.indexOf('签到成功')>-1||t.indexOf('领取今日签到奖励')>-1||t.indexOf('签到完成')>-1) return 'SIGN_OK';
   if(t.indexOf('请登录')>-1||t.indexOf('必须登录')>-1) return 'LOGIN_REQUIRED';
   return 'UNKNOWN';
 })()
@@ -76,11 +76,13 @@ $WebSignInConfigs = @{
         Detect = @'
 (function(){
   var t = document.body.innerText||'';
+  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],iframe[src*="turnstile"],#challenge-stage,#cf-challenge,div[class*="challenge"]')) return 'SLIDER';
+  if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1||t.indexOf('DDoS')>-1||t.indexOf('turnstile')>-1) return 'CF_CHALLENGE';
+  if(t.indexOf('验证您是真人')>-1||t.indexOf('确认您是真人')>-1||t.indexOf('滑动滑块')>-1) return 'SLIDER';
   if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1) return 'SIGN_OK';
   var idx = t.indexOf('签到得魔力');
   if(idx>-1) return 'NEED_SIGN';
   if(t.indexOf('请先登录')>-1||t.indexOf('未登录')>-1||t.indexOf('客户端')>-1&&t.indexOf('登录')>-1) return 'LOGIN_REQUIRED';
-  if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
   var match = t.match(/签到.{0,20}/);
   return 'UNKNOWN:'+(match?match[0]:'no_match');
 })()
@@ -101,6 +103,36 @@ $WebSignInConfigs = @{
   for(var k=0;k<links.length;k++){
     var lv = (links[k].textContent||'').trim();
     if(lv==='签到得魔力'||lv.indexOf('签到得')===0){ links[k].click(); return 'CLICKED_A:'+lv; }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
+
+    "PigGo" = @{
+        Url = "https://piggo.me/attendance.php?id=18989"
+        WaitMs = 8000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var t = document.body.innerText||'';
+  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1) return 'SIGN_OK';
+  if(t.indexOf('签到得魔力')>-1) return 'NEED_SIGN';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1) return 'LOGIN_REQUIRED';
+  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
+  var match = t.match(/签到.{0,20}/);
+  if(match) return 'NEED_SIGN:'+match[0];
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  if(!document.body) return 'NO_BODY';
+  var all = document.querySelectorAll('b,font,a,input[type=submit],button');
+  for(var i=0;i<all.length;i++){
+    var txt = (all[i].textContent||all[i].value||'').trim();
+    if(txt.indexOf('签到得魔力')>-1||txt==='签到'){ all[i].click(); return 'CLICKED:'+txt; }
   }
   return 'NO_BTN';
 })()
@@ -162,6 +194,107 @@ $WebSignInConfigs = @{
     if(v.indexOf('签到得')>-1||v.indexOf('打卡')>-1||v==='签到'){
       all[i].click();
       return 'CLICKED:'+v.substring(0,40);
+    }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
+    "InvitesFun" = @{
+        Url = "https://www.invites.fun/?sort=newest"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var t = document.body.innerText||'';
+  if(t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1||t.indexOf('今日已签')>-1||t.indexOf('签到完成')>-1) return 'SIGN_OK';
+  if(t.indexOf('签到')>-1||t.indexOf('Sign')>-1||t.indexOf('Check')>-1) return 'NEED_SIGN';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1) return 'LOGIN_REQUIRED';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  var all = document.querySelectorAll('a,button,.btn,[class*=sign]');
+  for(var i=0;i<all.length;i++){
+    var v = all[i].textContent||'';
+    if(v.indexOf('签到')>-1||v.indexOf('Sign')>-1||v.indexOf('Check')>-1){
+      all[i].click(); return 'CLICKED'
+    }
+  }
+  var header = document.querySelector('.header,header,#header,.navbar');
+  if(header){
+    var links = header.querySelectorAll('a');
+    for(var j=0;j<links.length;j++){
+      var t2 = links[j].textContent||'';
+      if(t2.indexOf('签到')>-1||t2.indexOf('Sign')>-1){
+        links[j].click(); return 'CLICKED'
+      }
+    }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
+    "OurBits" = @{
+        Url = "https://ourbits.club/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var t = document.body.innerText||'';
+  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
+  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
+  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
+  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
+  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
+  var match = t.match(/签到.{0,20}/);
+  if(match) return 'NEED_SIGN:'+match[0];
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  var all = document.querySelectorAll('a,span,b,font,button,input[type=submit]');
+  for(var i=0;i<all.length;i++){
+    var v = (all[i].textContent||all[i].value||'').trim();
+    if(v.indexOf('签到得魔力')>-1||v.indexOf('签到')>-1||v.indexOf('打卡')>-1){
+      all[i].click(); return 'CLICKED:'+v.substring(0,40);
+    }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
+    "UBits" = @{
+        Url = "https://ubits.club/attendance.php"
+        WaitMs = 15000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var t = document.body.innerText||'';
+  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
+  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
+  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
+  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
+  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
+  var match = t.match(/签到.{0,20}/);
+  if(match) return 'NEED_SIGN:'+match[0];
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  var all = document.querySelectorAll('a,span,b,font,button,input[type=submit]');
+  for(var i=0;i<all.length;i++){
+    var v = (all[i].textContent||all[i].value||'').trim();
+    if(v.indexOf('签到得魔力')>-1||v.indexOf('签到')>-1||v.indexOf('打卡')>-1){
+      all[i].click(); return 'CLICKED:'+v.substring(0,40);
     }
   }
   return 'NO_BTN';

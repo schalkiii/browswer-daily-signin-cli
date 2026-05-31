@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, slider captcha API bypass,
   click-to-sign pages, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-05-30 (v4.0.0 — Productization: config.json centralized config, browser/bookmark paths configurable, dir cleanup, README rewrite)
+updated: 2026-05-31 (v4.0.1 — PigGo body null fix, InvitesFun/OurBits/UBits → webbridge, BODY_NULL signal handling)
 ---
 
 # PT Site Sign-in Automation
@@ -23,14 +23,14 @@ cd d:\workspace\ptsignin
 
 | Category                       | Count  | Description                              |
 | ------------------------------ | ------ | ---------------------------------------- |
-| web-read (NexusPHP)            | 22     | Attendance on page visit                 |
-| browser-open (webbridge)       | 6      | kimi real browser, CF/WAF bypass         |
-| browser-open (opencli)         | 2      | JS sign-in, CF challenge                 |
-| browser-eval-click (click+det) | 3      | Click button + re-detect (forum checkin) |
+| web-read (NexusPHP)            | 19     | Attendance on page visit                 |
+| browser-open (webbridge)       | 9      | kimi real browser, CF/WAF bypass         |
+| browser-open (opencli)         | 1      | JS sign-in, CF challenge                 |
+| browser-eval-click (click+det) | 2      | Click button + re-detect (forum checkin) |
 | browser-visit (visit only)     | 7      | Pure visit, no sign-in detection         |
 | browser-eval (API bypass)      | —      | Slider captcha bypass (as needed)        |
 | manual (captcha / policy)      | 2      | Requires human interaction               |
-| **Total**                      | **42** | All bookmark sites attempted             |
+| **Total**                      | **40** | All bookmark sites attempted             |
 
 **Key Rule: Attempt ALL sites in the bookmark folder, not just previously successful ones.**
 Use the baseline (`baseline.json`) as a reference for which sites _should_ succeed — regressions are real bugs. Sites not in baseline are exploratory opportunities.
@@ -136,10 +136,10 @@ This applies to both `sites.json` and `iterations.json` reads.
 
 | Strategy                   | Command                               | Base Wait | CF Wait | Retry Policy          | Count |
 | -------------------------- | ------------------------------------- | --------- | ------- | --------------------- | ----- |
-| `web-read`                 | `opencli web read --url`              | 3s        | —       | None                  | 22    |
-| `browser-open` (webbridge) | `Invoke-WebSignIn` via kimi webbridge | 8-15s     | —       | None (perfect bypass) | 6     |
-| `browser-open` (opencli)   | `opencli browser open` + eval         | 8s        | 12s     | 8s (UNKNOWN/CF)       | 2     |
-| `browser-eval-click`       | Open + eval click + detect            | 6s+5s     | —       | 8s (UNKNOWN)          | 3     |
+| `web-read`                 | `opencli web read --url`              | 3s        | —       | None                  | 19    |
+| `browser-open` (webbridge) | `Invoke-WebSignIn` via kimi webbridge | 8-15s     | —       | None (perfect bypass) | 9     |
+| `browser-open` (opencli)   | `opencli browser open` + eval         | 8s        | 12s     | 8s (UNKNOWN/CF)       | 1     |
+| `browser-eval-click`       | Open + eval click + detect            | 6s+5s     | —       | 8s (UNKNOWN)          | 2     |
 | `browser-visit`            | Open + detect + close                 | 8s        | —       | —                     | 7     |
 | `browser-eval`             | Open + bypass API + eval              | 5s+10s    | —       | Auto token refresh    | —     |
 | `manual`                   | N/A                                   | —         | —       | —                     | 2     |
@@ -219,7 +219,7 @@ These sites require JS execution to trigger or detect the sign-in result. `openc
 **Strategy**: `browser-open` — opens real browser, runs JS detection, supports retry
 
 **Sites without CF**: HDDolby, SBPT, HHCLUB, 13City, HDCITY, DepthStudio, PTLAO, 音乐乌托邦, HDBao
-**Sites with CF**: UBits, OurBits, HDHome (need 12s wait + note field contains "CF")
+**Sites with CF**: HDHome (need 12s wait + note field contains "CF")
 
 ### Category C: Cloudflare Turnstile
 
@@ -256,9 +256,9 @@ Sites that require clicking a button on a dedicated sign-in page to complete the
 
 **Pattern**: Visit sign-in page → find target button via JS → click → wait → detect result
 **Strategy**: `browser-eval-click`
-**Sites**: 远景论坛 (PCEVA), Rousi, InvitesFun
+**Sites**: 远景论坛 (PCEVA), Rousi
 
-> **Note**: V2EX, 52pojie, NodeSeek were previously in this category; moved to webbridge (Category G) in v3.9 for better CF bypass reliability.
+> **Note**: V2EX, 52pojie, NodeSeek, InvitesFun were previously in this category; moved to webbridge (Category G) in v3.9/v4.0.1 for better CF bypass reliability.
 
 **Key design principles (v3.6+)**:
 
@@ -343,14 +343,17 @@ function Test-WebBridgeSignIn {
 
 #### Verified Webbridge Sites
 
-| Site         | Signal           | Key Finding                                                                |
-| ------------ | ---------------- | -------------------------------------------------------------------------- |
-| **52pojie**  | `SIGN_OK`        | `button.custom-function-button.check-in` → NEED_SIGN → CLICK → SIGN_OK     |
-| **FreeFarm** | `SIGN_OK`        | hdfans.org via kimi browser, CF zero challenge                             |
-| **HDKYL**    | `SIGN_OK`        | attendance.php auto check-in                                               |
-| **V2EX**     | `SIGN_OK`        | Navigate to `/mission/daily`, detected as already claimed                  |
-| **NodeSeek** | `LOGIN_REQUIRED` | kimi browser not logged in; signal correctly returned, Feishu report warns |
-| **PigGo**    | `NO_CONFIG`      | Dead site (timeout unreachable), returns SKIPPED                           |
+| Site           | Signal           | Key Finding                                                                |
+| -------------- | ---------------- | -------------------------------------------------------------------------- |
+| **52pojie**    | `SIGN_OK`        | `button.custom-function-button.check-in` → NEED_SIGN → CLICK → SIGN_OK     |
+| **FreeFarm**   | `SIGN_OK`        | hdfans.org via kimi browser, CF zero challenge                             |
+| **HDKYL**      | `SIGN_OK`        | attendance.php auto check-in                                               |
+| **V2EX**       | `SIGN_OK`        | Navigate to `/mission/daily`, detected as already claimed                  |
+| **NodeSeek**   | `LOGIN_REQUIRED` | kimi browser not logged in; signal correctly returned, Feishu report warns |
+| **PigGo**      | `SIGN_OK`        | attendance.php with body null guard; fixed v4.0.1                          |
+| **InvitesFun** | `SIGN_OK`        | Moved from browser-eval-click (v4.0.1); detects 签到/已签到 via webbridge  |
+| **OurBits**    | `SIGN_OK`        | Moved from web-read (v4.0.1); CF bypass via webbridge                      |
+| **UBits**      | `SIGN_OK`        | Moved from web-read (v4.0.1); CF bypass via webbridge                      |
 
 ## Eval Patterns (JS Snippets)
 
@@ -779,6 +782,8 @@ Every sign-in session must follow this complete workflow. No step may be skipped
 | Slider captcha page                              | Extract JS token URL from `<script src="...slide...">`, call `set_access_token` API directly. |
 | Image captcha (select matching picture)          | Cannot automate currently. Mark as `manual` strategy.                                         |
 | `ERROR_NO_SIGNAL` / null-valued expression       | Browser eval returned nothing. Browser may have crashed or session was closed.                |
+| `BODY_NULL` / PAGE_ERROR (webbridge)             | Page document.body is null after WaitMs — error page or interstitial. Check URL validity.     |
+| `EVAL_FAIL` (webbridge)                          | JS evaluate crashed (e.g. `document.body.innerText` on null body). Add null guard in detect.  |
 | Feishu push fails                                | Verify webhook URL; network may block `open.feishu.cn`. Check proxy settings.                 |
 | Leichi WAF page                                  | Requires human verification once. After passing, site may become usable.                      |
 | `ConvertFrom-Json` fails with "无效的 JSON 基元" | UTF-8 BOM at file start. Strip with `-replace '^\uFEFF', ''` before parsing.                  |
@@ -805,3 +810,9 @@ Every sign-in session must follow this complete workflow. No step may be skipped
 16. **Failure sites must be taxonomized for systematic improvement**: v3.7.1 failures fall into five categories — (a) server down/connection closed, (b) 404/site gone, (c) CF/WAF blocked, (d) login required/session expired, (e) page empty/no content. Each category maps to a different action: a→skip & wait for recovery, b→flag as potentially offline, c→increase wait to 12s/reuse trust tokens, d→investigate cookie expiry, e→switch to browser-open strategy. Categorized reporting in Feishu provides actionable data.
 
 17. **webbridge beats opencli browser extension (v3.9)**: kimi webbridge controls the user's real browser — CF/WAF is perfectly bypassed (zero challenges), and sites never detect an anomalous environment. For any site where the opencli browser extension is CF-blocked or returns UNKNOWN, prefer switching to webbridge. Each site needs individual debug-verification of its detect/click JS code, then hardening into `signin-web.ps1` to ensure stable replayability. The debug flow for new webbridge sites: navigate → wait → detect → [click] → re-check → close_session. `Invoke-WebBridgeCommand` must use explicit named parameters (`-Action`, `-CmdArgs`, `-Session`) — positional arguments cause parameter type conflicts (`$Args` collides with PowerShell's automatic variable).
+
+18. **Always guard document.body access in detect JS (v4.0.1)**: `document.body` can be null when the page is still loading, is an interstitial page, or has an error. The JS expression `document.body.innerText||''` throws `TypeError: Cannot read properties of null` when body is null. Fix: `var t = document.body ? document.body.innerText : '';`. This applies to both detect and click JS functions. Returning `BODY_NULL` from detect JS is a valid signal that should be handled without crashing.
+
+19. **BODY_NULL is a terminal signal**: When a page has no body element after the configured WaitMs, it's not a timing issue — the page is likely in an error state, a redirect, or a pre-render state that won't resolve. Return `BODY_NULL` immediately without attempting click. The webbridge switch in `signin-batch.ps1` reports it as `PAGE_ERROR` for diagnosis.
+
+20. **web-read → webbridge migration is the preferred fix for CF-blocked sites (v4.0.1)**: When a web-read site starts returning CF_DETECTED and the fallback browser-open also fails, the correct fix is to switch the site to webbridge strategy. This requires: (a) adding a `$WebSignInConfigs` entry in `signin-web.ps1` with detect/click JS, (b) changing strategy to `browser-open` in `sites.json` with `"webbridge"` in the note field, and (c) removing any `eval` field from the site config. The webbridge detect JS should follow the same pattern as other PT attendance pages: check CF/slider first, then sign-in status, then login status.

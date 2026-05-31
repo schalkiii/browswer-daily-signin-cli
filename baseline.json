@@ -1,4 +1,4 @@
-﻿{
+{
   "version": "v3.9",
   "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v3.9: 集成 kimi webbridge 替代 opencli 浏览器扩展，CF 绕过成功率 100%。",
   "sites": [
@@ -42,10 +42,14 @@
     "NewInsane",
     "SpeedApp",
     "UsefulTrash",
-    "InvitesFun"
+    "InvitesFun",
+    "HDKYL",
+    "PigGo"
   ],
-  "manual_sites": ["北洋园PT"],
-  "auto_total": 41,
+  "manual_sites": [
+    "北洋园PT"
+  ],
+  "auto_total": 43,
   "manual_total": 1,
-  "last_updated": "2026-05-30 15:30:00"
+  "last_updated": "2026-05-31 02:48:36"
 }
