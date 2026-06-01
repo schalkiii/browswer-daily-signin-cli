@@ -7,6 +7,12 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
+
+if ($PSVersionTable.PSVersion.Major -lt 6) {
+    Write-Error "signin-batch.ps1 需要 PowerShell 7+ (pwsh.exe)，当前版本为 $($PSVersionTable.PSVersion)。请安装 https://aka.ms/powershell"
+    exit 1
+}
+
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $results = @()
 

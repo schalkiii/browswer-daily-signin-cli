@@ -4,16 +4,64 @@
   "baseline_file": "baseline.json",
   "sites": [
     {
-      "name": "13City",
-      "url": "https://13city.org/usercp.php?action=personal#signin",
-      "strategy": "web-read",
-      "note": "书签同步: 13City签到"
-    },
-    {
       "name": "52pojie",
       "url": "https://www.52pojie.cn/forum.php",
       "strategy": "browser-open",
       "note": "书签同步: 吾爱破解 - webbridge"
+    },
+    {
+      "name": "HDKYL",
+      "url": "https://www.hdkyl.in/attendance.php",
+      "strategy": "browser-open",
+      "note": "书签同步: HDKYL - webbridge"
+    },
+    {
+      "name": "InvitesFun",
+      "url": "https://www.invites.fun/?sort=newest",
+      "strategy": "browser-open",
+      "note": "书签同步: InvitesFun - webbridge"
+    },
+    {
+      "name": "NodeSeek",
+      "url": "https://www.nodeseek.com/board",
+      "strategy": "browser-open",
+      "note": "书签同步: NodeSeek - webbridge"
+    },
+    {
+      "name": "OurBits",
+      "url": "https://ourbits.club/attendance.php",
+      "strategy": "browser-open",
+      "note": "书签同步: OurBits - webbridge"
+    },
+    {
+      "name": "PigGo",
+      "url": "https://piggo.me/attendance.php?id=18989",
+      "strategy": "browser-open",
+      "note": "书签同步: PigGo - webbridge"
+    },
+    {
+      "name": "FreeFarm",
+      "url": "https://pt.0ff.cc/attendance.php",
+      "strategy": "browser-open",
+      "note": "书签同步: FreeFarm - webbridge"
+    },
+    {
+      "name": "UBits",
+      "url": "https://ubits.club/attendance.php",
+      "strategy": "browser-open",
+      "note": "书签同步: UBits - webbridge"
+    },
+    {
+      "name": "V2EX",
+      "url": "https://www.v2ex.com/",
+      "strategy": "browser-open",
+      "note": "书签同步: V2EX - webbridge"
+    },
+    {
+      "name": "13City",
+      "url": "https://13city.org/usercp.php?action=personal#signin",
+      "strategy": "web-read",
+      "note": "书签同步: 13City签到"
     },
     {
       "name": "AsianDVDClub",
@@ -76,12 +124,6 @@
       "note": "书签同步: HDHome签到"
     },
     {
-      "name": "HDKYL",
-      "url": "https://www.hdkyl.in/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: HDKYL - webbridge"
-    },
-    {
       "name": "HDVideo",
       "url": "https://hdvideo.top/attendance.php",
       "strategy": "web-read",
@@ -98,12 +140,6 @@
       "url": "https://www.htpt.cc/attendance.php",
       "strategy": "web-read",
       "note": "书签同步: 海棠PT签到"
-    },
-    {
-      "name": "InvitesFun",
-      "url": "https://www.invites.fun/?sort=newest",
-      "strategy": "browser-open",
-      "note": "书签同步: InvitesFun - webbridge"
     },
     {
       "name": "Kufirc",
@@ -134,30 +170,6 @@
       "url": "https://newinsane.info/browse.php",
       "strategy": "browser-visit",
       "note": "书签同步: NewInsane 仅访问"
-    },
-    {
-      "name": "NodeSeek",
-      "url": "https://www.nodeseek.com/board",
-      "strategy": "browser-open",
-      "note": "书签同步: NodeSeek - webbridge"
-    },
-    {
-      "name": "OurBits",
-      "url": "https://ourbits.club/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: OurBits - webbridge"
-    },
-    {
-      "name": "PigGo",
-      "url": "https://piggo.me/attendance.php?id=18989",
-      "strategy": "browser-open",
-      "note": "书签同步: PigGo - webbridge"
-    },
-    {
-      "name": "FreeFarm",
-      "url": "https://pt.0ff.cc/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: FreeFarm - webbridge"
     },
     {
       "name": "PTLAO",
@@ -197,22 +209,10 @@
       "note": "书签同步: Tokyo签到"
     },
     {
-      "name": "UBits",
-      "url": "https://ubits.club/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: UBits - webbridge"
-    },
-    {
       "name": "UsefulTrash",
       "url": "https://usefultrash.net/browse.php",
       "strategy": "browser-visit",
       "note": "书签同步: UsefulTrash 仅访问"
-    },
-    {
-      "name": "V2EX",
-      "url": "https://www.v2ex.com/",
-      "strategy": "browser-open",
-      "note": "书签同步: V2EX - webbridge"
     },
     {
       "name": "xloli",
