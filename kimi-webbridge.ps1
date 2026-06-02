@@ -69,13 +69,40 @@ function Test-WebBridgeSignIn {
     else { $signal = "$detect" }
     Write-Host "  [WebBridge] $SiteName : signal=$signal"
 
-    if ($signal -match "SIGN_OK|ALREADY_SIGNED|LOGIN_REQUIRED|CF_CHALLENGE|SLIDER|CAPTCHA|BODY_NULL|REDIRECTING") {
-        if ($signal -match "SIGN_OK|ALREADY_SIGNED") {
-            $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
-            return "SIGN_OK"
-        }
+    if ($signal -match "SIGN_OK|ALREADY_SIGNED") {
+        $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
+        return "SIGN_OK"
+    }
+    if ($signal -match "LOGIN_REQUIRED|SLIDER|CAPTCHA") {
         $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
         return $signal
+    }
+
+    if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
+        $retryWaits = @(10, 15, 20)
+        for ($retry = 0; $retry -lt $retryWaits.Count; $retry++) {
+            Write-Host "  [WebBridge] $SiteName : CF/BODY retry $($retry+1)/$($retryWaits.Count), wait $($retryWaits[$retry])s..."
+            Start-Sleep -Seconds $retryWaits[$retry]
+            $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+            $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
+            Write-Host "  [WebBridge] $SiteName : retry signal=$reSig"
+            if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
+                $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
+                return "SIGN_OK"
+            }
+            if ($reSig -match "NEED_SIGN|UNKNOWN") {
+                $signal = $reSig
+                break
+            }
+            if ($reSig -match "LOGIN_REQUIRED") {
+                $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
+                return "LOGIN_REQUIRED"
+            }
+        }
+        if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
+            $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
+            return $signal
+        }
     }
 
     if ($ClickEval) {

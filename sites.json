@@ -36,8 +36,8 @@
     {
       "name": "PigGo",
       "url": "https://piggo.me/attendance.php?id=18989",
-      "strategy": "browser-open",
-      "note": "书签同步: PigGo - webbridge"
+      "strategy": "web-read",
+      "note": "书签同步: PigGo签到 (雷池WAF封kimi浏览器IP，改用opencli)"
     },
     {
       "name": "FreeFarm",
@@ -132,8 +132,8 @@
     {
       "name": "HHCLUB",
       "url": "https://hhanclub.net/attendance.php",
-      "strategy": "web-read",
-      "note": "书签同步: HHCLUB签到"
+      "strategy": "browser-open",
+      "note": "书签同步: HHCLUB签到 (web-read被CF拦截，改用browser-open)"
     },
     {
       "name": "HTCPT",
@@ -223,8 +223,8 @@
     {
       "name": "Yemapt",
       "url": "https://www.yemapt.org/#/consumer/checkIn",
-      "strategy": "browser-open",
-      "note": "书签同步: Yemapt签到"
+      "strategy": "browser-visit",
+      "note": "书签同步: Yemapt签到 (SPA站点，访问即签到)"
     },
     {
       "name": "YHPP",

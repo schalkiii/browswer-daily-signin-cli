@@ -109,36 +109,6 @@ $WebSignInConfigs = @{
 '@
     }
 
-    "PigGo" = @{
-        Url = "https://piggo.me/attendance.php?id=18989"
-        WaitMs = 8000
-        PostClickMs = 5000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1) return 'LOGIN_REQUIRED';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
-  return 'UNKNOWN';
-})()
-'@
-        Click = @'
-(function(){
-  if(!document.body) return 'NO_BODY';
-  var all = document.querySelectorAll('b,font,a,input[type=submit],button');
-  for(var i=0;i<all.length;i++){
-    var txt = (all[i].textContent||all[i].value||'').trim();
-    if(txt.indexOf('签到得魔力')>-1||txt==='签到'){ all[i].click(); return 'CLICKED:'+txt; }
-  }
-  return 'NO_BTN';
-})()
-'@
-    }
-
     "NodeSeek" = @{
         Url = "https://www.nodeseek.com"
         WaitMs = 8000
