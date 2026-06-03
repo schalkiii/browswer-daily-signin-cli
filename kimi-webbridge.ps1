@@ -13,6 +13,46 @@ if (Test-Path $ConfigPath) {
     } catch {}
 }
 
+# daemon 健康检查与自动修复
+# 解决: daemon 异常退出后残留 daemon.pid 导致无法重启
+function Ensure-WebBridgeDaemon {
+    # 先检测 API 是否可用
+    try {
+        $null = Invoke-RestMethod -Uri $WebBridgeBase -Method Post -ContentType "application/json" -Body '{"action":"snapshot","args":{},"session":"__health__"}' -TimeoutSec 3
+        return $true
+    } catch {}
+
+    # API 不可用，尝试修复 pid 文件并重启
+    $wbDir = Join-Path $env:USERPROFILE ".kimi-webbridge"
+    $pidFile = Join-Path $wbDir "daemon.pid"
+    $exePath = Join-Path $wbDir "bin\kimi-webbridge.exe"
+
+    if (-not (Test-Path $exePath)) {
+        Write-Host "[WebBridge] daemon 未安装，跳过 webbridge 站点" -ForegroundColor Yellow
+        return $false
+    }
+
+    # 删除残留 pid 文件
+    if (Test-Path $pidFile) {
+        Write-Host "[WebBridge] 清理残留 daemon.pid..."
+        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+    }
+
+    # 启动 daemon
+    Write-Host "[WebBridge] 启动 daemon..."
+    try {
+        & $exePath start 2>&1 | Out-Null
+        Start-Sleep -Seconds 3
+        # 验证
+        $null = Invoke-RestMethod -Uri $WebBridgeBase -Method Post -ContentType "application/json" -Body '{"action":"snapshot","args":{},"session":"__health__"}' -TimeoutSec 5
+        Write-Host "[WebBridge] daemon 启动成功" -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Host "[WebBridge] daemon 启动失败，跳过 webbridge 站点" -ForegroundColor Red
+        return $false
+    }
+}
+
 function Invoke-WebBridgeCommand {
     param(
         [string]$Action,

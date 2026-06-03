@@ -410,6 +410,9 @@ function Track-Baseline($siteName, $status) {
     }
 }
 
+# webbridge daemon 健康检查：不可用时自动清理 pid 并重启
+$script:webbridgeAvailable = Ensure-WebBridgeDaemon
+
 foreach ($site in $config.sites) {
     $idx = $config.sites.IndexOf($site) + 1
     $session = "pt$idx"
@@ -462,18 +465,23 @@ foreach ($site in $config.sites) {
             }
             "browser-open" {
                 if ($site.note -match "webbridge") {
-                    $wbResult = Invoke-WebSignIn $site.name
-                    $r.signal = $wbResult
-                    switch -Wildcard ($wbResult) {
-                        "SIGN_OK"       { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
-                        "LOGIN_REQUIRED"{ $r.status = "NO_LOGIN"; $signals.login_expired += $site.name; Write-Output "  => NO_LOGIN" }
-                        "CF_CHALLENGE"  { $r.status = "CF_BLOCKED"; $signals.fail_sites += $site.name; Write-Output "  => CF_BLOCKED" }
-                        "SLIDER"        { $r.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL" }
-                        "NAV_FAIL"      { $r.status = "TIMEOUT"; $signals.fail_sites += $site.name; Write-Output "  => TIMEOUT" }
-                        "NO_CONFIG"     { $r.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => NO_CONFIG" }
-                        "BODY_NULL"     { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (body null)" }
-                        "REDIRECTING"   { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => REDIRECTING" }
-                        default         { $r.status = "NO_DETECT"; $signals.fail_sites += $site.name; Write-Output "  => $wbResult (webbridge)" }
+                    if (-not $script:webbridgeAvailable) {
+                        $r.status = "SKIPPED"; $r.signal = "DAEMON_DOWN"
+                        $signals.skip_sites += $site.name; Write-Output "  => SKIPPED (webbridge daemon 不可用)"
+                    } else {
+                        $wbResult = Invoke-WebSignIn $site.name
+                        $r.signal = $wbResult
+                        switch -Wildcard ($wbResult) {
+                            "SIGN_OK"       { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
+                            "LOGIN_REQUIRED"{ $r.status = "NO_LOGIN"; $signals.login_expired += $site.name; Write-Output "  => NO_LOGIN" }
+                            "CF_CHALLENGE"  { $r.status = "CF_BLOCKED"; $signals.fail_sites += $site.name; Write-Output "  => CF_BLOCKED" }
+                            "SLIDER"        { $r.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL" }
+                            "NAV_FAIL"      { $r.status = "TIMEOUT"; $signals.fail_sites += $site.name; Write-Output "  => TIMEOUT" }
+                            "NO_CONFIG"     { $r.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => NO_CONFIG" }
+                            "BODY_NULL"     { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (body null)" }
+                            "REDIRECTING"   { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => REDIRECTING" }
+                            default         { $r.status = "NO_DETECT"; $signals.fail_sites += $site.name; Write-Output "  => $wbResult (webbridge)" }
+                        }
                     }
                 } else {
                     $br = Browser-SignIn $site $session
