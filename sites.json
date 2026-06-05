@@ -6,8 +6,9 @@
     {
       "name": "52pojie",
       "url": "https://www.52pojie.cn/forum.php",
-      "strategy": "browser-open",
-      "note": "书签同步: 吾爱破解 - webbridge"
+      "strategy": "browser-eval-click",
+      "eval": "(function(){var btn=document.querySelector('button.custom-function-button.check-in');if(btn){btn.click();return'CLICKED'}return'NO_BTN'})()",
+      "note": "书签同步: 吾爱破解 - opencli"
     },
     {
       "name": "HDKYL",
@@ -18,8 +19,9 @@
     {
       "name": "InvitesFun",
       "url": "https://www.invites.fun/?sort=newest",
-      "strategy": "browser-open",
-      "note": "书签同步: InvitesFun - webbridge"
+      "strategy": "browser-eval-click",
+      "eval": "(function(){var btn=document.querySelector('button.CheckInButton--yellow');if(btn){btn.click();return'CLICKED'}return'NO_BTN'})()",
+      "note": "书签同步: InvitesFun - opencli"
     },
     {
       "name": "NodeSeek",
@@ -30,8 +32,8 @@
     {
       "name": "OurBits",
       "url": "https://ourbits.club/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: OurBits - webbridge"
+      "strategy": "browser-visit",
+      "note": "书签同步: OurBits - opencli"
     },
     {
       "name": "PigGo",
@@ -48,14 +50,14 @@
     {
       "name": "UBits",
       "url": "https://ubits.club/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: UBits - webbridge"
+      "strategy": "browser-visit",
+      "note": "书签同步: UBits - opencli"
     },
     {
       "name": "V2EX",
-      "url": "https://www.v2ex.com/",
-      "strategy": "browser-open",
-      "note": "书签同步: V2EX - webbridge"
+      "url": "https://www.v2ex.com/mission/daily",
+      "strategy": "browser-visit",
+      "note": "书签同步: V2EX - opencli"
     },
     {
       "name": "13City",
