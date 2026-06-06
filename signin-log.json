@@ -1,7 +1,475 @@
 {
+  "total": 39,
+  "success": 37,
+  "skip_sites": [],
+  "results": [
+    {
+      "url": "https://www.52pojie.cn/forum.php",
+      "elapsed": "20.7s",
+      "name": "52pojie",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 1,
+      "strategy": "browser-eval-click"
+    },
+    {
+      "url": "https://www.hdkyl.in/attendance.php",
+      "elapsed": "27.1s",
+      "name": "HDKYL",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 2,
+      "strategy": "browser-open"
+    },
+    {
+      "url": "https://www.invites.fun/?sort=newest",
+      "elapsed": "13.5s",
+      "name": "InvitesFun",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 3,
+      "strategy": "browser-open"
+    },
+    {
+      "url": "https://www.nodeseek.com/board",
+      "elapsed": "10.1s",
+      "name": "NodeSeek",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 4,
+      "strategy": "browser-open"
+    },
+    {
+      "url": "https://ourbits.club/attendance.php",
+      "elapsed": "12.8s",
+      "name": "OurBits",
+      "status": "VISITED",
+      "signal": "SIGN_OK",
+      "index": 5,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://piggo.me/attendance.php?id=18989",
+      "elapsed": "15.7s",
+      "name": "PigGo",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 6,
+      "strategy": "browser-open"
+    },
+    {
+      "url": "https://pt.0ff.cc/attendance.php",
+      "elapsed": "71.7s",
+      "name": "FreeFarm",
+      "status": "SLIDER_FAIL",
+      "signal": "SLIDER",
+      "index": 7,
+      "strategy": "browser-open"
+    },
+    {
+      "url": "https://ubits.club/attendance.php",
+      "elapsed": "13.4s",
+      "name": "UBits",
+      "status": "VISITED",
+      "signal": "CF_CHALLENGE",
+      "index": 8,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://www.v2ex.com/mission/daily",
+      "elapsed": "19.2s",
+      "name": "V2EX",
+      "status": "VISITED",
+      "signal": "UNKNOWN",
+      "index": 9,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://13city.org/usercp.php?action=personal#signin",
+      "elapsed": "10.9s",
+      "name": "13City",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 10,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://asiandvdclub.org/index.php",
+      "elapsed": "14.3s",
+      "name": "AsianDVDClub",
+      "status": "VISITED",
+      "signal": "UNKNOWN",
+      "index": 11,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://bilibili.download/attendance.php",
+      "elapsed": "15.8s",
+      "name": "BiliDownload",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 12,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://pt.btschool.club/torrents.php",
+      "elapsed": "15.6s",
+      "name": "BTSchool",
+      "status": "LOGGED_IN",
+      "signal": "LOGGED_IN",
+      "index": 13,
+      "strategy": "browser-open"
+    },
+    {
+      "url": "https://dstudio.me/attendance.php",
+      "elapsed": "37.2s",
+      "name": "DepthStudio",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK_ITER",
+      "index": 14,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
+      "elapsed": "18.1s",
+      "name": "DigitalCore",
+      "status": "VISITED",
+      "signal": "UNKNOWN",
+      "index": 15,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://www.gamegamept.com/attendance.php",
+      "elapsed": "10.3s",
+      "name": "GGPT",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 16,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://hdbao.cc/attendance.php",
+      "elapsed": "8s",
+      "name": "HDBao",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 17,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://pt.hdclone.top/attendance.php",
+      "elapsed": "9.5s",
+      "name": "HDClone",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 18,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://www.hddolby.com/attendance.php",
+      "elapsed": "10.9s",
+      "name": "HDDolby",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 19,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://hdhome.org/attendance.php",
+      "elapsed": "9.1s",
+      "name": "HDHome",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 20,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://hdvideo.top/attendance.php",
+      "elapsed": "9.1s",
+      "name": "HDVideo",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 21,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://hhanclub.net/attendance.php",
+      "elapsed": "38.4s",
+      "name": "HHCLUB",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 22,
+      "strategy": "browser-open"
+    },
+    {
+      "url": "https://www.htpt.cc/attendance.php",
+      "elapsed": "7.5s",
+      "name": "HTCPT",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 23,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://kufirc.com/index.php",
+      "elapsed": "14.4s",
+      "name": "Kufirc",
+      "status": "VISITED",
+      "signal": "UNKNOWN",
+      "index": 24,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://kp.m-team.cc/index",
+      "elapsed": "16.1s",
+      "name": "M-Team",
+      "status": "VISITED",
+      "signal": "UNKNOWN",
+      "index": 25,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://www.momentpt.top/attendance.php",
+      "elapsed": "12.2s",
+      "name": "Moment",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 26,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://www.musopia.vip/attendance.php",
+      "elapsed": "7.7s",
+      "name": "Musopia",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 27,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://newinsane.info/browse.php",
+      "elapsed": "15.4s",
+      "name": "NewInsane",
+      "status": "VISITED",
+      "signal": "UNKNOWN",
+      "index": 28,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://ptlao.top/attendance.php",
+      "elapsed": "8.4s",
+      "name": "PTLAO",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 29,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://rousi.pro/points",
+      "elapsed": "17.3s",
+      "name": "Rousi",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 30,
+      "strategy": "browser-eval-click"
+    },
+    {
+      "url": "https://sbpt.link/attendance.php",
+      "elapsed": "8s",
+      "name": "SBPT",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 31,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://speedapp.io/adult",
+      "elapsed": "17.4s",
+      "name": "SpeedApp",
+      "status": "VISITED",
+      "signal": "UNKNOWN",
+      "index": 32,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://www.tjupt.org/attendance.php",
+      "elapsed": "15.4s",
+      "name": "TJUPT",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 33,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://www.tokyo-manga.top/attendance.php",
+      "elapsed": "7.9s",
+      "name": "Tokyo",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 34,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://usefultrash.net/browse.php",
+      "elapsed": "18.8s",
+      "name": "UsefulTrash",
+      "status": "VISITED",
+      "signal": "UNKNOWN",
+      "index": 35,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://mua.xloli.cc/attendance.php",
+      "elapsed": "10s",
+      "name": "xloli",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 36,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://www.yemapt.org/#/consumer/checkIn",
+      "elapsed": "44.1s",
+      "name": "Yemapt",
+      "status": "VISITED",
+      "signal": "SIGN_OK",
+      "index": 37,
+      "strategy": "browser-visit"
+    },
+    {
+      "url": "https://www.yhpp.cc/attendance.php",
+      "elapsed": "11.3s",
+      "name": "YHPP",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 38,
+      "strategy": "web-read"
+    },
+    {
+      "url": "https://bbs.pcbeta.com/forum-win11-1.html",
+      "elapsed": "17.8s",
+      "name": "远景论坛",
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "index": 39,
+      "strategy": "browser-eval-click"
+    }
+  ],
+  "regressions": [
+    "FreeFarm"
+  ],
+  "iterations": 3,
+  "iteration_log": [
+    {
+      "value": [
+        {
+          "value": "@{value=@{value=System.Object[]; Count=5} @{signal=UNKNOWN; timestamp=2026-05-29 20:39:41; contentPreview=\\n官方bilibiliWindows破解入门Android逆向入门\\n【网络诊断修复工具】切换到窄版\\n切换风格\\n消息\\n新听众\\n帖子\\n收藏\\n好友\\n导读\\n帖子\\n收藏\\n淘帖\\n勋章\\n任务\\n好友\\n排行榜\\n充值\\nSchalkiii\\n|悬赏|我的\\n|设置\\n|消息\\n|提醒\\n|退出\\n |积分: 69\\n|用户组: 锋芒初露\\n论坛大师家庭模式每日签到系统设置\\n快捷导航\\n门户吾爱破解门户网站吾爱破解论坛新帖吾爱破解论坛新帖导读专辑吾爱破解文章专辑列表家园Space排行榜吾爱破解排行榜总版规吾爱破解论坛总版规投诉举报吾爱破解论坛欢迎大家积极举报违规帖子!爱盘爱盘，在线破解工具包，实时提供最新逆向资源！帮助吾爱破解论坛常见问题解答中心\\n\t\t\\n\t\t\\n关注人的新帖技术新帖合集最新软件合集原创发布新贴脱壳破解新帖移动安全新帖病毒分析新帖软件调试新贴动画发布新帖编程语言新帖邀请好友注册Tools吾爱破解Logo吾爱破解桌面壁纸吾爱破解视频教程吾爱破解论坛精华集吾爱破解专用版Ollydbg处理举报贴处理站务贴处理福利贴处理水区贴办公区证据区\\n   \\n原创发布区; site=52pojie; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-29 20:42:57; contentPreview=如您是正常访问，请联系HDKylin\\n安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户; site=HDKYL; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-29 20:46:22; contentPreview=NodeSeekbeta\\n日常\\n技术\\n情报\\n测评\\n交易\\n拼车\\n推广\\nDeepFlood\\n今日还未签到， 鸡腿 x 5 / 试试手气\\n今日签到鸡腿排行榜\\n1\\nSpectacle2467\\n13\\n2\\ngu18168\\n13\\n3\\nevilddog233\\n13\\n4\\nypc\\n13\\n5\\n1396397205\\n12\\n6\\nyuyu12138\\n12\\n7\\npotatopuff\\n12\\n8\\nJoiplay\\n12\\n9\\n卡拉彼丘\\n12\\n10\\nguadiule\\n12\\n11\\nwapsir\\n12\\n12\\nkank\\n12\\n13\\n山羊\\n12\\n14\\nhizket\\n12\\n15\\nmysql\\n12\\n16\\n520\\n12\\n17\\nlifansama\\n12\\n18\\n潘凤\\n12\\n19\\nATT321\\n12\\n20\\nConor\\n11\\n21\\ncoverer\\n11\\n22\\nkrobslebluh\\n11\\n23\\nhaoyouduo\\n11\\n24\\nYINIANY\\n11\\n25\\nKu自由飞翔\\n11\\n26; site=NodeSeek; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-29 20:47:10; contentPreview=安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户; site=PigGo; action=pattern_discovery}; Count=5} @{signal=UNKNOWN; timestamp=2026-05-30 10:38:06; contentPreview=\\n官方bilibiliWindows破解入门Android逆向入门\\n【网络诊断修复工具】切换到窄版\\n切换风格\\n消息\\n新听众\\n帖子\\n收藏\\n好友\\n导读\\n帖子\\n收藏\\n淘帖\\n勋章\\n任务\\n好友\\n排行榜\\n充值\\nSchalkiii\\n|悬赏|我的\\n|设置\\n|消息\\n|提醒\\n|退出\\n |积分: 69\\n|用户组: 锋芒初露\\n论坛大师家庭模式每日签到系统设置\\n快捷导航\\n门户吾爱破解门户网站吾爱破解论坛新帖吾爱破解论坛新帖导读专辑吾爱破解文章专辑列表家园Space排行榜吾爱破解排行榜总版规吾爱破解论坛总版规投诉举报吾爱破解论坛欢迎大家积极举报违规帖子!爱盘爱盘，在线破解工具包，实时提供最新逆向资源！帮助吾爱破解论坛常见问题解答中心\\n\t\t\\n\t\t\\n关注人的新帖技术新帖合集最新软件合集原创发布新贴脱壳破解新帖移动安全新帖病毒分析新帖软件调试新贴动画发布新帖编程语言新帖邀请好友注册Tools吾爱破解Logo吾爱破解桌面壁纸吾爱破解视频教程吾爱破解论坛精华集吾爱破解专用版Ollydbg处理举报贴处理站务贴处理福利贴处理水区贴办公区证据区\\n   \\n原创发布区; site=52pojie; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-30 10:42:14; contentPreview=连接已中断\\n检测到网络更改。\\nERR_NETWORK_CHANGED\\n刷新; site=BTSchool; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-30 10:46:38; contentPreview=如您是正常访问，请联系HDKylin\\n安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户; site=HDKYL; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-30 10:52:32; contentPreview=NodeSeekbeta\\n日常\\n技术\\n情报\\n测评\\n交易\\n拼车\\n推广\\nDeepFlood\\n今日还未签到， 鸡腿 x 5 / 试试手气\\n今日签到鸡腿排行榜\\n1\\n燦丶\\n15\\n2\\nMARSHALLDTEACH\\n15\\n3\\ntoma-c137\\n14\\n4\\n俺村俺最傻\\n14\\n5\\nxuefengjia1\\n14\\n6\\nSuenotto\\n14\\n7\\netotakeo\\n13\\n8\\nrains\\n12\\n9\\nAckywOw\\n12\\n10\\nSeeknode-sb\\n12\\n11\\ncinnamon\\n12\\n12\\nWildDraft\\n12\\n13\\nGachani\\n12\\n14\\nInklazy\\n12\\n15\\n你说吧-JM2\\n12\\n16\\nhuerchen\\n12\\n17\\nallenmusic\\n11\\n18\\nstarlight98\\n11\\n19\\noouuce\\n11\\n20\\nnff\\n11\\n21\\nCoolGuci\\n11\\n22\\nforeach\\n11\\n23\\nYandex\\n11\\n24\\n佛祖给你加持\\n11\\; site=NodeSeek; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-30 10:55:42; contentPreview=嗯… 无法访问此页面\\n似乎 piggo.me 关闭了连接。\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_CONNECTION_CLOSED\\n刷新; site=PigGo; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-30 10:57:19; contentPreview=嗯… 无法访问此页面\\n似乎 pt.0ff.cc 关闭了连接。\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_CONNECTION_CLOSED\\n刷新; site=FreeFarm; action=pattern_discovery}",
+          "Count": 7
+        },
+        {
+          "signal": "UNKNOWN",
+          "timestamp": "2026-05-30 11:30:03",
+          "contentPreview": "\\n官方bilibiliWindows破解入门Android逆向入门\\n【网络诊断修复工具】切换到窄版\\n切换风格\\n消息\\n新听众\\n帖子\\n收藏\\n好友\\n导读\\n帖子\\n收藏\\n淘帖\\n勋章\\n任务\\n好友\\n排行榜\\n充值\\nSchalkiii\\n|悬赏|我的\\n|设置\\n|消息\\n|提醒\\n|退出\\n |积分: 69\\n|用户组: 锋芒初露\\n论坛大师家庭模式每日签到系统设置\\n快捷导航\\n门户吾爱破解门户网站吾爱破解论坛新帖吾爱破解论坛新帖导读专辑吾爱破解文章专辑列表家园Space排行榜吾爱破解排行榜总版规吾爱破解论坛总版规投诉举报吾爱破解论坛欢迎大家积极举报违规帖子!爱盘爱盘，在线破解工具包，实时提供最新逆向资源！帮助吾爱破解论坛常见问题解答中心\\n\t\t\\n\t\t\\n关注人的新帖技术新帖合集最新软件合集原创发布新贴脱壳破解新帖移动安全新帖病毒分析新帖软件调试新贴动画发布新帖编程语言新帖邀请好友注册Tools吾爱破解Logo吾爱破解桌面壁纸吾爱破解视频教程吾爱破解论坛精华集吾爱破解专用版Ollydbg处理举报贴处理站务贴处理福利贴处理水区贴办公区证据区\\n   \\n原创发布区",
+          "site": "52pojie",
+          "action": "pattern_discovery"
+        },
+        {
+          "signal": "UNKNOWN",
+          "timestamp": "2026-05-30 11:35:06",
+          "contentPreview": "如您是正常访问，请联系HDKylin\\n安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户",
+          "site": "HDKYL",
+          "action": "pattern_discovery"
+        },
+        {
+          "signal": "UNKNOWN",
+          "timestamp": "2026-05-30 11:40:10",
+          "contentPreview": "Oops! Nework Error\\nYou can visit network manager to fix this problem.\\n重新加载 返回主页",
+          "site": "NodeSeek",
+          "action": "pattern_discovery"
+        },
+        {
+          "content": "\\n 首  页 \\n 论  坛 \\n 种  子 \\n4K\\n 保  种 \\n 求  种 \\n 候  选 \\n 发  布 \\n 字  幕 \\n 设 置 \\n排 行 榜\\n 菠  菜 \\n 规  则 \\n 问 题 \\n管 理 组\\n欢迎回来, Schalkiiii [退出] [收藏] [RSS 下载筐] [徽章] [抽奖] 魔力值 [使用]: 422,818.8 签到得魔力 邀请 [发送]: 0/0\\n分享率： 38.982 上传量： 1.682 TB 下载量： 44.18 GB 当前活动： 141 0  H&R: 0/10  可连接：是  blackjack   日  志 \t      当前时间：11:40\\n 13 (0 新)  0  \\n签到\\n如验证程序长时间未加载完成，请将 challenges.cloudflare.com 加入代理规则后重试。\\n首次签到获得 10 个魔力值。\\n每次签到可额外获得 1 个魔力值，直到 100 封顶。\\n连续签到 10 天后，每次签到额外获得 5 魔力值（不累计）。\\n连续签到 20 天后，每次签到额外获得 20 魔力值（不累计）。\\n连续签到",
+          "timestamp": "2026-05-30 11:40:37",
+          "site": "OurBits",
+          "action": "cf_detected_on_webread"
+        },
+        {
+          "signal": "UNKNOWN",
+          "timestamp": "2026-05-30 11:41:01",
+          "contentPreview": "安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户",
+          "site": "PigGo",
+          "action": "pattern_discovery"
+        },
+        {
+          "signal": "UNKNOWN",
+          "timestamp": "2026-05-30 11:41:25",
+          "contentPreview": "",
+          "site": "FreeFarm",
+          "action": "pattern_discovery"
+        },
+        {
+          "content": "ubits.club\\n正在进行安全验证\\n本网站使用安全服务防护恶意自动程序。在验证您不是自动程序期间，将显示此页面。\\nRay ID: a03abb08fa75f99f\\n由 Cloudflare 提供的性能和安全服务\\n隐私",
+          "timestamp": "2026-05-30 11:42:58",
+          "site": "UBits",
+          "action": "cf_detected_on_webread"
+        },
+        {
+          "action": "cf_detected_on_webread",
+          "timestamp": "2026-05-31 11:58:38",
+          "content": "A timeout occurred Error code 524\\nVisit cloudflare.com for more information.\\n2026-05-31 03:58:17 UTC\\nYou\\nBrowser\\nWorking\\nHong Kong\\nCloudflare\\nWorking\\nbilibili.download\\nHost\\nError\\nWhat happened?\\nThe origin web server timed out responding to this request.\\nThe likely cause is an overloaded background task, database or application, stressing the resources on the host web server.\\nWhat can I do?\\nIf you're a visitor of this website:\\nPlease try again in a few minutes.\\nIf you're the own",
+          "site": "BiliDownload"
+        },
+        {
+          "action": "cf_detected_on_webread",
+          "timestamp": "2026-05-31 12:11:30",
+          "content": "ourbits.club\\n正在进行安全验证\\n本网站使用安全服务防护恶意自动程序。在验证您不是自动程序期间，将显示此页面。\\nRay ID: a04322329a1ffb9e\\n由 Cloudflare 提供的性能和安全服务\\n隐私",
+          "site": "OurBits"
+        },
+        {
+          "action": "cf_detected_on_webread",
+          "timestamp": "2026-05-31 12:14:19",
+          "content": "ubits.club\\n正在进行安全验证\\n本网站使用安全服务防护恶意自动程序。在验证您不是自动程序期间，将显示此页面。\\nRay ID: a043264dcf27df0a\\n由 Cloudflare 提供的性能和安全服务\\n隐私",
+          "site": "UBits"
+        }
+      ],
+      "Count": 11
+    },
+    {
+      "signal": "UNKNOWN",
+      "timestamp": "2026-06-01 08:41:57",
+      "contentPreview": "嗯… 无法访问此页面\\nwww.yemapt.org 响应时间太长\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_TIMED_OUT\\n刷新",
+      "site": "Yemapt",
+      "action": "pattern_discovery"
+    },
+    {
+      "site": "Yemapt",
+      "contentPreview": "YemaPT\\n探索无界，共享无限\\n人机验证加载中\\n知识库\\n注册新用户\\n忘记密码\\n通过通行密钥登录\\n 2026 YemaPT",
+      "signal": "UNKNOWN",
+      "action": "pattern_discovery",
+      "timestamp": "2026-06-02 04:06:45"
+    }
+  ],
+  "failed": 2,
+  "skipped": 0,
+  "new_successes": [
+    "NodeSeek"
+  ],
+  "baseline_known": 44,
+  "timestamp": "2026-06-06 11:48:35",
+  "fail_sites": [
+    "FreeFarm",
+    "BTSchool"
+  ],
   "ok_sites": [
-    "13City",
     "52pojie",
+    "HDKYL",
+    "InvitesFun",
+    "NodeSeek",
+    "OurBits",
+    "PigGo",
+    "UBits",
+    "V2EX",
+    "13City",
     "AsianDVDClub",
     "BiliDownload",
     "DepthStudio",
@@ -11,7 +479,6 @@
     "HDClone",
     "HDDolby",
     "HDHome",
-    "HDKYL",
     "HDVideo",
     "HHCLUB",
     "HTCPT",
@@ -20,7 +487,6 @@
     "Moment",
     "Musopia",
     "NewInsane",
-    "FreeFarm",
     "PTLAO",
     "Rousi",
     "SBPT",
@@ -28,503 +494,9 @@
     "TJUPT",
     "Tokyo",
     "UsefulTrash",
-    "V2EX",
     "xloli",
     "Yemapt",
     "YHPP",
     "远景论坛"
-  ],
-  "skip_sites": [],
-  "skipped": 0,
-  "timestamp": "2026-05-31 12:16:50",
-  "success": 33,
-  "new_successes": [],
-  "iterations": 11,
-  "failed": 5,
-  "fail_sites": [
-    "BTSchool",
-    "InvitesFun",
-    "OurBits",
-    "PigGo",
-    "UBits"
-  ],
-  "regressions": [
-    "InvitesFun",
-    "OurBits",
-    "PigGo",
-    "UBits"
-  ],
-  "iteration_log": [
-    {
-      "value": [
-        {
-          "value": "@{value=System.Object[]; Count=5} @{signal=UNKNOWN; timestamp=2026-05-29 20:39:41; contentPreview=\\n官方bilibiliWindows破解入门Android逆向入门\\n【网络诊断修复工具】切换到窄版\\n切换风格\\n消息\\n新听众\\n帖子\\n收藏\\n好友\\n导读\\n帖子\\n收藏\\n淘帖\\n勋章\\n任务\\n好友\\n排行榜\\n充值\\nSchalkiii\\n|悬赏|我的\\n|设置\\n|消息\\n|提醒\\n|退出\\n |积分: 69\\n|用户组: 锋芒初露\\n论坛大师家庭模式每日签到系统设置\\n快捷导航\\n门户吾爱破解门户网站吾爱破解论坛新帖吾爱破解论坛新帖导读专辑吾爱破解文章专辑列表家园Space排行榜吾爱破解排行榜总版规吾爱破解论坛总版规投诉举报吾爱破解论坛欢迎大家积极举报违规帖子!爱盘爱盘，在线破解工具包，实时提供最新逆向资源！帮助吾爱破解论坛常见问题解答中心\\n\t\t\\n\t\t\\n关注人的新帖技术新帖合集最新软件合集原创发布新贴脱壳破解新帖移动安全新帖病毒分析新帖软件调试新贴动画发布新帖编程语言新帖邀请好友注册Tools吾爱破解Logo吾爱破解桌面壁纸吾爱破解视频教程吾爱破解论坛精华集吾爱破解专用版Ollydbg处理举报贴处理站务贴处理福利贴处理水区贴办公区证据区\\n   \\n原创发布区; site=52pojie; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-29 20:42:57; contentPreview=如您是正常访问，请联系HDKylin\\n安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户; site=HDKYL; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-29 20:46:22; contentPreview=NodeSeekbeta\\n日常\\n技术\\n情报\\n测评\\n交易\\n拼车\\n推广\\nDeepFlood\\n今日还未签到， 鸡腿 x 5 / 试试手气\\n今日签到鸡腿排行榜\\n1\\nSpectacle2467\\n13\\n2\\ngu18168\\n13\\n3\\nevilddog233\\n13\\n4\\nypc\\n13\\n5\\n1396397205\\n12\\n6\\nyuyu12138\\n12\\n7\\npotatopuff\\n12\\n8\\nJoiplay\\n12\\n9\\n卡拉彼丘\\n12\\n10\\nguadiule\\n12\\n11\\nwapsir\\n12\\n12\\nkank\\n12\\n13\\n山羊\\n12\\n14\\nhizket\\n12\\n15\\nmysql\\n12\\n16\\n520\\n12\\n17\\nlifansama\\n12\\n18\\n潘凤\\n12\\n19\\nATT321\\n12\\n20\\nConor\\n11\\n21\\ncoverer\\n11\\n22\\nkrobslebluh\\n11\\n23\\nhaoyouduo\\n11\\n24\\nYINIANY\\n11\\n25\\nKu自由飞翔\\n11\\n26; site=NodeSeek; action=pattern_discovery} @{signal=UNKNOWN; timestamp=2026-05-29 20:47:10; contentPreview=安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户; site=PigGo; action=pattern_discovery}",
-          "Count": 5
-        },
-        {
-          "signal": "UNKNOWN",
-          "timestamp": "2026-05-30 10:38:06",
-          "contentPreview": "\\n官方bilibiliWindows破解入门Android逆向入门\\n【网络诊断修复工具】切换到窄版\\n切换风格\\n消息\\n新听众\\n帖子\\n收藏\\n好友\\n导读\\n帖子\\n收藏\\n淘帖\\n勋章\\n任务\\n好友\\n排行榜\\n充值\\nSchalkiii\\n|悬赏|我的\\n|设置\\n|消息\\n|提醒\\n|退出\\n |积分: 69\\n|用户组: 锋芒初露\\n论坛大师家庭模式每日签到系统设置\\n快捷导航\\n门户吾爱破解门户网站吾爱破解论坛新帖吾爱破解论坛新帖导读专辑吾爱破解文章专辑列表家园Space排行榜吾爱破解排行榜总版规吾爱破解论坛总版规投诉举报吾爱破解论坛欢迎大家积极举报违规帖子!爱盘爱盘，在线破解工具包，实时提供最新逆向资源！帮助吾爱破解论坛常见问题解答中心\\n\t\t\\n\t\t\\n关注人的新帖技术新帖合集最新软件合集原创发布新贴脱壳破解新帖移动安全新帖病毒分析新帖软件调试新贴动画发布新帖编程语言新帖邀请好友注册Tools吾爱破解Logo吾爱破解桌面壁纸吾爱破解视频教程吾爱破解论坛精华集吾爱破解专用版Ollydbg处理举报贴处理站务贴处理福利贴处理水区贴办公区证据区\\n   \\n原创发布区",
-          "site": "52pojie",
-          "action": "pattern_discovery"
-        },
-        {
-          "signal": "UNKNOWN",
-          "timestamp": "2026-05-30 10:42:14",
-          "contentPreview": "连接已中断\\n检测到网络更改。\\nERR_NETWORK_CHANGED\\n刷新",
-          "site": "BTSchool",
-          "action": "pattern_discovery"
-        },
-        {
-          "signal": "UNKNOWN",
-          "timestamp": "2026-05-30 10:46:38",
-          "contentPreview": "如您是正常访问，请联系HDKylin\\n安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户",
-          "site": "HDKYL",
-          "action": "pattern_discovery"
-        },
-        {
-          "signal": "UNKNOWN",
-          "timestamp": "2026-05-30 10:52:32",
-          "contentPreview": "NodeSeekbeta\\n日常\\n技术\\n情报\\n测评\\n交易\\n拼车\\n推广\\nDeepFlood\\n今日还未签到， 鸡腿 x 5 / 试试手气\\n今日签到鸡腿排行榜\\n1\\n燦丶\\n15\\n2\\nMARSHALLDTEACH\\n15\\n3\\ntoma-c137\\n14\\n4\\n俺村俺最傻\\n14\\n5\\nxuefengjia1\\n14\\n6\\nSuenotto\\n14\\n7\\netotakeo\\n13\\n8\\nrains\\n12\\n9\\nAckywOw\\n12\\n10\\nSeeknode-sb\\n12\\n11\\ncinnamon\\n12\\n12\\nWildDraft\\n12\\n13\\nGachani\\n12\\n14\\nInklazy\\n12\\n15\\n你说吧-JM2\\n12\\n16\\nhuerchen\\n12\\n17\\nallenmusic\\n11\\n18\\nstarlight98\\n11\\n19\\noouuce\\n11\\n20\\nnff\\n11\\n21\\nCoolGuci\\n11\\n22\\nforeach\\n11\\n23\\nYandex\\n11\\n24\\n佛祖给你加持\\n11\\",
-          "site": "NodeSeek",
-          "action": "pattern_discovery"
-        },
-        {
-          "signal": "UNKNOWN",
-          "timestamp": "2026-05-30 10:55:42",
-          "contentPreview": "嗯… 无法访问此页面\\n似乎 piggo.me 关闭了连接。\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_CONNECTION_CLOSED\\n刷新",
-          "site": "PigGo",
-          "action": "pattern_discovery"
-        },
-        {
-          "signal": "UNKNOWN",
-          "timestamp": "2026-05-30 10:57:19",
-          "contentPreview": "嗯… 无法访问此页面\\n似乎 pt.0ff.cc 关闭了连接。\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_CONNECTION_CLOSED\\n刷新",
-          "site": "FreeFarm",
-          "action": "pattern_discovery"
-        }
-      ],
-      "Count": 7
-    },
-    {
-      "signal": "UNKNOWN",
-      "timestamp": "2026-05-30 11:30:03",
-      "contentPreview": "\\n官方bilibiliWindows破解入门Android逆向入门\\n【网络诊断修复工具】切换到窄版\\n切换风格\\n消息\\n新听众\\n帖子\\n收藏\\n好友\\n导读\\n帖子\\n收藏\\n淘帖\\n勋章\\n任务\\n好友\\n排行榜\\n充值\\nSchalkiii\\n|悬赏|我的\\n|设置\\n|消息\\n|提醒\\n|退出\\n |积分: 69\\n|用户组: 锋芒初露\\n论坛大师家庭模式每日签到系统设置\\n快捷导航\\n门户吾爱破解门户网站吾爱破解论坛新帖吾爱破解论坛新帖导读专辑吾爱破解文章专辑列表家园Space排行榜吾爱破解排行榜总版规吾爱破解论坛总版规投诉举报吾爱破解论坛欢迎大家积极举报违规帖子!爱盘爱盘，在线破解工具包，实时提供最新逆向资源！帮助吾爱破解论坛常见问题解答中心\\n\t\t\\n\t\t\\n关注人的新帖技术新帖合集最新软件合集原创发布新贴脱壳破解新帖移动安全新帖病毒分析新帖软件调试新贴动画发布新帖编程语言新帖邀请好友注册Tools吾爱破解Logo吾爱破解桌面壁纸吾爱破解视频教程吾爱破解论坛精华集吾爱破解专用版Ollydbg处理举报贴处理站务贴处理福利贴处理水区贴办公区证据区\\n   \\n原创发布区",
-      "site": "52pojie",
-      "action": "pattern_discovery"
-    },
-    {
-      "signal": "UNKNOWN",
-      "timestamp": "2026-05-30 11:35:06",
-      "contentPreview": "如您是正常访问，请联系HDKylin\\n安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户",
-      "site": "HDKYL",
-      "action": "pattern_discovery"
-    },
-    {
-      "signal": "UNKNOWN",
-      "timestamp": "2026-05-30 11:40:10",
-      "contentPreview": "Oops! Nework Error\\nYou can visit network manager to fix this problem.\\n重新加载 返回主页",
-      "site": "NodeSeek",
-      "action": "pattern_discovery"
-    },
-    {
-      "content": "\\n 首  页 \\n 论  坛 \\n 种  子 \\n4K\\n 保  种 \\n 求  种 \\n 候  选 \\n 发  布 \\n 字  幕 \\n 设 置 \\n排 行 榜\\n 菠  菜 \\n 规  则 \\n 问 题 \\n管 理 组\\n欢迎回来, Schalkiiii [退出] [收藏] [RSS 下载筐] [徽章] [抽奖] 魔力值 [使用]: 422,818.8 签到得魔力 邀请 [发送]: 0/0\\n分享率： 38.982 上传量： 1.682 TB 下载量： 44.18 GB 当前活动： 141 0  H&R: 0/10  可连接：是  blackjack   日  志 \t      当前时间：11:40\\n 13 (0 新)  0  \\n签到\\n如验证程序长时间未加载完成，请将 challenges.cloudflare.com 加入代理规则后重试。\\n首次签到获得 10 个魔力值。\\n每次签到可额外获得 1 个魔力值，直到 100 封顶。\\n连续签到 10 天后，每次签到额外获得 5 魔力值（不累计）。\\n连续签到 20 天后，每次签到额外获得 20 魔力值（不累计）。\\n连续签到",
-      "timestamp": "2026-05-30 11:40:37",
-      "site": "OurBits",
-      "action": "cf_detected_on_webread"
-    },
-    {
-      "signal": "UNKNOWN",
-      "timestamp": "2026-05-30 11:41:01",
-      "contentPreview": "安全检测能力由 雷池 WAF 驱动\\n确认\\n客户端异常，请确认您是合法用户",
-      "site": "PigGo",
-      "action": "pattern_discovery"
-    },
-    {
-      "signal": "UNKNOWN",
-      "timestamp": "2026-05-30 11:41:25",
-      "contentPreview": "",
-      "site": "FreeFarm",
-      "action": "pattern_discovery"
-    },
-    {
-      "content": "ubits.club\\n正在进行安全验证\\n本网站使用安全服务防护恶意自动程序。在验证您不是自动程序期间，将显示此页面。\\nRay ID: a03abb08fa75f99f\\n由 Cloudflare 提供的性能和安全服务\\n隐私",
-      "timestamp": "2026-05-30 11:42:58",
-      "site": "UBits",
-      "action": "cf_detected_on_webread"
-    },
-    {
-      "action": "cf_detected_on_webread",
-      "timestamp": "2026-05-31 11:58:38",
-      "content": "A timeout occurred Error code 524\\nVisit cloudflare.com for more information.\\n2026-05-31 03:58:17 UTC\\nYou\\nBrowser\\nWorking\\nHong Kong\\nCloudflare\\nWorking\\nbilibili.download\\nHost\\nError\\nWhat happened?\\nThe origin web server timed out responding to this request.\\nThe likely cause is an overloaded background task, database or application, stressing the resources on the host web server.\\nWhat can I do?\\nIf you're a visitor of this website:\\nPlease try again in a few minutes.\\nIf you're the own",
-      "site": "BiliDownload"
-    },
-    {
-      "action": "cf_detected_on_webread",
-      "timestamp": "2026-05-31 12:11:30",
-      "content": "ourbits.club\\n正在进行安全验证\\n本网站使用安全服务防护恶意自动程序。在验证您不是自动程序期间，将显示此页面。\\nRay ID: a04322329a1ffb9e\\n由 Cloudflare 提供的性能和安全服务\\n隐私",
-      "site": "OurBits"
-    },
-    {
-      "action": "cf_detected_on_webread",
-      "timestamp": "2026-05-31 12:14:19",
-      "content": "ubits.club\\n正在进行安全验证\\n本网站使用安全服务防护恶意自动程序。在验证您不是自动程序期间，将显示此页面。\\nRay ID: a043264dcf27df0a\\n由 Cloudflare 提供的性能和安全服务\\n隐私",
-      "site": "UBits"
-    }
-  ],
-  "total": 39,
-  "results": [
-    {
-      "index": 1,
-      "name": "13City",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://13city.org/usercp.php?action=personal#signin",
-      "status": "SUCCESS",
-      "elapsed": "11.4s"
-    },
-    {
-      "index": 2,
-      "name": "52pojie",
-      "signal": "SIGN_OK",
-      "strategy": "browser-open",
-      "url": "https://www.52pojie.cn/forum.php",
-      "status": "SUCCESS",
-      "elapsed": "16.1s"
-    },
-    {
-      "index": 3,
-      "name": "AsianDVDClub",
-      "signal": "UNKNOWN",
-      "strategy": "browser-visit",
-      "url": "https://asiandvdclub.org/index.php",
-      "status": "VISITED",
-      "elapsed": "15.2s"
-    },
-    {
-      "index": 4,
-      "name": "BiliDownload",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://bilibili.download/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "17.8s"
-    },
-    {
-      "index": 5,
-      "name": "BTSchool",
-      "signal": "LOGGED_IN",
-      "strategy": "browser-open",
-      "url": "https://pt.btschool.club/torrents.php",
-      "status": "LOGGED_IN",
-      "elapsed": "23.8s"
-    },
-    {
-      "index": 6,
-      "name": "DepthStudio",
-      "signal": "SIGN_OK_ITER",
-      "strategy": "web-read",
-      "url": "https://dstudio.me/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "27.6s"
-    },
-    {
-      "index": 7,
-      "name": "DigitalCore",
-      "signal": "UNKNOWN",
-      "strategy": "browser-visit",
-      "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
-      "status": "VISITED",
-      "elapsed": "16.3s"
-    },
-    {
-      "index": 8,
-      "name": "GGPT",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://www.gamegamept.com/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "9.8s"
-    },
-    {
-      "index": 9,
-      "name": "HDBao",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://hdbao.cc/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "9.3s"
-    },
-    {
-      "index": 10,
-      "name": "HDClone",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://pt.hdclone.top/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "10.3s"
-    },
-    {
-      "index": 11,
-      "name": "HDDolby",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://www.hddolby.com/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "12.5s"
-    },
-    {
-      "index": 12,
-      "name": "HDHome",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://hdhome.org/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "9.3s"
-    },
-    {
-      "index": 13,
-      "name": "HDKYL",
-      "signal": "SIGN_OK",
-      "strategy": "browser-open",
-      "url": "https://www.hdkyl.in/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "18.6s"
-    },
-    {
-      "index": 14,
-      "name": "HDVideo",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://hdvideo.top/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "12.1s"
-    },
-    {
-      "index": 15,
-      "name": "HHCLUB",
-      "signal": "SIGN_OK_ITER",
-      "strategy": "web-read",
-      "url": "https://hhanclub.net/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "38.4s"
-    },
-    {
-      "index": 16,
-      "name": "HTCPT",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://www.htpt.cc/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "9s"
-    },
-    {
-      "index": 17,
-      "name": "InvitesFun",
-      "signal": "UNKNOWN",
-      "strategy": "browser-eval-click",
-      "url": "https://www.invites.fun/?sort=newest",
-      "status": "EVAL_FAIL",
-      "elapsed": "28.4s"
-    },
-    {
-      "index": 18,
-      "name": "Kufirc",
-      "signal": "UNKNOWN",
-      "strategy": "browser-visit",
-      "url": "https://kufirc.com/index.php",
-      "status": "VISITED",
-      "elapsed": "11s"
-    },
-    {
-      "index": 19,
-      "name": "M-Team",
-      "signal": "UNKNOWN",
-      "strategy": "browser-visit",
-      "url": "https://kp.m-team.cc/index",
-      "status": "VISITED",
-      "elapsed": "18.7s"
-    },
-    {
-      "index": 20,
-      "name": "Moment",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://www.momentpt.top/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "11.8s"
-    },
-    {
-      "index": 21,
-      "name": "Musopia",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://www.musopia.vip/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "11.4s"
-    },
-    {
-      "index": 22,
-      "name": "NewInsane",
-      "signal": "UNKNOWN",
-      "strategy": "browser-visit",
-      "url": "https://newinsane.info/browse.php",
-      "status": "VISITED",
-      "elapsed": "14.4s"
-    },
-    {
-      "index": 23,
-      "name": "NodeSeek",
-      "signal": "LOGIN_REQUIRED",
-      "strategy": "browser-open",
-      "url": "https://www.nodeseek.com/board",
-      "status": "NO_LOGIN",
-      "elapsed": "23.6s"
-    },
-    {
-      "index": 24,
-      "name": "OurBits",
-      "signal": "TOO_SMALL",
-      "strategy": "web-read",
-      "url": "https://ourbits.club/attendance.php",
-      "status": "CAPTCHA",
-      "elapsed": "25.1s"
-    },
-    {
-      "index": 25,
-      "name": "PigGo",
-      "signal": "EVAL_FAIL",
-      "strategy": "browser-open",
-      "url": "https://piggo.me/attendance.php?id=18989",
-      "status": "NO_DETECT",
-      "elapsed": "22.5s"
-    },
-    {
-      "index": 26,
-      "name": "FreeFarm",
-      "signal": "SIGN_OK",
-      "strategy": "browser-open",
-      "url": "https://pt.0ff.cc/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "17.2s"
-    },
-    {
-      "index": 27,
-      "name": "PTLAO",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://ptlao.top/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "11.7s"
-    },
-    {
-      "index": 28,
-      "name": "Rousi",
-      "signal": "SIGN_OK",
-      "strategy": "browser-eval-click",
-      "url": "https://rousi.pro/points",
-      "status": "SUCCESS",
-      "elapsed": "18.7s"
-    },
-    {
-      "index": 29,
-      "name": "SBPT",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://sbpt.link/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "17.1s"
-    },
-    {
-      "index": 30,
-      "name": "SpeedApp",
-      "signal": "UNKNOWN",
-      "strategy": "browser-visit",
-      "url": "https://speedapp.io/adult",
-      "status": "VISITED",
-      "elapsed": "26.3s"
-    },
-    {
-      "index": 31,
-      "name": "TJUPT",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://www.tjupt.org/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "13.1s"
-    },
-    {
-      "index": 32,
-      "name": "Tokyo",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://www.tokyo-manga.top/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "17s"
-    },
-    {
-      "index": 33,
-      "name": "UBits",
-      "signal": "",
-      "strategy": "web-read",
-      "url": "https://ubits.club/attendance.php",
-      "status": "NO_ARTICLE",
-      "elapsed": "25.4s"
-    },
-    {
-      "index": 34,
-      "name": "UsefulTrash",
-      "signal": "UNKNOWN",
-      "strategy": "browser-visit",
-      "url": "https://usefultrash.net/browse.php",
-      "status": "VISITED",
-      "elapsed": "31.6s"
-    },
-    {
-      "index": 35,
-      "name": "V2EX",
-      "signal": "SIGN_OK",
-      "strategy": "browser-open",
-      "url": "https://www.v2ex.com/",
-      "status": "SUCCESS",
-      "elapsed": "14.2s"
-    },
-    {
-      "index": 36,
-      "name": "xloli",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://mua.xloli.cc/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "12.2s"
-    },
-    {
-      "index": 37,
-      "name": "Yemapt",
-      "signal": "SIGN_OK",
-      "strategy": "browser-open",
-      "url": "https://www.yemapt.org/#/consumer/checkIn",
-      "status": "SUCCESS",
-      "elapsed": "28.2s"
-    },
-    {
-      "index": 38,
-      "name": "YHPP",
-      "signal": "SIGN_OK",
-      "strategy": "web-read",
-      "url": "https://www.yhpp.cc/attendance.php",
-      "status": "SUCCESS",
-      "elapsed": "13.5s"
-    },
-    {
-      "index": 39,
-      "name": "远景论坛",
-      "signal": "SIGN_OK",
-      "strategy": "browser-eval-click",
-      "url": "https://bbs.pcbeta.com/forum-win11-1.html",
-      "status": "SUCCESS",
-      "elapsed": "49.4s"
-    }
-  ],
-  "baseline_known": 43
+  ]
 }

@@ -482,6 +482,24 @@ foreach ($site in $config.sites) {
                             "REDIRECTING"   { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => REDIRECTING" }
                             default         { $r.status = "NO_DETECT"; $signals.fail_sites += $site.name; Write-Output "  => $wbResult (webbridge)" }
                         }
+                        # 失败重试：CF_BLOCKED / SLIDER_FAIL / PAGE_ERROR / NO_DETECT / TIMEOUT 最多重试 2 次
+                        $retryable = @("CF_BLOCKED", "SLIDER_FAIL", "PAGE_ERROR", "NO_DETECT", "TIMEOUT")
+                        if ($r.status -in $retryable) {
+                            for ($retry = 1; $retry -le 2; $retry++) {
+                                Write-Output "  [RETRY $retry/2] $($site.name) - waiting 10s..."
+                                Start-Sleep -Seconds 10
+                                $wbResult2 = Invoke-WebSignIn $site.name
+                                $r.signal = $wbResult2
+                                if ($wbResult2 -eq "SIGN_OK") {
+                                    $r.status = "SUCCESS"
+                                    $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $site.name })
+                                    $signals.ok_sites += $site.name
+                                    Write-Output "  => SIGN_OK (webbridge retry $retry)"
+                                    break
+                                }
+                                Write-Output "  [RETRY $retry/2] $site.name => $wbResult2"
+                            }
+                        }
                     }
                 } else {
                     $br = Browser-SignIn $site $session
@@ -561,6 +579,30 @@ foreach ($site in $config.sites) {
                     "SIGN_OK"  { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK" }
                     "LOGGED_IN"{ $r.status = "ALREADY_DONE"; $signals.ok_sites += $site.name; Write-Output "  => ALREADY_DONE" }
                     default    { $r.status = "EVAL_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => $signal" }
+                }
+                # 失败重试：EVAL_FAIL 最多重试 2 次
+                if ($r.status -eq "EVAL_FAIL") {
+                    for ($retry = 1; $retry -le 2; $retry++) {
+                        Write-Output "  [RETRY $retry/2] $($site.name) - waiting 10s..."
+                        Start-Sleep -Seconds 10
+                        opencli browser $session open $site.url 2>&1 | Out-Null
+                        Start-Sleep -Seconds 6
+                        if ($site.eval) {
+                            $clickResult2 = opencli browser $session eval $site.eval 2>&1
+                            Write-Output "  [CLICK R$retry] $($clickResult2 -join ' ')"
+                            Start-Sleep -Seconds 5
+                        }
+                        $signal2 = Test-SignIn $session
+                        Write-Output "  [RETRY $retry/2] $site.name => $signal2"
+                        if ($signal2 -eq "SIGN_OK" -or $signal2 -eq "LOGGED_IN") {
+                            $r.status = "SUCCESS"
+                            $r.signal = $signal2
+                            $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $site.name })
+                            $signals.ok_sites += $site.name
+                            Write-Output "  => SIGN_OK (eval-click retry $retry)"
+                            break
+                        }
+                    }
                 }
                 try { opencli browser $session close 2>&1 | Out-Null } catch {}
             }
