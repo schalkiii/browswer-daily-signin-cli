@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, slider captcha API bypass,
   click-to-sign pages, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-05-31 (v4.0.1 — PigGo body null fix, InvitesFun/OurBits/UBits → webbridge, BODY_NULL signal handling)
+updated: 2026-06-07 (v4.1 — 批量迁移web-read失败站点到webbridge: GGPT/HDDolby/HDHome/TJUPT/BTSchool/远景论坛/52pojie, 全站点Detect JS添加document.body null保护)
 ---
 
 # PT Site Sign-in Automation

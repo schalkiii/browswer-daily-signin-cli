@@ -6,9 +6,8 @@
     {
       "name": "52pojie",
       "url": "https://www.52pojie.cn/forum.php",
-      "strategy": "browser-eval-click",
-      "eval": "(function(){var btn=document.querySelector('button.custom-function-button.check-in');if(btn){btn.click();return'CLICKED'}return'NO_BTN'})()",
-      "note": "书签同步: 吾爱破解 - opencli"
+      "strategy": "browser-open",
+      "note": "书签同步: 吾爱破解 - webbridge (browser-eval-click不稳定，改用webbridge)"
     },
     {
       "name": "HDKYL",
@@ -78,9 +77,9 @@
     },
     {
       "name": "BTSchool",
-      "url": "https://pt.btschool.club/torrents.php",
+      "url": "https://pt.btschool.club/attendance.php",
       "strategy": "browser-open",
-      "note": "书签同步: BTSchool"
+      "note": "书签同步: BTSchool - webbridge"
     },
     {
       "name": "DepthStudio",
@@ -97,8 +96,8 @@
     {
       "name": "GGPT",
       "url": "https://www.gamegamept.com/attendance.php",
-      "strategy": "web-read",
-      "note": "书签同步: GGPT签到"
+      "strategy": "browser-open",
+      "note": "书签同步: GGPT签到 - webbridge (web-read被CF拦截，改用webbridge)"
     },
     {
       "name": "HDBao",
@@ -115,14 +114,14 @@
     {
       "name": "HDDolby",
       "url": "https://www.hddolby.com/attendance.php",
-      "strategy": "web-read",
-      "note": "书签同步: HDDolby签到"
+      "strategy": "browser-open",
+      "note": "书签同步: HDDolby签到 - webbridge (web-read被CF拦截，改用webbridge)"
     },
     {
       "name": "HDHome",
       "url": "https://hdhome.org/attendance.php",
-      "strategy": "web-read",
-      "note": "书签同步: HDHome签到"
+      "strategy": "browser-open",
+      "note": "书签同步: HDHome签到 - webbridge (web-read被CF拦截，改用webbridge)"
     },
     {
       "name": "HDVideo",
@@ -200,8 +199,8 @@
     {
       "name": "TJUPT",
       "url": "https://www.tjupt.org/attendance.php",
-      "strategy": "web-read",
-      "note": "书签同步: 北洋园PT签到"
+      "strategy": "browser-open",
+      "note": "书签同步: 北洋园PT签到 - webbridge (web-read被CF拦截，改用webbridge)"
     },
     {
       "name": "Tokyo",
@@ -236,9 +235,8 @@
     {
       "name": "远景论坛",
       "url": "https://bbs.pcbeta.com/forum-win11-1.html",
-      "strategy": "browser-eval-click",
-      "eval": "(function(){var t=document.body.innerText||'';if(t.indexOf('签到成功')>-1||t.indexOf('签到完成')>-1||t.indexOf('已签到')>-1||t.indexOf('签到领奖')>-1)return'SIGN_OK';var b=document.querySelector('button.check-in');if(b){b.click();return'CLICKED'}var all=document.querySelectorAll('button');for(var i=0;i<all.length;i++){var v=all[i].textContent||'';if(v.indexOf('每日签到')>-1){all[i].click();return'CLICKED'}}return'NO_BTN'})()",
-      "note": "书签同步: 远景论坛签到"
+      "strategy": "browser-open",
+      "note": "书签同步: 远景论坛签到 - webbridge (browser-eval-click不稳定，改用webbridge)"
     }
   ],
   "batch": {
