@@ -43,7 +43,7 @@
       "name": "FreeFarm",
       "url": "https://pt.0ff.cc/attendance.php",
       "strategy": "browser-open",
-      "note": "书签同步: FreeFarm - webbridge"
+      "note": "书签同步: FreeFarm - webbridge (2026-06-09: 滑块验证拦截，需更新token绕过)"
     },
     {
       "name": "UBits",
@@ -79,7 +79,7 @@
       "name": "BTSchool",
       "url": "https://pt.btschool.club/attendance.php",
       "strategy": "browser-open",
-      "note": "书签同步: BTSchool - webbridge"
+      "note": "书签同步: BTSchool - webbridge (2026-06-09: 站点返回404，可能已关闭或更换域名)"
     },
     {
       "name": "DepthStudio",
@@ -163,7 +163,7 @@
       "name": "Musopia",
       "url": "https://www.musopia.vip/attendance.php",
       "strategy": "web-read",
-      "note": "书签同步: 音乐乌托邦签到"
+      "note": "书签同步: 音乐乌托邦签到 (2026-06-09: 站点无法访问，web-read和browser-open均失败)"
     },
     {
       "name": "NewInsane",

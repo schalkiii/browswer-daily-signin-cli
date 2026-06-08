@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, slider captcha API bypass,
   click-to-sign pages, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-06-07 (v4.1 — 批量迁移web-read失败站点到webbridge: GGPT/HDDolby/HDHome/TJUPT/BTSchool/远景论坛/52pojie, 全站点Detect JS添加document.body null保护)
+updated: 2026-06-09 (v4.2 — 站点关闭检测与优雅降级: BTSchool 404/Musopia 无法访问/FreeFarm 滑块拦截, 更新sites.json标记, 新增Rule 21)
 ---
 
 # PT Site Sign-in Automation
@@ -816,3 +816,17 @@ Every sign-in session must follow this complete workflow. No step may be skipped
 19. **BODY_NULL is a terminal signal**: When a page has no body element after the configured WaitMs, it's not a timing issue — the page is likely in an error state, a redirect, or a pre-render state that won't resolve. Return `BODY_NULL` immediately without attempting click. The webbridge switch in `signin-batch.ps1` reports it as `PAGE_ERROR` for diagnosis.
 
 20. **web-read → webbridge migration is the preferred fix for CF-blocked sites (v4.0.1)**: When a web-read site starts returning CF_DETECTED and the fallback browser-open also fails, the correct fix is to switch the site to webbridge strategy. This requires: (a) adding a `$WebSignInConfigs` entry in `signin-web.ps1` with detect/click JS, (b) changing strategy to `browser-open` in `sites.json` with `"webbridge"` in the note field, and (c) removing any `eval` field from the site config. The webbridge detect JS should follow the same pattern as other PT attendance pages: check CF/slider first, then sign-in status, then login status.
+
+21. **Site closure detection and graceful degradation (v4.2)**: Not all regressions are fixable — some sites simply close or become permanently unavailable. The 2026-06-09 run revealed three baseline sites failing for non-automation reasons:
+    - **BTSchool**: Returns HTTP 404 — site likely closed or changed domain. Action: mark in `sites.json` note as potentially offline, monitor for new domain announcements.
+    - **Musopia**: Returns "当前无法使用此页面" — site temporarily or permanently down. Action: same as above.
+    - **FreeFarm**: Slider captcha page with no auto-bypass path. Action: token refresh may be needed, but if site structure changed, manual intervention required.
+    
+    **Key insight**: When a baseline site fails with 404 or "site down" signals across multiple runs, it's a **site closure**, not an automation bug. The correct response is:
+    1. Verify via webbridge manual navigation (navigate → evaluate title/text)
+    2. If confirmed 404/down, update `sites.json` note with timestamp and status
+    3. Do NOT remove from `baseline.json` — keep for historical tracking
+    4. If site recovers in future, the note documents the outage period
+    5. Consider adding a `status` field to `sites.json` for systematic offline tracking
+    
+    This prevents wasting debugging effort on unfixable infrastructure problems.
