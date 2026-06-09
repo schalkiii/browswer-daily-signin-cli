@@ -817,16 +817,20 @@ Every sign-in session must follow this complete workflow. No step may be skipped
 
 20. **web-read → webbridge migration is the preferred fix for CF-blocked sites (v4.0.1)**: When a web-read site starts returning CF_DETECTED and the fallback browser-open also fails, the correct fix is to switch the site to webbridge strategy. This requires: (a) adding a `$WebSignInConfigs` entry in `signin-web.ps1` with detect/click JS, (b) changing strategy to `browser-open` in `sites.json` with `"webbridge"` in the note field, and (c) removing any `eval` field from the site config. The webbridge detect JS should follow the same pattern as other PT attendance pages: check CF/slider first, then sign-in status, then login status.
 
-21. **Site closure detection and graceful degradation (v4.2)**: Not all regressions are fixable — some sites simply close or become permanently unavailable. The 2026-06-09 run revealed three baseline sites failing for non-automation reasons:
-    - **BTSchool**: Returns HTTP 404 — site likely closed or changed domain. Action: mark in `sites.json` note as potentially offline, monitor for new domain announcements.
-    - **Musopia**: Returns "当前无法使用此页面" — site temporarily or permanently down. Action: same as above.
-    - **FreeFarm**: Slider captcha page with no auto-bypass path. Action: token refresh may be needed, but if site structure changed, manual intervention required.
-    
-    **Key insight**: When a baseline site fails with 404 or "site down" signals across multiple runs, it's a **site closure**, not an automation bug. The correct response is:
-    1. Verify via webbridge manual navigation (navigate → evaluate title/text)
-    2. If confirmed 404/down, update `sites.json` note with timestamp and status
-    3. Do NOT remove from `baseline.json` — keep for historical tracking
-    4. If site recovers in future, the note documents the outage period
-    5. Consider adding a `status` field to `sites.json` for systematic offline tracking
-    
-    This prevents wasting debugging effort on unfixable infrastructure problems.
+21. **Site closure detection and graceful degradation (v4.2 → v4.3)**: Not all regressions are fixable — some sites simply close or become permanently unavailable.
+    - **2026-06-09**: BTSchool 返回 HTTP 404，Musopia 返回"当前无法使用此页面"，FreeFarm 滑块拦截。
+    - **2026-06-10**: BTSchool 持续返回 REDIRECTING（webbridge 多次重试均失败），确认站点已关闭。执行以下降级：
+      1. `sites.json`: strategy 改为 `manual`，note 记录"2026-06-10: 站点持续返回404/REDIRECTING，疑似已关闭或更换域名"
+      2. `baseline.json`: 移除 BTSchool，auto_total 43，manual_total 2
+      3. 避免后续运行浪费 ~200s 重试时间
+    - **Musopia**: 2026-06-10 通过 browser-open fallback 成功签到，恢复自动。
+    - **FreeFarm**: 2026-06-10 webbridge 直接 SIGN_OK，滑块问题已解决。
+
+    **Key insight**: 当基线站点连续多次以 404/REDIRECTING 失败时，这是**站点关闭**，不是自动化 bug。正确响应：
+    1. 通过 webbridge 手动导航验证（navigate → evaluate title/text）
+    2. 确认关闭后，将 strategy 改为 `manual`，更新 note 带时间戳
+    3. 从 `baseline.json` 移除，更新 auto_total/manual_total
+    4. 如站点未来恢复，可从 manual 改回并重新加入 baseline
+    5. 考虑在 `sites.json` 增加 `status` 字段做系统性的离线追踪
+
+    这避免了在不可修复的基础设施问题上浪费调试精力。

@@ -78,8 +78,8 @@
     {
       "name": "BTSchool",
       "url": "https://pt.btschool.club/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: BTSchool - webbridge (2026-06-09: 站点返回404，可能已关闭或更换域名)"
+      "strategy": "manual",
+      "note": "2026-06-10: 站点持续返回404/REDIRECTING，疑似已关闭或更换域名，改为手动"
     },
     {
       "name": "DepthStudio",
