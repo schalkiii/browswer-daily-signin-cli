@@ -43,7 +43,7 @@
       "name": "FreeFarm",
       "url": "https://pt.0ff.cc/attendance.php",
       "strategy": "browser-open",
-      "note": "书签同步: FreeFarm - webbridge (2026-06-09: 滑块验证拦截，需更新token绕过)"
+      "note": "书签同步: FreeFarm - webbridge (2026-06-11: 间歇性滑块/CF验证，webbridge可绕过但偶发失败)"
     },
     {
       "name": "UBits",
@@ -199,8 +199,8 @@
     {
       "name": "TJUPT",
       "url": "https://www.tjupt.org/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: 北洋园PT签到 - webbridge (web-read被CF拦截，改用webbridge)"
+      "strategy": "manual",
+      "note": "2026-06-11: 站点启用图片验证码（选择与图片对应的影视名称），无法自动化，改为手动"
     },
     {
       "name": "Tokyo",

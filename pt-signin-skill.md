@@ -834,3 +834,11 @@ Every sign-in session must follow this complete workflow. No step may be skipped
     5. 考虑在 `sites.json` 增加 `status` 字段做系统性的离线追踪
 
     这避免了在不可修复的基础设施问题上浪费调试精力。
+
+22. **Image captcha = manual site (v4.4)**: TJUPT (北洋园PT) 在 2026-06-11 启用图片验证码（选择与图片对应的影视名称），这是无法自动化的验证类型。与 BTSchool 不同，这不是站点关闭，而是验证升级。
+    - **诊断**: webbridge navigate 成功，但页面显示"签到验证码"要求选择图片对应的影视名称
+    - **修复**: 
+      1. `sites.json`: strategy 从 `browser-open` 改为 `manual`，note 记录"2026-06-11: 站点启用图片验证码，无法自动化"
+      2. `baseline.json`: 将 TJUPT 从 `sites` 移到 `manual_sites`，auto_total 42，manual_total 3
+    - **区别**: 图片验证码 (v4.4) vs 站点关闭 (v4.2) — 前者是验证升级需人工处理，后者是基础设施问题。两者都转为 manual，但原因不同。
+    - **FreeFarm 补充**: 同日 FreeFarm 再次遇到间歇性滑块/CF验证，webbridge 偶发失败。保持 `browser-open` 策略，更新 note 记录间歇性问题。

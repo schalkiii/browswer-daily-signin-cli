@@ -34,7 +34,6 @@
     "BiliDownload",
     "HTCPT",
     "Musopia",
-    "TJUPT",
     "DigitalCore",
     "Kufirc",
     "M-Team",
@@ -47,9 +46,11 @@
     "NodeSeek"
   ],
   "manual_sites": [
-    "北洋园PT"
+    "北洋园PT",
+    "TJUPT",
+    "BTSchool"
   ],
-  "auto_total": 43,
-  "manual_total": 2,
-  "last_updated": "2026-06-10 02:30:00"
+  "auto_total": 42,
+  "manual_total": 3,
+  "last_updated": "2026-06-11 02:30:00"
 }
