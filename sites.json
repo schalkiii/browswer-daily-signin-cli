@@ -54,8 +54,8 @@
     {
       "name": "V2EX",
       "url": "https://www.v2ex.com/mission/daily",
-      "strategy": "browser-visit",
-      "note": "书签同步: V2EX - opencli"
+      "strategy": "browser-open",
+      "note": "书签同步: V2EX - webbridge (需点击领取按钮，browser-visit无法签到)"
     },
     {
       "name": "13City",
