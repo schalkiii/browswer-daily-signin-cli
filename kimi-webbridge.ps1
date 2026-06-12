@@ -90,12 +90,13 @@ function Test-WebBridgeSignIn {
         [string]$DetectEval,
         [string]$ClickEval,
         [int]$WaitMs = 5000,
-        [int]$PostClickWaitMs = 3000
+        [int]$PostClickWaitMs = 3000,
+        [int]$NavTimeoutSec = 60
     )
     $session = "signin-$($SiteName.ToLower() -replace '\s','-')"
 
     Write-Host "  [WebBridge] $SiteName : navigate -> $Url"
-    $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec 30
+    $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
     if (-not $nav -or -not $nav.success) {
         $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
         return "NAV_FAIL"

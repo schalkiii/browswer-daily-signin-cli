@@ -266,7 +266,8 @@ $WebSignInConfigs = @{
     }
     "UBits" = @{
         Url = "https://ubits.club/attendance.php"
-        WaitMs = 15000
+        WaitMs = 25000
+        NavTimeoutSec = 90
         PostClickMs = 5000
         Detect = @'
 (function(){
@@ -571,5 +572,14 @@ function Invoke-WebSignIn {
         return "NO_CONFIG"
     }
 
-    return Test-WebBridgeSignIn -SiteName $SiteName -Url $cfg.Url -DetectEval $cfg.Detect -ClickEval $cfg.Click -WaitMs $cfg.WaitMs -PostClickWaitMs $cfg.PostClickMs
+    $params = @{
+        SiteName = $SiteName
+        Url = $cfg.Url
+        DetectEval = $cfg.Detect
+        ClickEval = $cfg.Click
+        WaitMs = $cfg.WaitMs
+        PostClickWaitMs = $cfg.PostClickMs
+    }
+    if ($cfg.NavTimeoutSec) { $params.NavTimeoutSec = $cfg.NavTimeoutSec }
+    return Test-WebBridgeSignIn @params
 }
