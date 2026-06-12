@@ -495,6 +495,70 @@ $WebSignInConfigs = @{
 })()
 '@
     }
+
+    "HDBao" = @{
+        Url = "https://hdbao.cc/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var t = document.body.innerText||'';
+  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
+  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
+  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
+  if(t.indexOf('签到得魔力')>-1||t.indexOf('立即签到')>-1) return 'NEED_SIGN';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1) return 'LOGIN_REQUIRED';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  var btn = document.querySelector('input[value*="签到"]');
+  if(btn){ btn.click(); return 'CLICKED_INPUT'; }
+  var all = document.querySelectorAll('a,button,input[type="submit"]');
+  for(var i=0;i<all.length;i++){
+    var v = (all[i].textContent||all[i].value||'').trim();
+    if(v.indexOf('签到')>-1||v.indexOf('打卡')>-1){
+      all[i].click(); return 'CLICKED:'+v.substring(0,40);
+    }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
+
+    "Yemapt" = @{
+        Url = "https://www.yemapt.org/#/consumer/checkIn"
+        WaitMs = 20000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var t = document.body.innerText||'';
+  if(t.indexOf('人机验证加载中')>-1||t.indexOf('验证中')>-1) return 'CAPTCHA';
+  if(t.indexOf('连续签到')>-1&&t.indexOf('天')>-1&&t.indexOf('尚未签到')<0) return 'SIGN_OK';
+  if(t.indexOf('尚未签到')>-1) return 'NEED_SIGN';
+  if(t.indexOf('签到成功')>-1||t.indexOf('已签到')>-1) return 'SIGN_OK';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1) return 'LOGIN_REQUIRED';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  var t = document.body.innerText||'';
+  if(t.indexOf('人机验证加载中')>-1) return 'CAPTCHA_BLOCKED';
+  var btns = document.querySelectorAll('button');
+  for(var i=0;i<btns.length;i++){
+    var v = (btns[i].textContent||'').trim();
+    if(v.indexOf('签到')>-1||v.indexOf('Sign')>-1||v.indexOf('sign')>-1){
+      btns[i].click(); return 'CLICKED:'+v.substring(0,40);
+    }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
 }
 
 function Invoke-WebSignIn {

@@ -48,8 +48,8 @@
     {
       "name": "UBits",
       "url": "https://ubits.club/attendance.php",
-      "strategy": "browser-visit",
-      "note": "书签同步: UBits - opencli"
+      "strategy": "browser-open",
+      "note": "书签同步: UBits - webbridge (CF拦截browser-visit，改用webbridge)"
     },
     {
       "name": "V2EX",
@@ -102,8 +102,8 @@
     {
       "name": "HDBao",
       "url": "https://hdbao.cc/attendance.php",
-      "strategy": "web-read",
-      "note": "书签同步: HDBao签到"
+      "strategy": "browser-open",
+      "note": "书签同步: HDBao - webbridge (web-read假成功，需点击签到按钮)"
     },
     {
       "name": "HDClone",
@@ -223,8 +223,8 @@
     {
       "name": "Yemapt",
       "url": "https://www.yemapt.org/#/consumer/checkIn",
-      "strategy": "browser-visit",
-      "note": "书签同步: Yemapt签到 (SPA站点，访问即签到)"
+      "strategy": "browser-open",
+      "note": "书签同步: Yemapt - webbridge (SPA站点需CAPTCHA验证，browser-visit无法签到)"
     },
     {
       "name": "YHPP",
