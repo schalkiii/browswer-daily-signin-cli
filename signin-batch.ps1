@@ -932,6 +932,11 @@ function Send-FeishuSummary {
 
 Send-FeishuSummary $FeishuWebhook $FeishuChatId $summary
 
+# 关闭统一 webbridge session
+if ($script:webbridgeAvailable) {
+    try { $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session "daily-signin" -TimeoutSec 5 } catch {}
+}
+
 # Cleanup web-articles after run
 if (Test-Path $WebArticlesDir) {
     Get-ChildItem $WebArticlesDir -Directory -ErrorAction SilentlyContinue | ForEach-Object { Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }

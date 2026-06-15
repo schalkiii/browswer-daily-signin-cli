@@ -1,4 +1,5 @@
 {
+  "iterations": 6,
   "iteration_log": [
     {
       "value": [
@@ -87,7 +88,392 @@
       "signal": "UNKNOWN",
       "action": "pattern_discovery",
       "timestamp": "2026-06-02 04:06:45"
+    },
+    {
+      "site": "Musopia",
+      "action": "cf_detected_on_webread",
+      "content": "Connection timed out Error code 522\\nVisit cloudflare.com for more information.\\n2026-06-11 23:11:41 UTC\\nYou\\nBrowser\\nWorking\\nSingapore\\nCloudflare\\nWorking\\nwww.musopia.vip\\nHost\\nError\\nWhat happened?\\nThe initial connection between Cloudflare's network and the origin web server timed out. As a result, the web page can not be displayed.\\nWhat can I do?\\nIf you're a visitor of this website:\\nPlease try again in a few minutes.\\nIf you're the owner of this website:\\nContact your hosting provid",
+      "timestamp": "2026-06-12 07:12:04"
+    },
+    {
+      "contentPreview": "嗯… 无法访问此页面\\n似乎 hhanclub.net 关闭了连接。\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_CONNECTION_CLOSED\\n刷新",
+      "action": "pattern_discovery",
+      "site": "HHCLUB",
+      "timestamp": "2026-06-13 00:36:51",
+      "signal": "UNKNOWN"
+    },
+    {
+      "action": "pattern_discovery",
+      "contentPreview": "嗯… 无法访问此页面\\n似乎 hhanclub.net 关闭了连接。\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_CONNECTION_CLOSED\\n刷新",
+      "site": "HHCLUB",
+      "timestamp": "2026-06-14 00:20:09",
+      "signal": "UNKNOWN"
     }
+  ],
+  "failed": 2,
+  "skipped": 2,
+  "results": [
+    {
+      "status": "SUCCESS",
+      "elapsed": "18.4s",
+      "index": 1,
+      "strategy": "browser-open",
+      "name": "52pojie",
+      "url": "https://www.52pojie.cn/forum.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "44.4s",
+      "index": 2,
+      "strategy": "browser-open",
+      "name": "HDKYL",
+      "url": "https://www.hdkyl.in/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "52.4s",
+      "index": 3,
+      "strategy": "browser-open",
+      "name": "InvitesFun",
+      "url": "https://www.invites.fun/?sort=newest",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "56.5s",
+      "index": 4,
+      "strategy": "browser-open",
+      "name": "NodeSeek",
+      "url": "https://www.nodeseek.com/board",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "VISITED",
+      "elapsed": "35.1s",
+      "index": 5,
+      "strategy": "browser-visit",
+      "name": "OurBits",
+      "url": "https://ourbits.club/attendance.php",
+      "signal": "ERROR_NO_SIGNAL"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "24.9s",
+      "index": 6,
+      "strategy": "browser-open",
+      "name": "PigGo",
+      "url": "https://piggo.me/attendance.php?id=18989",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SLIDER_FAIL",
+      "elapsed": "74.1s",
+      "index": 7,
+      "strategy": "browser-open",
+      "name": "FreeFarm",
+      "url": "https://pt.0ff.cc/attendance.php",
+      "signal": "SLIDER"
+    },
+    {
+      "status": "CF_BLOCKED",
+      "elapsed": "254.2s",
+      "index": 8,
+      "strategy": "browser-open",
+      "name": "UBits",
+      "url": "https://ubits.club/attendance.php",
+      "signal": "REDIRECTING"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "28.1s",
+      "index": 9,
+      "strategy": "browser-open",
+      "name": "V2EX",
+      "url": "https://www.v2ex.com/mission/daily",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "22.7s",
+      "index": 10,
+      "strategy": "web-read",
+      "name": "13City",
+      "url": "https://13city.org/usercp.php?action=personal#signin",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "VISITED",
+      "elapsed": "34.7s",
+      "index": 11,
+      "strategy": "browser-visit",
+      "name": "AsianDVDClub",
+      "url": "https://asiandvdclub.org/index.php",
+      "signal": "UNKNOWN"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "102.8s",
+      "index": 12,
+      "strategy": "web-read",
+      "name": "BiliDownload",
+      "url": "https://bilibili.download/attendance.php",
+      "signal": "SIGN_OK_ITER"
+    },
+    {
+      "status": "SKIPPED",
+      "elapsed": "0.1s",
+      "index": 13,
+      "strategy": "manual",
+      "name": "BTSchool",
+      "url": "https://pt.btschool.club/attendance.php",
+      "signal": null
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "45.2s",
+      "index": 14,
+      "strategy": "web-read",
+      "name": "DepthStudio",
+      "url": "https://dstudio.me/attendance.php",
+      "signal": "SIGN_OK_ITER"
+    },
+    {
+      "status": "VISITED",
+      "elapsed": "33.2s",
+      "index": 15,
+      "strategy": "browser-visit",
+      "name": "DigitalCore",
+      "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
+      "signal": "UNKNOWN"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "17.4s",
+      "index": 16,
+      "strategy": "browser-open",
+      "name": "GGPT",
+      "url": "https://www.gamegamept.com/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "22.1s",
+      "index": 17,
+      "strategy": "browser-open",
+      "name": "HDBao",
+      "url": "https://hdbao.cc/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "18.5s",
+      "index": 18,
+      "strategy": "web-read",
+      "name": "HDClone",
+      "url": "https://pt.hdclone.top/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "61.3s",
+      "index": 19,
+      "strategy": "browser-open",
+      "name": "HDDolby",
+      "url": "https://www.hddolby.com/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "18s",
+      "index": 20,
+      "strategy": "browser-open",
+      "name": "HDHome",
+      "url": "https://hdhome.org/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "12.2s",
+      "index": 21,
+      "strategy": "web-read",
+      "name": "HDVideo",
+      "url": "https://hdvideo.top/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "62.1s",
+      "index": 22,
+      "strategy": "browser-open",
+      "name": "HHCLUB",
+      "url": "https://hhanclub.net/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "8.7s",
+      "index": 23,
+      "strategy": "web-read",
+      "name": "HTCPT",
+      "url": "https://www.htpt.cc/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "VISITED",
+      "elapsed": "45.5s",
+      "index": 24,
+      "strategy": "browser-visit",
+      "name": "Kufirc",
+      "url": "https://kufirc.com/index.php",
+      "signal": "ERROR_NO_SIGNAL"
+    },
+    {
+      "status": "VISITED",
+      "elapsed": "32.9s",
+      "index": 25,
+      "strategy": "browser-visit",
+      "name": "M-Team",
+      "url": "https://kp.m-team.cc/index",
+      "signal": "UNKNOWN"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "17.6s",
+      "index": 26,
+      "strategy": "web-read",
+      "name": "Moment",
+      "url": "https://www.momentpt.top/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "9.1s",
+      "index": 27,
+      "strategy": "web-read",
+      "name": "Musopia",
+      "url": "https://www.musopia.vip/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "VISITED",
+      "elapsed": "32.7s",
+      "index": 28,
+      "strategy": "browser-visit",
+      "name": "NewInsane",
+      "url": "https://newinsane.info/browse.php",
+      "signal": "UNKNOWN"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "8.8s",
+      "index": 29,
+      "strategy": "web-read",
+      "name": "PTLAO",
+      "url": "https://ptlao.top/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "34.5s",
+      "index": 30,
+      "strategy": "browser-eval-click",
+      "name": "Rousi",
+      "url": "https://rousi.pro/points",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "9.7s",
+      "index": 31,
+      "strategy": "web-read",
+      "name": "SBPT",
+      "url": "https://sbpt.link/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "VISITED",
+      "elapsed": "41.2s",
+      "index": 32,
+      "strategy": "browser-visit",
+      "name": "SpeedApp",
+      "url": "https://speedapp.io/adult",
+      "signal": "UNKNOWN"
+    },
+    {
+      "status": "SKIPPED",
+      "elapsed": "0s",
+      "index": 33,
+      "strategy": "manual",
+      "name": "TJUPT",
+      "url": "https://www.tjupt.org/attendance.php",
+      "signal": null
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "17.5s",
+      "index": 34,
+      "strategy": "web-read",
+      "name": "Tokyo",
+      "url": "https://www.tokyo-manga.top/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "VISITED",
+      "elapsed": "46.2s",
+      "index": 35,
+      "strategy": "browser-visit",
+      "name": "UsefulTrash",
+      "url": "https://usefultrash.net/browse.php",
+      "signal": "UNKNOWN"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "14.9s",
+      "index": 36,
+      "strategy": "web-read",
+      "name": "xloli",
+      "url": "https://mua.xloli.cc/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "40.1s",
+      "index": 37,
+      "strategy": "browser-open",
+      "name": "Yemapt",
+      "url": "https://www.yemapt.org/#/consumer/checkIn",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "19.1s",
+      "index": 38,
+      "strategy": "web-read",
+      "name": "YHPP",
+      "url": "https://www.yhpp.cc/attendance.php",
+      "signal": "SIGN_OK"
+    },
+    {
+      "status": "SUCCESS",
+      "elapsed": "18.9s",
+      "index": 39,
+      "strategy": "browser-open",
+      "name": "远景论坛",
+      "url": "https://bbs.pcbeta.com/forum-win11-1.html",
+      "signal": "SIGN_OK"
+    }
+  ],
+  "new_successes": [],
+  "baseline_known": 42,
+  "fail_sites": [
+    "FreeFarm",
+    "UBits"
+  ],
+  "skip_sites": [
+    "BTSchool",
+    "TJUPT"
   ],
   "ok_sites": [
     "52pojie",
@@ -96,7 +482,6 @@
     "NodeSeek",
     "OurBits",
     "PigGo",
-    "UBits",
     "V2EX",
     "13City",
     "AsianDVDClub",
@@ -127,376 +512,11 @@
     "YHPP",
     "远景论坛"
   ],
-  "success": 36,
-  "timestamp": "2026-06-11 02:25:31",
-  "iterations": 3,
-  "skipped": 1,
+  "success": 35,
+  "total": 39,
   "regressions": [
     "FreeFarm",
-    "TJUPT"
+    "UBits"
   ],
-  "results": [
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://www.52pojie.cn/forum.php",
-      "signal": "SIGN_OK",
-      "index": 1,
-      "elapsed": "17.9s",
-      "name": "52pojie"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://www.hdkyl.in/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 2,
-      "elapsed": "17.9s",
-      "name": "HDKYL"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://www.invites.fun/?sort=newest",
-      "signal": "SIGN_OK",
-      "index": 3,
-      "elapsed": "22.8s",
-      "name": "InvitesFun"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://www.nodeseek.com/board",
-      "signal": "SIGN_OK",
-      "index": 4,
-      "elapsed": "27.2s",
-      "name": "NodeSeek"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://ourbits.club/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 5,
-      "elapsed": "29.9s",
-      "name": "OurBits"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://piggo.me/attendance.php?id=18989",
-      "signal": "SIGN_OK",
-      "index": 6,
-      "elapsed": "24.5s",
-      "name": "PigGo"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SLIDER_FAIL",
-      "url": "https://pt.0ff.cc/attendance.php",
-      "signal": "SLIDER",
-      "index": 7,
-      "elapsed": "72.1s",
-      "name": "FreeFarm"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://ubits.club/attendance.php",
-      "signal": "CF_CHALLENGE",
-      "index": 8,
-      "elapsed": "25.5s",
-      "name": "UBits"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://www.v2ex.com/mission/daily",
-      "signal": "UNKNOWN",
-      "index": 9,
-      "elapsed": "20.1s",
-      "name": "V2EX"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://13city.org/usercp.php?action=personal#signin",
-      "signal": "SIGN_OK",
-      "index": 10,
-      "elapsed": "15.9s",
-      "name": "13City"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://asiandvdclub.org/index.php",
-      "signal": "UNKNOWN",
-      "index": 11,
-      "elapsed": "21s",
-      "name": "AsianDVDClub"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://bilibili.download/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 12,
-      "elapsed": "24.1s",
-      "name": "BiliDownload"
-    },
-    {
-      "strategy": "manual",
-      "status": "SKIPPED",
-      "url": "https://pt.btschool.club/attendance.php",
-      "signal": null,
-      "index": 13,
-      "elapsed": "0s",
-      "name": "BTSchool"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://dstudio.me/attendance.php",
-      "signal": "SIGN_OK_ITER",
-      "index": 14,
-      "elapsed": "40.1s",
-      "name": "DepthStudio"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
-      "signal": "UNKNOWN",
-      "index": 15,
-      "elapsed": "23.2s",
-      "name": "DigitalCore"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://www.gamegamept.com/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 16,
-      "elapsed": "16.5s",
-      "name": "GGPT"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://hdbao.cc/attendance.php",
-      "signal": "SIGN_OK_ITER",
-      "index": 17,
-      "elapsed": "83.2s",
-      "name": "HDBao"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://pt.hdclone.top/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 18,
-      "elapsed": "25.3s",
-      "name": "HDClone"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://www.hddolby.com/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 19,
-      "elapsed": "15.9s",
-      "name": "HDDolby"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://hdhome.org/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 20,
-      "elapsed": "17.9s",
-      "name": "HDHome"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://hdvideo.top/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 21,
-      "elapsed": "32.6s",
-      "name": "HDVideo"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://hhanclub.net/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 22,
-      "elapsed": "50.1s",
-      "name": "HHCLUB"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://www.htpt.cc/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 23,
-      "elapsed": "17.3s",
-      "name": "HTCPT"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://kufirc.com/index.php",
-      "signal": "UNKNOWN",
-      "index": 24,
-      "elapsed": "25s",
-      "name": "Kufirc"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://kp.m-team.cc/index",
-      "signal": "UNKNOWN",
-      "index": 25,
-      "elapsed": "20.9s",
-      "name": "M-Team"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://www.momentpt.top/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 26,
-      "elapsed": "121.9s",
-      "name": "Moment"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://www.musopia.vip/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 27,
-      "elapsed": "23.4s",
-      "name": "Musopia"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://newinsane.info/browse.php",
-      "signal": "UNKNOWN",
-      "index": 28,
-      "elapsed": "21.2s",
-      "name": "NewInsane"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://ptlao.top/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 29,
-      "elapsed": "13.2s",
-      "name": "PTLAO"
-    },
-    {
-      "strategy": "browser-eval-click",
-      "status": "SUCCESS",
-      "url": "https://rousi.pro/points",
-      "signal": "SIGN_OK",
-      "index": 30,
-      "elapsed": "24.6s",
-      "name": "Rousi"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://sbpt.link/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 31,
-      "elapsed": "18.1s",
-      "name": "SBPT"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://speedapp.io/adult",
-      "signal": "UNKNOWN",
-      "index": 32,
-      "elapsed": "34s",
-      "name": "SpeedApp"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "TIMEOUT",
-      "url": "https://www.tjupt.org/attendance.php",
-      "signal": "NAV_FAIL",
-      "index": 33,
-      "elapsed": "110.2s",
-      "name": "TJUPT"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://www.tokyo-manga.top/attendance.php",
-      "signal": "SIGN_OK_ITER",
-      "index": 34,
-      "elapsed": "54.9s",
-      "name": "Tokyo"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://usefultrash.net/browse.php",
-      "signal": "UNKNOWN",
-      "index": 35,
-      "elapsed": "30.7s",
-      "name": "UsefulTrash"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://mua.xloli.cc/attendance.php",
-      "signal": "SIGN_OK_ITER",
-      "index": 36,
-      "elapsed": "47.2s",
-      "name": "xloli"
-    },
-    {
-      "strategy": "browser-visit",
-      "status": "VISITED",
-      "url": "https://www.yemapt.org/#/consumer/checkIn",
-      "signal": "SIGN_OK",
-      "index": 37,
-      "elapsed": "52.2s",
-      "name": "Yemapt"
-    },
-    {
-      "strategy": "web-read",
-      "status": "SUCCESS",
-      "url": "https://www.yhpp.cc/attendance.php",
-      "signal": "SIGN_OK",
-      "index": 38,
-      "elapsed": "24.3s",
-      "name": "YHPP"
-    },
-    {
-      "strategy": "browser-open",
-      "status": "SUCCESS",
-      "url": "https://bbs.pcbeta.com/forum-win11-1.html",
-      "signal": "SIGN_OK",
-      "index": 39,
-      "elapsed": "60.4s",
-      "name": "远景论坛"
-    }
-  ],
-  "fail_sites": [
-    "FreeFarm",
-    "TJUPT"
-  ],
-  "new_successes": [],
-  "total": 39,
-  "baseline_known": 43,
-  "skip_sites": [
-    "BTSchool"
-  ],
-  "failed": 2
+  "timestamp": "2026-06-15 09:09:44"
 }

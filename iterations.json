@@ -86,5 +86,25 @@
     "signal": "UNKNOWN",
     "action": "pattern_discovery",
     "timestamp": "2026-06-02 04:06:45"
+  },
+  {
+    "site": "Musopia",
+    "action": "cf_detected_on_webread",
+    "content": "Connection timed out Error code 522\\nVisit cloudflare.com for more information.\\n2026-06-11 23:11:41 UTC\\nYou\\nBrowser\\nWorking\\nSingapore\\nCloudflare\\nWorking\\nwww.musopia.vip\\nHost\\nError\\nWhat happened?\\nThe initial connection between Cloudflare's network and the origin web server timed out. As a result, the web page can not be displayed.\\nWhat can I do?\\nIf you're a visitor of this website:\\nPlease try again in a few minutes.\\nIf you're the owner of this website:\\nContact your hosting provid",
+    "timestamp": "2026-06-12 07:12:04"
+  },
+  {
+    "contentPreview": "嗯… 无法访问此页面\\n似乎 hhanclub.net 关闭了连接。\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_CONNECTION_CLOSED\\n刷新",
+    "action": "pattern_discovery",
+    "site": "HHCLUB",
+    "timestamp": "2026-06-13 00:36:51",
+    "signal": "UNKNOWN"
+  },
+  {
+    "action": "pattern_discovery",
+    "contentPreview": "嗯… 无法访问此页面\\n似乎 hhanclub.net 关闭了连接。\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_CONNECTION_CLOSED\\n刷新",
+    "site": "HHCLUB",
+    "timestamp": "2026-06-14 00:20:09",
+    "signal": "UNKNOWN"
   }
 ]

@@ -93,12 +93,11 @@ function Test-WebBridgeSignIn {
         [int]$PostClickWaitMs = 3000,
         [int]$NavTimeoutSec = 60
     )
-    $session = "signin-$($SiteName.ToLower() -replace '\s','-')"
+    $session = "daily-signin"
 
     Write-Host "  [WebBridge] $SiteName : navigate -> $Url"
     $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
     if (-not $nav -or -not $nav.success) {
-        $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
         return "NAV_FAIL"
     }
 
@@ -108,7 +107,6 @@ function Test-WebBridgeSignIn {
     Write-Host "  [WebBridge] $SiteName : evaluate detect"
     $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
     if (-not $detect) {
-        $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
         return "EVAL_FAIL"
     }
 
@@ -118,11 +116,9 @@ function Test-WebBridgeSignIn {
     Write-Host "  [WebBridge] $SiteName : signal=$signal"
 
     if ($signal -match "SIGN_OK|ALREADY_SIGNED") {
-        $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
         return "SIGN_OK"
     }
     if ($signal -match "LOGIN_REQUIRED|SLIDER|CAPTCHA") {
-        $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
         return $signal
     }
 
@@ -135,7 +131,6 @@ function Test-WebBridgeSignIn {
             $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
             Write-Host "  [WebBridge] $SiteName : retry signal=$reSig"
             if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
-                $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
                 return "SIGN_OK"
             }
             if ($reSig -match "NEED_SIGN|UNKNOWN") {
@@ -143,12 +138,10 @@ function Test-WebBridgeSignIn {
                 break
             }
             if ($reSig -match "LOGIN_REQUIRED") {
-                $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
                 return "LOGIN_REQUIRED"
             }
         }
         if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
-            $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
             return $signal
         }
     }
@@ -165,12 +158,10 @@ function Test-WebBridgeSignIn {
         $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
         $recheckSig = if ($recheck -is [string]) { $recheck } elseif ($recheck.value) { "$($recheck.value)" } else { "$recheck" }
         if ($recheckSig -match "SIGN_OK|ALREADY_SIGNED") {
-            $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
             return "SIGN_OK"
         }
         $signal = $recheckSig
     }
 
-    $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $session -TimeoutSec 5
     return $signal
 }
