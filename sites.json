@@ -48,8 +48,8 @@
     {
       "name": "UBits",
       "url": "https://ubits.club/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: UBits - webbridge (2026-06-19: CF挑战持续拦截，多次重试无效)"
+      "strategy": "manual",
+      "note": "2026-06-20: 站点启用Cloudflare托管挑战（需人机交互验证），webbridge无法绕过，改为手动"
     },
     {
       "name": "V2EX",

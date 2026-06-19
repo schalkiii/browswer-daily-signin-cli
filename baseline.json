@@ -4,7 +4,6 @@
   "sites": [
     "GGPT",
     "V2EX",
-    "UBits",
     "HDHome",
     "HDDolby",
     "YHPP",
@@ -48,9 +47,10 @@
   "manual_sites": [
     "北洋园PT",
     "TJUPT",
-    "BTSchool"
+    "BTSchool",
+    "UBits"
   ],
-  "auto_total": 42,
-  "manual_total": 3,
-  "last_updated": "2026-06-11 02:30:00"
+  "auto_total": 41,
+  "manual_total": 4,
+  "last_updated": "2026-06-20 02:21:31"
 }

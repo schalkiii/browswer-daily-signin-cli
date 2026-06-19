@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, slider captcha API bypass,
   click-to-sign pages, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-06-09 (v4.2 — 站点关闭检测与优雅降级: BTSchool 404/Musopia 无法访问/FreeFarm 滑块拦截, 更新sites.json标记, 新增Rule 21)
+updated: 2026-06-20 (v4.5 — Cloudflare Managed Challenge handling: UBits moved to manual, distinguish CF Turnstile vs Managed Challenge)
 ---
 
 # PT Site Sign-in Automation
@@ -842,3 +842,11 @@ Every sign-in session must follow this complete workflow. No step may be skipped
       2. `baseline.json`: 将 TJUPT 从 `sites` 移到 `manual_sites`，auto_total 42，manual_total 3
     - **区别**: 图片验证码 (v4.4) vs 站点关闭 (v4.2) — 前者是验证升级需人工处理，后者是基础设施问题。两者都转为 manual，但原因不同。
     - **FreeFarm 补充**: 同日 FreeFarm 再次遇到间歇性滑块/CF验证，webbridge 偶发失败。保持 `browser-open` 策略，更新 note 记录间歇性问题。
+
+23. **Cloudflare Managed Challenge = manual site (v4.5)**: UBits 在 2026-06-20 启用 Cloudflare 托管挑战（Managed Challenge），页面显示"正在进行安全验证"并包含 CF 安全质询 iframe，webbridge 无法自动通过。
+    - **诊断**: webbridge navigate 后，snapshot 显示标题为"请稍候…"，页面内容包含"正在进行安全验证"和"包含 Cloudflare 安全质询的小组件"，等待 30 秒后仍未通过
+    - **与 CF Turnstile 的区别**: CF Turnstile 是自动化的 JavaScript 挑战，webbridge 可以自动通过；Managed Challenge 需要人机交互（如点击"我不是机器人"），webbridge 无法绕过
+    - **修复**:
+      1. `sites.json`: strategy 从 `browser-open` 改为 `manual`，note 记录"2026-06-20: 站点启用Cloudflare托管挑战（需人机交互验证），webbridge无法绕过，改为手动"
+      2. `baseline.json`: 将 UBits 从 `sites` 移到 `manual_sites`，auto_total 41，manual_total 4
+    - **关键区别**: CF Turnstile (自动通过) vs CF Managed Challenge (需人机交互)。前者 webbridge 可以处理，后者必须转为 manual。

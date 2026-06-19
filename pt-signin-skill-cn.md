@@ -5,7 +5,7 @@ description: |
   涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、滑动验证 API 绕过、
   点击签到页面和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-05-30 (v4.0.0 — 产品化: config.json 集中配置，浏览器路径/书签文件夹可配，目录整理，README 重写)
+updated: 2026-06-20 (v4.5 — Cloudflare Managed Challenge 处理: UBits 转为 manual，区分 CF Turnstile vs Managed Challenge)
 ---
 
 # PT 站点签到自动化
@@ -890,3 +890,11 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
 16. **失败站点必须分类分析才能系统化改进**: v3.7.1 失败站点可分为五类——(a) 服务器关闭/连接中断，(b) 404/站点消失，(c) CF/WAF 拦截，(d) 登录失效/需要重新登录，(e) 页面空/无内容。每一类对应不同处理策略：a→跳过等待恢复，b→标记为疑似下线，c→增加12s等待/复用信任Token，d→排查Cookie过期，e→调整策略为browser-open。统一报告格式为飞书推送提供可读的细分数据。
 
 17. **webbridge 优于 opencli 浏览器扩展（v3.9）**: kimi webbridge 操控用户真实浏览器，CF/WAF 完美绕过（零挑战），站点不会检测到环境异常。对于 opencli 浏览器扩展被 CF 拦截或返回 UNKNOWN 的站点，应优先切换到 webbridge。每个站点需要单独调试验证其 detect/click JS 代码，然后固化到 `signin-web.ps1` 中确保流程可稳定重放。新增 webbridge 站点的调试流程：navigate → wait → detect → [click] → re-check → close_session。`Invoke-WebBridgeCommand` 必须使用显式命名参数（`-Action`、`-CmdArgs`、`-Session`），位置参数会导致参数类型冲突（`$Args` 与 PowerShell 自动变量冲突）。
+
+18. **Cloudflare Managed Challenge 需转为 manual（v4.5）**: UBits 在 2026-06-20 启用 Cloudflare 托管挑战（Managed Challenge），页面显示"正在进行安全验证"并包含 CF 安全质询 iframe，webbridge 等待 30 秒后仍无法自动通过。
+    - **诊断**: webbridge navigate 后，snapshot 显示标题为"请稍候…"，页面内容包含"正在进行安全验证"和"包含 Cloudflare 安全质询的小组件"
+    - **与 CF Turnstile 的区别**: CF Turnstile 是自动化的 JavaScript 挑战，webbridge 可以自动通过；Managed Challenge 需要人机交互（如点击"我不是机器人"），webbridge 无法绕过
+    - **修复**:
+      1. `sites.json`: strategy 从 `browser-open` 改为 `manual`，note 记录"2026-06-20: 站点启用Cloudflare托管挑战（需人机交互验证），webbridge无法绕过，改为手动"
+      2. `baseline.json`: 将 UBits 从 `sites` 移到 `manual_sites`，auto_total 41，manual_total 4
+    - **关键区别**: CF Turnstile（自动通过）vs CF Managed Challenge（需人机交互）。前者 webbridge 可以处理，后者必须转为 manual。
