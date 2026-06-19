@@ -43,13 +43,13 @@
       "name": "FreeFarm",
       "url": "https://pt.0ff.cc/attendance.php",
       "strategy": "browser-open",
-      "note": "书签同步: FreeFarm - webbridge (2026-06-11: 间歇性滑块/CF验证，webbridge可绕过但偶发失败)"
+      "note": "书签同步: FreeFarm - webbridge (2026-06-19: 滑块验证持续拦截，webbridge无法绕过)"
     },
     {
       "name": "UBits",
       "url": "https://ubits.club/attendance.php",
       "strategy": "browser-open",
-      "note": "书签同步: UBits - webbridge (CF拦截browser-visit，改用webbridge)"
+      "note": "书签同步: UBits - webbridge (2026-06-19: CF挑战持续拦截，多次重试无效)"
     },
     {
       "name": "V2EX",
@@ -188,7 +188,7 @@
       "name": "SBPT",
       "url": "https://sbpt.link/attendance.php",
       "strategy": "web-read",
-      "note": "书签同步: SBPT签到"
+      "note": "书签同步: SBPT签到 (2026-06-19: web-read返回TOO_SMALL，browser-open回退也失败，需进一步分析)"
     },
     {
       "name": "SpeedApp",
@@ -224,7 +224,7 @@
       "name": "Yemapt",
       "url": "https://www.yemapt.org/#/consumer/checkIn",
       "strategy": "browser-open",
-      "note": "书签同步: Yemapt - webbridge (SPA站点需CAPTCHA验证，browser-visit无法签到)"
+      "note": "书签同步: Yemapt - webbridge (2026-06-19: SPA站点tab导航失败，需检查webbridge兼容性)"
     },
     {
       "name": "YHPP",
