@@ -5,7 +5,7 @@ description: |
   涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、滑动验证 API 绕过、
   点击签到页面和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-06-20 (v4.5 — Cloudflare Managed Challenge 处理: UBits 转为 manual，区分 CF Turnstile vs Managed Challenge)
+updated: 2026-06-22 (v4.6 — Yemapt 转为 manual: SPA站点人机验证无法自动化)
 ---
 
 # PT 站点签到自动化
@@ -898,3 +898,11 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
       1. `sites.json`: strategy 从 `browser-open` 改为 `manual`，note 记录"2026-06-20: 站点启用Cloudflare托管挑战（需人机交互验证），webbridge无法绕过，改为手动"
       2. `baseline.json`: 将 UBits 从 `sites` 移到 `manual_sites`，auto_total 41，manual_total 4
     - **关键区别**: CF Turnstile（自动通过）vs CF Managed Challenge（需人机交互）。前者 webbridge 可以处理，后者必须转为 manual。
+
+19. **SPA 站点人机验证需转为 manual（v4.6）**: Yemapt 在 2026-06-22 持续返回 NEED_SIGN 即使点击"立即签到"按钮后仍无法变更状态。
+    - **诊断**: webbridge navigate 到 `https://www.yemapt.org/#/consumer/checkIn` 后，detect 返回 NEED_SIGN，click 返回 CLICKED:立即签到，但 re-check 仍为 NEED_SIGN。历史记录显示该站点为 SPA 架构，6月2日曾出现"人机验证加载中"。
+    - **根因**: SPA 站点的签到逻辑可能依赖异步 API 调用，点击后需要额外等待或存在前端验证机制；webbridge 的点击事件可能未触发实际的签到请求
+    - **修复**:
+      1. `sites.json`: strategy 从 `browser-open` 改为 `manual`，note 记录"2026-06-22: SPA站点且有人机验证加载中，webbridge点击签到后状态未变更，无法自动化，改为手动"
+      2. `baseline.json`: 将 Yemapt 从 `sites` 移到 `manual_sites`，auto_total 40，manual_total 5
+    - **经验**: SPA 站点（尤其是带人机验证的）自动化难度大，当多次尝试（包括增加等待时间、重试）仍失败后，应果断转为 manual 避免浪费每日签到机会。

@@ -223,8 +223,8 @@
     {
       "name": "Yemapt",
       "url": "https://www.yemapt.org/#/consumer/checkIn",
-      "strategy": "browser-open",
-      "note": "书签同步: Yemapt - webbridge (2026-06-19: SPA站点tab导航失败，需检查webbridge兼容性)"
+      "strategy": "manual",
+      "note": "2026-06-22: SPA站点且有人机验证加载中，webbridge点击签到后状态未变更，无法自动化，改为手动"
     },
     {
       "name": "YHPP",

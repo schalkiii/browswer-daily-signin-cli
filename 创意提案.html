@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser Sign-in CLI — 一键批量签到自动化工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 40px 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; }
+        .header h1 { font-size: 2.2em; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 1.1em; }
+        .badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; font-size: 0.85em; margin-top: 15px; }
+        .section { padding: 35px 40px; border-bottom: 1px solid #eee; }
+        .section:last-child { border-bottom: none; }
+        .section-title { font-size: 1.4em; color: #333; margin-bottom: 20px; display: flex; align-items: center; }
+        .section-title::before { content: ''; width: 4px; height: 24px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 2px; margin-right: 15px; }
+        .card { background: #f8f9fa; border-radius: 12px; padding: 25px; margin-bottom: 20px; }
+        .card-title { font-weight: 600; color: #333; margin-bottom: 12px; font-size: 1.1em; }
+        .card-content { color: #666; line-height: 1.8; font-size: 0.95em; }
+        .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .feature-item { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 25px; text-align: center; transition: transform 0.3s; }
+        .feature-item:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(102,126,234,0.15); }
+        .feature-icon { font-size: 2.5em; margin-bottom: 15px; }
+        .feature-title { font-weight: 600; color: #333; margin-bottom: 10px; }
+        .feature-desc { color: #666; font-size: 0.9em; line-height: 1.6; }
+        .stats-row { display: flex; justify-content: space-around; padding: 30px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 2.5em; font-weight: 700; }
+        .stat-label { opacity: 0.9; font-size: 0.95em; margin-top: 5px; }
+        .code-block { background: #2d2d2d; color: #f8f8f2; padding: 20px; border-radius: 10px; font-family: 'Consolas', monospace; font-size: 0.9em; overflow-x: auto; margin: 20px 0; }
+        .flow-chart { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; margin: 20px 0; }
+        .flow-step { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 15px 25px; border-radius: 10px; text-align: center; flex: 1; min-width: 140px; }
+        .flow-arrow { color: #ddd; font-size: 1.5em; }
+        .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #888; font-size: 0.9em; }
+        .tech-stack { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
+        .tech-tag { background: #e0e0e0; padding: 6px 16px; border-radius: 20px; font-size: 0.85em; color: #555; }
+        .highlight { color: #667eea; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Browser Sign-in CLI</h1>
+            <p>一键批量签到自动化工具 —— 让每日签到从此无忧</p>
+            <span class="badge">学习工作赛道</span>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📌 创意概述</h2>
+            <div class="card">
+                <div class="card-title">核心痛点</div>
+                <div class="card-content">
+                    PT 站点和论坛的每日签到是典型的「重复性手工劳动」——用户每天需要打开<span class="highlight">数十个标签页</span>、逐个点击签到按钮，耗时 10-30 分钟，且容易遗漏导致账号等级下降。
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">解决方案</div>
+                <div class="card-content">
+                    基于 PowerShell 的命令行工具，通过<span class="highlight">真实浏览器操控</span>实现批量签到。支持从浏览器书签自动同步站点，CF/WAF 完美绕过，签到结果自动推送到飞书，全程无需人工干预。
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-item">
+                <div class="stat-value">40+</div>
+                <div class="stat-label">支持站点</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">35/39</div>
+                <div class="stat-label">签到成功率</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">1条</div>
+                <div class="stat-label">命令执行</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">0</div>
+                <div class="stat-label">人工干预</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🎯 目标用户</h2>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">👨‍💻</div>
+                    <div class="feature-title">PT 站点爱好者</div>
+                    <div class="feature-desc">需要每日签到维持账号等级、获取下载权限的资深 PT 用户</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🌐</div>
+                    <div class="feature-title">论坛活跃用户</div>
+                    <div class="feature-desc">同时活跃在多个论坛社区，需要每日签到获取积分奖励</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">⏰</div>
+                    <div class="feature-title">时间紧张人群</div>
+                    <div class="feature-desc">工作繁忙，无法每天花时间手动签到的上班族</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">✈️</div>
+                    <div class="feature-title">经常外出用户</div>
+                    <div class="feature-desc">出差或旅行期间无法稳定访问网络，需要自动化签到保障</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">⚡ 核心功能</h2>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">📚</div>
+                    <div class="feature-title">书签自动同步</div>
+                    <div class="feature-desc">从浏览器书签栏自动扫描签到站点，新增站点自动加入，删除站点自动移除</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🤖</div>
+                    <div class="feature-title">多策略签到</div>
+                    <div class="feature-desc">支持 web-read、browser-open、browser-visit 等多种策略，适配不同站点架构</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🛡️</div>
+                    <div class="feature-title">CF 完美绕过</div>
+                    <div class="feature-desc">基于真实浏览器操控，零挑战通过 Cloudflare/WAF 防护</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📱</div>
+                    <div class="feature-title">飞书推送</div>
+                    <div class="feature-desc">签到结果实时推送到飞书群，包含成功/失败分类统计</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🚀 使用流程</h2>
+            <div class="flow-chart">
+                <div class="flow-step">1. 配置</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">2. 运行</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">3. 签到</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">4. 推送</div>
+            </div>
+            <div class="code-block">
+# 三步上手
+git clone https://github.com/schalkiii/browswer-daily-signin-cli.git
+copy config.example.json config.json
+.\signin-batch.ps1
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">💡 价值意义</h2>
+            <div class="card">
+                <div class="card-title">⏱️ 效率提升</div>
+                <div class="card-content">
+                    将每天 10-30 分钟的手动签到操作压缩为一条命令，每周节省 1-3.5 小时，每年节省 50-180 小时。这些时间可以用于更有价值的学习、工作或娱乐。
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">📊 商业价值</div>
+                <div class="card-content">
+                    对于 PT 站点用户来说，连续签到是维持账号等级、获取下载权限的关键。本工具确保签到连续性，避免因忘记签到导致账号权益受损，间接保护用户的时间和资源投入。
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">🔄 技术创新</div>
+                <div class="card-content">
+                    通过 WebBridge 操控真实浏览器，解决了传统自动化工具被 CF/WAF 拦截的难题。同时支持自迭代修复机制，当站点页面变化时自动探测新的签到模式。
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🛠️ 技术栈</h2>
+            <div class="tech-stack">
+                <span class="tech-tag">PowerShell 7+</span>
+                <span class="tech-tag">Kimi WebBridge</span>
+                <span class="tech-tag">opencli</span>
+                <span class="tech-tag">飞书 API</span>
+                <span class="tech-tag">Edge/Chrome</span>
+                <span class="tech-tag">JavaScript</span>
+                <span class="tech-tag">JSON</span>
+                <span class="tech-tag">GitHub</span>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Browser Sign-in CLI — 让每日签到从此无忧</p>
+            <p style="margin-top: 10px;">GitHub: <a href="https://github.com/schalkiii/browswer-daily-signin-cli" style="color: #667eea;">https://github.com/schalkiii/browswer-daily-signin-cli</a></p>
+        </div>
+    </div>
+</body>
+</html>

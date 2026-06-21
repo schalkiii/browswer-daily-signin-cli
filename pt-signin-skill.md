@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, slider captcha API bypass,
   click-to-sign pages, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-06-20 (v4.5 — Cloudflare Managed Challenge handling: UBits moved to manual, distinguish CF Turnstile vs Managed Challenge)
+updated: 2026-06-22 (v4.6 — Yemapt moved to manual: SPA site with human verification cannot be automated)
 ---
 
 # PT Site Sign-in Automation
@@ -850,3 +850,11 @@ Every sign-in session must follow this complete workflow. No step may be skipped
       1. `sites.json`: strategy 从 `browser-open` 改为 `manual`，note 记录"2026-06-20: 站点启用Cloudflare托管挑战（需人机交互验证），webbridge无法绕过，改为手动"
       2. `baseline.json`: 将 UBits 从 `sites` 移到 `manual_sites`，auto_total 41，manual_total 4
     - **关键区别**: CF Turnstile (自动通过) vs CF Managed Challenge (需人机交互)。前者 webbridge 可以处理，后者必须转为 manual。
+
+24. **SPA sites with human verification = manual site (v4.6)**: Yemapt on 2026-06-22 consistently returned NEED_SIGN even after clicking the "立即签到" button.
+    - **Diagnosis**: After webbridge navigate to `https://www.yemapt.org/#/consumer/checkIn`, detect returned NEED_SIGN, click returned CLICKED:立即签到, but re-check still returned NEED_SIGN. Historical records show this site uses SPA architecture and on 2026-06-02 displayed "人机验证加载中" (human verification loading).
+    - **Root cause**: SPA sign-in logic likely depends on asynchronous API calls; the click event may not trigger the actual sign-in request, or additional frontend validation may be required
+    - **Fix**:
+      1. `sites.json`: strategy changed from `browser-open` to `manual`, note records "2026-06-22: SPA site with human verification, webbridge click does not change state, cannot automate, moved to manual"
+      2. `baseline.json`: moved Yemapt from `sites` to `manual_sites`, auto_total 40, manual_total 5
+    - **Lesson**: SPA sites (especially those with human verification) are difficult to automate. When multiple attempts (including increased wait times, retries) still fail, move to manual promptly to avoid wasting daily sign-in opportunities.
