@@ -1,414 +1,57 @@
 {
-  "failed": 2,
-  "timestamp": "2026-06-22 02:19:09",
-  "regressions": [
-    "FreeFarm",
-    "Yemapt"
+  "baseline_known": 47,
+  "needs_manual_review": [
+    "UBits(CF_BLOCKED)"
   ],
-  "new_successes": [],
-  "total": 39,
-  "ok_sites": [
+  "failed": 20,
+  "skip_sites": [
+    "FreeFarm",
+    "TJUPT"
+  ],
+  "total": 38,
+  "fail_sites": [
     "52pojie",
+    "UBits",
+    "13City",
+    "BiliDownload",
+    "DepthStudio",
+    "HDClone",
+    "HDVideo",
+    "HHCLUB",
+    "HTCPT",
+    "Moment",
+    "Rousi",
+    "SBPT",
+    "Tokyo",
+    "xloli",
+    "Yemapt",
+    "YHPP",
+    "远景论坛",
+    "fearnopeer",
+    "dreamingtree",
+    "cysic"
+  ],
+  "skipped": 2,
+  "timestamp": "2026-07-01 03:30:02",
+  "ok_sites": [
     "HDKYL",
-    "InvitesFun",
     "NodeSeek",
     "OurBits",
     "PigGo",
     "V2EX",
-    "13City",
     "AsianDVDClub",
-    "BiliDownload",
-    "DepthStudio",
+    "BTSchool",
     "DigitalCore",
     "GGPT",
-    "HDBao",
-    "HDClone",
     "HDDolby",
     "HDHome",
-    "HDVideo",
-    "HHCLUB",
-    "HTCPT",
     "Kufirc",
     "M-Team",
-    "Moment",
-    "Musopia",
     "NewInsane",
-    "PTLAO",
-    "Rousi",
-    "SBPT",
     "SpeedApp",
-    "Tokyo",
-    "UsefulTrash",
-    "xloli",
-    "YHPP",
-    "远景论坛"
+    "UsefulTrash"
   ],
-  "baseline_known": 41,
-  "iterations": 6,
-  "success": 34,
-  "results": [
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "18.6s",
-      "strategy": "browser-open",
-      "url": "https://www.52pojie.cn/forum.php",
-      "name": "52pojie",
-      "index": 1
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "18.2s",
-      "strategy": "browser-open",
-      "url": "https://www.hdkyl.in/attendance.php",
-      "name": "HDKYL",
-      "index": 2
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "24.1s",
-      "strategy": "browser-open",
-      "url": "https://www.invites.fun/?sort=newest",
-      "name": "InvitesFun",
-      "index": 3
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "31.4s",
-      "strategy": "browser-open",
-      "url": "https://www.nodeseek.com/board",
-      "name": "NodeSeek",
-      "index": 4
-    },
-    {
-      "signal": "CF_CHALLENGE",
-      "status": "VISITED",
-      "elapsed": "29.4s",
-      "strategy": "browser-visit",
-      "url": "https://ourbits.club/attendance.php",
-      "name": "OurBits",
-      "index": 5
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "33.9s",
-      "strategy": "browser-open",
-      "url": "https://piggo.me/attendance.php?id=18989",
-      "name": "PigGo",
-      "index": 6
-    },
-    {
-      "signal": "SLIDER",
-      "status": "SLIDER_FAIL",
-      "elapsed": "73.5s",
-      "strategy": "browser-open",
-      "url": "https://pt.0ff.cc/attendance.php",
-      "name": "FreeFarm",
-      "index": 7
-    },
-    {
-      "signal": null,
-      "status": "SKIPPED",
-      "elapsed": "0s",
-      "strategy": "manual",
-      "url": "https://ubits.club/attendance.php",
-      "name": "UBits",
-      "index": 8
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "15.4s",
-      "strategy": "browser-open",
-      "url": "https://www.v2ex.com/mission/daily",
-      "name": "V2EX",
-      "index": 9
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "14.1s",
-      "strategy": "web-read",
-      "url": "https://13city.org/usercp.php?action=personal#signin",
-      "name": "13City",
-      "index": 10
-    },
-    {
-      "signal": "UNKNOWN",
-      "status": "VISITED",
-      "elapsed": "26s",
-      "strategy": "browser-visit",
-      "url": "https://asiandvdclub.org/index.php",
-      "name": "AsianDVDClub",
-      "index": 11
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "19.4s",
-      "strategy": "web-read",
-      "url": "https://bilibili.download/attendance.php",
-      "name": "BiliDownload",
-      "index": 12
-    },
-    {
-      "signal": null,
-      "status": "SKIPPED",
-      "elapsed": "0s",
-      "strategy": "manual",
-      "url": "https://pt.btschool.club/attendance.php",
-      "name": "BTSchool",
-      "index": 13
-    },
-    {
-      "signal": "SIGN_OK_ITER",
-      "status": "SUCCESS",
-      "elapsed": "40.9s",
-      "strategy": "web-read",
-      "url": "https://dstudio.me/attendance.php",
-      "name": "DepthStudio",
-      "index": 14
-    },
-    {
-      "signal": "UNKNOWN",
-      "status": "VISITED",
-      "elapsed": "32.6s",
-      "strategy": "browser-visit",
-      "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
-      "name": "DigitalCore",
-      "index": 15
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "17.1s",
-      "strategy": "browser-open",
-      "url": "https://www.gamegamept.com/attendance.php",
-      "name": "GGPT",
-      "index": 16
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "23.9s",
-      "strategy": "browser-open",
-      "url": "https://hdbao.cc/attendance.php",
-      "name": "HDBao",
-      "index": 17
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "15.3s",
-      "strategy": "web-read",
-      "url": "https://pt.hdclone.top/attendance.php",
-      "name": "HDClone",
-      "index": 18
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "17.4s",
-      "strategy": "browser-open",
-      "url": "https://www.hddolby.com/attendance.php",
-      "name": "HDDolby",
-      "index": 19
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "17.3s",
-      "strategy": "browser-open",
-      "url": "https://hdhome.org/attendance.php",
-      "name": "HDHome",
-      "index": 20
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "19.8s",
-      "strategy": "web-read",
-      "url": "https://hdvideo.top/attendance.php",
-      "name": "HDVideo",
-      "index": 21
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "39.8s",
-      "strategy": "browser-open",
-      "url": "https://hhanclub.net/attendance.php",
-      "name": "HHCLUB",
-      "index": 22
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "12.3s",
-      "strategy": "web-read",
-      "url": "https://www.htpt.cc/attendance.php",
-      "name": "HTCPT",
-      "index": 23
-    },
-    {
-      "signal": "UNKNOWN",
-      "status": "VISITED",
-      "elapsed": "16.2s",
-      "strategy": "browser-visit",
-      "url": "https://kufirc.com/index.php",
-      "name": "Kufirc",
-      "index": 24
-    },
-    {
-      "signal": "UNKNOWN",
-      "status": "VISITED",
-      "elapsed": "17.2s",
-      "strategy": "browser-visit",
-      "url": "https://kp.m-team.cc/index",
-      "name": "M-Team",
-      "index": 25
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "37.1s",
-      "strategy": "web-read",
-      "url": "https://www.momentpt.top/attendance.php",
-      "name": "Moment",
-      "index": 26
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "17.6s",
-      "strategy": "web-read",
-      "url": "https://www.musopia.vip/attendance.php",
-      "name": "Musopia",
-      "index": 27
-    },
-    {
-      "signal": "UNKNOWN",
-      "status": "VISITED",
-      "elapsed": "42.1s",
-      "strategy": "browser-visit",
-      "url": "https://newinsane.info/browse.php",
-      "name": "NewInsane",
-      "index": 28
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "18.9s",
-      "strategy": "web-read",
-      "url": "https://ptlao.top/attendance.php",
-      "name": "PTLAO",
-      "index": 29
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "20.1s",
-      "strategy": "browser-eval-click",
-      "url": "https://rousi.pro/points",
-      "name": "Rousi",
-      "index": 30
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "13.9s",
-      "strategy": "web-read",
-      "url": "https://sbpt.link/attendance.php",
-      "name": "SBPT",
-      "index": 31
-    },
-    {
-      "signal": "UNKNOWN",
-      "status": "VISITED",
-      "elapsed": "26.8s",
-      "strategy": "browser-visit",
-      "url": "https://speedapp.io/adult",
-      "name": "SpeedApp",
-      "index": 32
-    },
-    {
-      "signal": null,
-      "status": "SKIPPED",
-      "elapsed": "0s",
-      "strategy": "manual",
-      "url": "https://www.tjupt.org/attendance.php",
-      "name": "TJUPT",
-      "index": 33
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "10.4s",
-      "strategy": "web-read",
-      "url": "https://www.tokyo-manga.top/attendance.php",
-      "name": "Tokyo",
-      "index": 34
-    },
-    {
-      "signal": "UNKNOWN",
-      "status": "VISITED",
-      "elapsed": "20.1s",
-      "strategy": "browser-visit",
-      "url": "https://usefultrash.net/browse.php",
-      "name": "UsefulTrash",
-      "index": 35
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "13.4s",
-      "strategy": "web-read",
-      "url": "https://mua.xloli.cc/attendance.php",
-      "name": "xloli",
-      "index": 36
-    },
-    {
-      "signal": "NEED_SIGN",
-      "status": "NO_DETECT",
-      "elapsed": "134.4s",
-      "strategy": "browser-open",
-      "url": "https://www.yemapt.org/#/consumer/checkIn",
-      "name": "Yemapt",
-      "index": 37
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "16.8s",
-      "strategy": "web-read",
-      "url": "https://www.yhpp.cc/attendance.php",
-      "name": "YHPP",
-      "index": 38
-    },
-    {
-      "signal": "SIGN_OK",
-      "status": "SUCCESS",
-      "elapsed": "26.8s",
-      "strategy": "browser-open",
-      "url": "https://bbs.pcbeta.com/forum-win11-1.html",
-      "name": "远景论坛",
-      "index": 39
-    }
-  ],
-  "skipped": 3,
-  "fail_sites": [
-    "FreeFarm",
-    "Yemapt"
-  ],
-  "skip_sites": [
-    "UBits",
-    "BTSchool",
-    "TJUPT"
-  ],
+  "success": 16,
   "iteration_log": [
     {
       "value": [
@@ -517,6 +160,609 @@
       "site": "HHCLUB",
       "timestamp": "2026-06-14 00:20:09",
       "signal": "UNKNOWN"
+    },
+    {
+      "contentPreview": "STAKE CGTS\\nSTAKE CGTS\\nCLICK HERE TO KNOW MORE ABOUT CYS STAKING\\nCONVERT\\nSTAKE\\nSTAKING AMOUNT\\n0 CGT\\nUNSTAKING AMOUNT\\n0 CGT\\nAPR\\n0%\\nCLAIM REWARDS\\n0 CYS\\nConnect Keplr\\nYOUR VALIDATORS\\nYour currently don't stake to any validators. Start staking now to select from the list of active validators below.\\nACTIVE VALIDATORS\\nCLICK HERE TO KNOW HOW TO RUN A VALIDATOR NODE\\nValidator\tVoting Power\tCommission Rate\tAPR\t\\nStatus\\n\tAction\\nCy\\nCysicFoundation01\\n\t\\n3659136.4075 CGT\\n30.69%\\n\t5%\t14.0",
+      "site": "cysic",
+      "signal": "UNKNOWN",
+      "timestamp": "2026-06-24 02:21:52",
+      "action": "pattern_discovery"
+    },
+    {
+      "contentPreview": "嗯… 无法访问此页面\\n似乎 fearnopeer.com 关闭了连接。\\n请尝试：\\n检查连接\\n检查代理和防火墙\\nERR_CONNECTION_CLOSED\\n刷新",
+      "site": "fearnopeer",
+      "signal": "UNKNOWN",
+      "timestamp": "2026-06-24 02:22:32",
+      "action": "pattern_discovery"
+    },
+    {
+      "contentPreview": "/\\nSchalkiii   Edit   Logout  Upload Invite (15) Donate - Please help if you can - June 80/125 Up: 500.00 MB Down: 0.00 B Ratio: ∞ Required: 0.00 Inbox Staff Inbox Uploads Bookmarks Notifications Subscriptions Comments Friends\\nHome\\nTorrents\\nCollages\\nRequests\\nForums\\nTop 10\\nRules\\nWiki\\nStaff\\nSchalkiii\\nSettings\\nStatistics\\nJoined: 3 years, 5 months ago\\nLast seen: Just now\\nUploaded: 500.00 MB\\nDownloaded: 0.00 B\\nRatio: ∞\\nRequired Ratio: 0.00\\nTokens: 0\\nPercentile Rankings (hover for ",
+      "site": "dreamingtree",
+      "signal": "UNKNOWN",
+      "timestamp": "2026-06-24 02:23:13",
+      "action": "pattern_discovery"
+    },
+    {
+      "timestamp": "2026-06-26 16:07:25",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "小天公益站\\n每日签到\\n请先使用 Linux Do 登录\\n🌿 使用 Linux Do 登录\\nTODAY BOARD\\n签到金额排行榜\\n统计日期：2026-06-26\\n1\\n🥇\\nNukaColaM\\n￥22.05\\n签到时间 09:26:43\\n2\\n🥈\\nDddye886\\n￥18.04\\n签到时间 09:39:33",
+      "site": "xt-url"
+    },
+    {
+      "timestamp": "2026-06-26 16:08:47",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "跳到主内容\\nToggle Sidebar\\nLittleSheep API\\n搜索\\n⌘\\nK\\n6\\n更改语言\\nS\\n聊天\\n游乐场\\n常规\\n概览\\n数据看板\\nAPI 密钥\\n使用日志\\n个人\\n钱包\\n个人资料\\nSC\\nSchalkiii\\n用户\\n@Schalkiii\\n•\\ndefault\\n当前余额\\n$1,016.55\\n剩余配额\\n总用量\\n$0\\n总消耗额度\\nAPI 请求\\n0\\n总请求数\\n设置\\n配置您的账户偏好和集成\\n账户绑定\\n设置与偏好\\n邮箱\\n未绑定\\n绑定\\nGitHub\\n未绑定\\n绑定\\nTelegram\\n未绑定\\n绑定\\nLinuxDO\\n已绑定\\n45418\\n已绑定\\n语言偏好\\n设置界面显示语言\\n界面语言\\n语言偏好会同步到您登录的所有设备，并影响 API 错误消息语言。\\n简体中文\\n安全\\n管理您的安全设置和账户访问\\n更改密码\\n更新您的密码以确保账户安全\\n访问令牌\\n生成和管理您的 API 访问令牌\\n删除账户\\n永久删除您的帐户和所有数据\\n每日签到\\n每日签到可获得随机额度奖励\\n立即签到\\n1\\n累计签到\\n",
+      "site": "littlesheep"
+    },
+    {
+      "timestamp": "2026-06-26 16:10:28",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "Huan API\\n首页\\n控制台\\n模型广场\\n文档\\n关于\\n7\\n登录\\n注册\\nHuan API\\n登 录\\n使用 LinuxDO 继续\\n使用 Passkey 登录\\n或\\n使用 邮箱或用户名 登录\\n我已阅读并同意用户协议和隐私政策\\n没有账户？ 注册\\n使用 Huan API 即代表您已阅读并同意我们的《用户协议》和《隐私政策》\\n设计与开发由 New API",
+      "site": "huan666"
+    },
+    {
+      "timestamp": "2026-06-26 16:11:48",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "404\\n糟糕！页面未找到！\\n您要查找的页面似乎\\n不存在或可能已被移除。\\n返回\\n返回主页",
+      "site": "pp"
+    },
+    {
+      "timestamp": "2026-06-26 16:13:03",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "ThatAPI\\n登录\\n没有账号？ 注册.\\n使用 Passkey 登录\\n或继续使用\\n使用 LinuxDO 继续\\n用户名或电子邮件\\n密码\\n忘记密码？\\n登录",
+      "site": "zxiaoruan"
+    },
+    {
+      "timestamp": "2026-06-26 16:14:09",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "404\\n糟糕！页面未找到！\\n您要查找的页面似乎\\n不存在或可能已被移除。\\n返回\\n返回主页",
+      "site": "42w"
+    },
+    {
+      "timestamp": "2026-06-26 16:15:23",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "API分享站\\n首页\\n控制台\\n模型广场\\n1\\nS\\nSchalkiii\\n聊天\\n操练场\\n控制台\\n数据看板\\n令牌管理\\n使用日志\\n绘图日志\\n任务日志\\n个人中心\\n钱包管理\\n个人设置\\n收起侧边栏\\nSC\\nSchalkiii\\n普通用户\\nID: 3597\\n$38.92\\n当前余额\\n历史消耗\\n$0.00\\n请求次数\\n0\\n用户分组\\ndefault\\n每日签到\\n每日签到可获得随机额度奖励\\n立即签到\\n1\\n累计签到\\n$18.916004\\n本月获得\\n$18.916004\\n累计获得\\n周日\\n周一\\n周二\\n周三\\n周四\\n周五\\n周六\\n31\\n6月 1日\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\n10\\n11\\n12\\n13\\n$18.92\\n14\\n15\\n16\\n17\\n18\\n19\\n20\\n21\\n22\\n23\\n24\\n25\\n26\\n27\\n28\\n29\\n30\\n7月 1日\\n2\\n3\\n4\\n每日签到可获得随机额度奖励\\n签到奖励将直接添加到您的账户余额\\n每日仅可签到一次，请勿重复签到\\n账户管理\\n账户绑定、安全设置和",
+      "site": "onrender"
+    },
+    {
+      "timestamp": "2026-06-26 16:17:12",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "烁\\n首页\\n控制台\\n模型健康度\\n模型广场\\n3\\n登录\\n注册\\n烁\\n登 录\\n使用 LinuxDO 继续\\n使用 Passkey 登录\\n或\\n使用 邮箱或用户名 登录\\n没有账户？ 注册\\n© 2026 烁. 版权所有\\n设计与开发由 New API",
+      "site": "h-e"
+    },
+    {
+      "timestamp": "2026-06-26 16:19:42",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "Any Router\\n首页\\n控制台\\n定价\\n使用指南\\nL\\nlinuxdo_191037\\n控制台\\n数据看板\\nAPI令牌\\n使用日志\\n个人中心\\n钱包\\n个人设置\\n👋下午好，linuxdo_191037\\n账户数据\\n当前余额\\n$100.00\\n历史消耗\\n$0.00\\n使用统计\\n请求次数\\n0\\n统计次数\\n0\\n资源消耗\\n统计额度\\n$0.00\\n统计Tokens\\n0\\n性能指标\\n平均RPM\\n0.000\\n平均TPM\\n0\\n模型数据分析\\n消耗分布\\n调用次数分布\\nAPI信息\\n主站\\n测速\\n主站直连\\nhttps://anyrouter.top\\n主站后端直连服务\\n大陆\\n测速\\n大陆网络优化\\nhttps://a-ocnfniawgw.cn-shanghai.fcapp.run\\n针对中国大陆地区优化的后端服务\\n系统公告\\n显示最新20条\\n默认\\n进行中\\n成功\\n警告\\n异常\\n本站已支持 gpt-5.5 调用，修复了一些报错\\n1 个月前\\n本站已支持 openclaw 调用，详情请点击右上角使用指南查看\\n4 个月前\\n主站域名可",
+      "site": "anyrouter"
+    },
+    {
+      "timestamp": "2026-06-26 16:21:39",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "contentPreview": "欢迎来到 邀玩（药丸）\\n本站点集成 PT信息、PT教程、PT邀请一条龙服务 从NAS到数据中心从百兆到专线入户\\n论坛新增一台PHP服务器，现在国内IP走CDN，国外IP走CF；出问题自动切换线路；\\n如有访问困难问题，请及时提供反馈 ；\\n你们每刷新一下，我的钱包都要-0.002\\n——辣佬 23/10/17\\n全部主题\\n新鲜出炉\\n【20260626】熊猫站点活动-世界杯竞猜火热开启，前100名均有丰厚奖励，大奖由你来挑！\\n灌水区 元宝 发布于 15 小时前\\n12\\n11 条未读，全部标记为已读。\\n观影推荐【006】期 - 《御法度》\\n灌水区影视 NWRC5711 发布于 21 小时前\\n1\\n0 条未读，全部标记为已读。\\n2026了，有没有一个webui 界面可以控制1个或多个qBittorrent 和 Transmission\\n灌水区 小王 发布于 1 天前\\n12\\n11 条未读，全部标记为已读。\\n【折腾血泪史】从4次花钱找人代装，到AI重构“屎山”，我的群晖NAS终极归拢之路\\nPT综合讨论 毛叔叔 发布于 1 天前\\n32\\n31 条未读，全部标记为已读",
+      "site": "invites"
+    },
+    {
+      "contentPreview": "小天公益站\\n每日签到\\n请先使用 Linux Do 登录\\n🌿 使用 Linux Do 登录\\nTODAY BOARD\\n签到金额排行榜\\n统计日期：2026-06-28\\n1\\n🥇\\nikurt\\n￥24.85\\n签到时间 18:26:39\\n2\\n🥈\\nlinuxdo_953\\n￥18.73\\n签到时间 21:53:43\\n3\\n🥉\\nalexdamocles\\n￥17.48\\n签到时间 21:53:33",
+      "timestamp": "2026-06-28 23:17:26",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "xt-url"
+    },
+    {
+      "contentPreview": "跳到主内容\\nToggle Sidebar\\nLittleSheep API\\n搜索\\n⌘\\nK\\n6\\n更改语言\\nS\\n聊天\\n游乐场\\n常规\\n概览\\n数据看板\\nAPI 密钥\\n使用日志\\n个人\\n钱包\\n个人资料\\nSC\\nSchalkiii\\n用户\\n@Schalkiii\\n•\\ndefault\\n当前余额\\n$1,016.55\\n剩余配额\\n总用量\\n$0\\n总消耗额度\\nAPI 请求\\n0\\n总请求数\\n设置\\n配置您的账户偏好和集成\\n账户绑定\\n设置与偏好\\n邮箱\\n未绑定\\n绑定\\nGitHub\\n未绑定\\n绑定\\nTelegram\\n未绑定\\n绑定\\nLinuxDO\\n已绑定\\n45418\\n已绑定\\n语言偏好\\n设置界面显示语言\\n界面语言\\n语言偏好会同步到您登录的所有设备，并影响 API 错误消息语言。\\n简体中文\\n安全\\n管理您的安全设置和账户访问\\n更改密码\\n更新您的密码以确保账户安全\\n访问令牌\\n生成和管理您的 API 访问令牌\\n删除账户\\n永久删除您的帐户和所有数据\\n每日签到\\n每日签到可获得随机额度奖励\\n立即签到\\n1\\n累计签到\\n",
+      "timestamp": "2026-06-28 23:18:19",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "littlesheep"
+    },
+    {
+      "contentPreview": "Huan API\\n首页\\n控制台\\n模型广场\\n文档\\n关于\\n7\\n登录\\n注册\\nHuan API\\n登 录\\n使用 LinuxDO 继续\\n使用 Passkey 登录\\n或\\n使用 邮箱或用户名 登录\\n我已阅读并同意用户协议和隐私政策\\n没有账户？ 注册\\n使用 Huan API 即代表您已阅读并同意我们的《用户协议》和《隐私政策》\\n设计与开发由 New API",
+      "timestamp": "2026-06-28 23:19:37",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "huan666"
+    },
+    {
+      "contentPreview": "404\\n糟糕！页面未找到！\\n您要查找的页面似乎\\n不存在或可能已被移除。\\n返回\\n返回主页",
+      "timestamp": "2026-06-28 23:20:37",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "pp"
+    },
+    {
+      "contentPreview": "Sorry, you have been blocked\\nYou are unable to access zxiaoruan.cn\\nWhy have I been blocked?\\nThis website is using a security service to protect itself from online attacks. The action you just performed triggered the security solution. There are several actions that could trigger this block including submitting a certain word or phrase, a SQL command or malformed data.\\nWhat can I do to resolve this?\\nYou can email the site owner to let them know you were blocked. Please include what you were ",
+      "timestamp": "2026-06-28 23:21:04",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "zxiaoruan"
+    },
+    {
+      "contentPreview": "404\\n糟糕！页面未找到！\\n您要查找的页面似乎\\n不存在或可能已被移除。\\n返回\\n返回主页",
+      "timestamp": "2026-06-28 23:21:44",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "42w"
+    },
+    {
+      "contentPreview": "API分享站\\n首页\\n控制台\\n模型广场\\n1\\nS\\nSchalkiii\\n聊天\\n操练场\\n控制台\\n数据看板\\n令牌管理\\n使用日志\\n绘图日志\\n任务日志\\n个人中心\\n钱包管理\\n个人设置\\n收起侧边栏\\nSC\\nSchalkiii\\n普通用户\\nID: 3597\\n$38.92\\n当前余额\\n历史消耗\\n$0.00\\n请求次数\\n0\\n用户分组\\ndefault\\n每日签到\\n每日签到可获得随机额度奖励\\n立即签到\\n1\\n累计签到\\n$18.916004\\n本月获得\\n$18.916004\\n累计获得\\n周日\\n周一\\n周二\\n周三\\n周四\\n周五\\n周六\\n31\\n6月 1日\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\n10\\n11\\n12\\n13\\n$18.92\\n14\\n15\\n16\\n17\\n18\\n19\\n20\\n21\\n22\\n23\\n24\\n25\\n26\\n27\\n28\\n29\\n30\\n7月 1日\\n2\\n3\\n4\\n每日签到可获得随机额度奖励\\n签到奖励将直接添加到您的账户余额\\n每日仅可签到一次，请勿重复签到\\n账户管理\\n账户绑定、安全设置和",
+      "timestamp": "2026-06-28 23:22:23",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "onrender"
+    },
+    {
+      "contentPreview": "烁\\n首页\\n控制台\\n模型健康度\\n模型广场\\n3\\n登录\\n注册\\n烁\\n登 录\\n使用 LinuxDO 继续\\n使用 Passkey 登录\\n或\\n使用 邮箱或用户名 登录\\n没有账户？ 注册\\n© 2026 烁. 版权所有\\n设计与开发由 New API",
+      "timestamp": "2026-06-28 23:23:50",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "h-e"
+    },
+    {
+      "contentPreview": "Any Router\\n首页\\n控制台\\n定价\\n使用指南\\nL\\nlinuxdo_191037\\n控制台\\n数据看板\\nAPI令牌\\n使用日志\\n个人中心\\n钱包\\n个人设置\\n👋晚上好，linuxdo_191037\\n账户数据\\n当前余额\\n$125.00\\n历史消耗\\n$0.00\\n使用统计\\n请求次数\\n0\\n统计次数\\n0\\n资源消耗\\n统计额度\\n$0.00\\n统计Tokens\\n0\\n性能指标\\n平均RPM\\n0.000\\n平均TPM\\n0\\n模型数据分析\\n消耗分布\\n调用次数分布\\nAPI信息\\n主站\\n测速\\n主站直连\\nhttps://anyrouter.top\\n主站后端直连服务\\n大陆\\n测速\\n大陆网络优化\\nhttps://a-ocnfniawgw.cn-shanghai.fcapp.run\\n针对中国大陆地区优化的后端服务\\n系统公告\\n显示最新20条\\n默认\\n进行中\\n成功\\n警告\\n异常\\n本站已支持 gpt-5.5 调用，修复了一些报错\\n1 个月前\\n本站已支持 openclaw 调用，详情请点击右上角使用指南查看\\n4 个月前\\n主站域名可",
+      "timestamp": "2026-06-28 23:25:29",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "anyrouter"
+    },
+    {
+      "contentPreview": "PBH-BTN BBS\\nBTN网络\\n Schalkiii\\n欢迎来到 PBH-BTN BBS\\n这里是一个讨论与 BitTorrent 有关内容的综合论坛。从左侧挑选一个标签开始浏览吧！\\n签到发布主题\\n全部主题\\n私密主题\\n我的关注\\n徽章\\n主题书签夹\\n标签\\n问答区\\n月读茶馆\\n冒险家协会\\nBitTorrent\\nGeekLab\\n下载器讨论\\nPT讨论\\nPeerBanHelper\\nBT资源\\n站务小桌\\n沙盒\\nBTN网络\\nqBittorrent\\n网络\\n更多标签...\\n最新回复\\n本站全站支持 RSS 订阅和邮件提醒推送\\n站务小桌\\n Jonathan Chiu 回复于 3月15日\\n 3.4千\\n为了方便大家订阅本站的最新内容，本站全站已支持全文 RSS 订阅，并支持通过邮件推送提醒信息。 RSS 订阅范围 首先要了解的是，RSS 订阅可见内容取决于你的账号权限。换言之，如果某些内容必须登录可见，则你的 RSS 阅读器也要配置登录。 对于带浏览器的 RSS 阅读，直接登录论坛即可。否则，你要在个人设置的安全选项卡创建开发者令牌，并根据这个文档配置鉴",
+      "timestamp": "2026-06-28 23:26:07",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "pbh-btn"
+    },
+    {
+      "contentPreview": "欢迎来到 邀玩（药丸）\\n本站点集成 PT信息、PT教程、PT邀请一条龙服务 从NAS到数据中心从百兆到专线入户\\n招募论坛开发，欢迎感兴趣的会PHP或JS的大佬，跪谢；\\n目前有江、浙地区用户反馈存在不明原因的访问问题，建议更换网络环境重新尝试访问。\\n你已经1分钟没有摸鱼了，猫猫很担心，趴在键盘上阻止你工作\\n全部主题\\n新鲜出炉\\n剧集推荐《村支书》\\n新鲜资讯区灌水区影视 柔风快枪 发布于 7 小时前\\n4\\n3 条未读，全部标记为已读。\\nR\\n发送两枚UB\\nPT邀请_发邀 Ronnie 发布于 9 小时前\\n1\\n0 条未读，全部标记为已读。\\nZ\\n发UB*2\\nPT邀请_发邀 zh609846284 发布于 10 小时前\\n1\\n0 条未读，全部标记为已读。\\n发UB*7 无契约\\nPT邀请_发邀 songjyu 发布于 10 小时前\\n8\\n7 条未读，全部标记为已读。\\nUB * 5 PPTP + 两个低隐私UID即可\\nPT邀请_发邀 七影蝶 发布于 10 小时前\\n1\\n0 条未读，全部标记为已读。\\n发UB*5\\nPT邀请_发邀 豆仁 发布于 11 小时前\\",
+      "timestamp": "2026-06-28 23:26:46",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "invites"
+    },
+    {
+      "contentPreview": "小天公益站\\n每日签到\\n请先使用 Linux Do 登录\\n🌿 使用 Linux Do 登录\\nTODAY BOARD\\n签到金额排行榜\\n统计日期：2026-06-29\\n1\\n🥇\\nli_li\\n￥20.16\\n签到时间 16:23:11\\n2\\n🥈\\nfslx\\n￥17.48\\n签到时间 10:30:46\\n3\\n🥉\\nwinffy2009\\n￥17.47\\n签到时间 18:25:11",
+      "timestamp": "2026-06-29 20:40:47",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "xt-url"
+    },
+    {
+      "contentPreview": "跳到主内容\\nToggle Sidebar\\nLittleSheep API\\n搜索\\n⌘\\nK\\n6\\n更改语言\\nS\\n聊天\\n游乐场\\n常规\\n概览\\n数据看板\\nAPI 密钥\\n使用日志\\n个人\\n钱包\\n个人资料\\nSC\\nSchalkiii\\n用户\\n@Schalkiii\\n•\\ndefault\\n当前余额\\n$1,016.55\\n剩余配额\\n总用量\\n$0\\n总消耗额度\\nAPI 请求\\n0\\n总请求数\\n设置\\n配置您的账户偏好和集成\\n账户绑定\\n设置与偏好\\n邮箱\\n未绑定\\n绑定\\nGitHub\\n未绑定\\n绑定\\nTelegram\\n未绑定\\n绑定\\nLinuxDO\\n已绑定\\n45418\\n已绑定\\n语言偏好\\n设置界面显示语言\\n界面语言\\n语言偏好会同步到您登录的所有设备，并影响 API 错误消息语言。\\n简体中文\\n安全\\n管理您的安全设置和账户访问\\n更改密码\\n更新您的密码以确保账户安全\\n访问令牌\\n生成和管理您的 API 访问令牌\\n删除账户\\n永久删除您的帐户和所有数据\\n每日签到\\n每日签到可获得随机额度奖励\\n立即签到\\n1\\n累计签到\\n",
+      "timestamp": "2026-06-29 20:41:33",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "littlesheep"
+    },
+    {
+      "contentPreview": "Huan API\\n首页\\n控制台\\n模型广场\\n文档\\n关于\\n7\\n登录\\n注册\\nHuan API\\n登 录\\n使用 LinuxDO 继续\\n使用 Passkey 登录\\n或\\n使用 邮箱或用户名 登录\\n我已阅读并同意用户协议和隐私政策\\n没有账户？ 注册\\n使用 Huan API 即代表您已阅读并同意我们的《用户协议》和《隐私政策》\\n设计与开发由 New API",
+      "timestamp": "2026-06-29 20:42:41",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "huan666"
+    },
+    {
+      "contentPreview": "404\\n糟糕！页面未找到！\\n您要查找的页面似乎\\n不存在或可能已被移除。\\n返回\\n返回主页",
+      "timestamp": "2026-06-29 20:43:23",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "pp"
+    },
+    {
+      "contentPreview": "ThatAPI\\n登录\\n没有账号？ 注册.\\n使用 Passkey 登录\\n或继续使用\\n使用 LinuxDO 继续\\n用户名或电子邮件\\n密码\\n忘记密码？\\n登录",
+      "timestamp": "2026-06-29 20:43:53",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "zxiaoruan"
+    },
+    {
+      "contentPreview": "404\\n糟糕！页面未找到！\\n您要查找的页面似乎\\n不存在或可能已被移除。\\n返回\\n返回主页",
+      "timestamp": "2026-06-29 20:44:24",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "42w"
+    },
+    {
+      "contentPreview": "API分享站\\n首页\\n控制台\\n模型广场\\n1\\nS\\nSchalkiii\\n聊天\\n操练场\\n控制台\\n数据看板\\n令牌管理\\n使用日志\\n绘图日志\\n任务日志\\n个人中心\\n钱包管理\\n个人设置\\n收起侧边栏\\nSC\\nSchalkiii\\n普通用户\\nID: 3597\\n$38.92\\n当前余额\\n历史消耗\\n$0.00\\n请求次数\\n0\\n用户分组\\ndefault\\n每日签到\\n每日签到可获得随机额度奖励\\n立即签到\\n1\\n累计签到\\n$18.916004\\n本月获得\\n$18.916004\\n累计获得\\n周日\\n周一\\n周二\\n周三\\n周四\\n周五\\n周六\\n31\\n6月 1日\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\n10\\n11\\n12\\n13\\n$18.92\\n14\\n15\\n16\\n17\\n18\\n19\\n20\\n21\\n22\\n23\\n24\\n25\\n26\\n27\\n28\\n29\\n30\\n7月 1日\\n2\\n3\\n4\\n每日签到可获得随机额度奖励\\n签到奖励将直接添加到您的账户余额\\n每日仅可签到一次，请勿重复签到\\n账户管理\\n账户绑定、安全设置和",
+      "timestamp": "2026-06-29 20:45:04",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "onrender"
+    },
+    {
+      "contentPreview": "烁\\n首页\\n控制台\\n模型健康度\\n模型广场\\n3\\n登录\\n注册\\n烁\\n登 录\\n使用 LinuxDO 继续\\n使用 Passkey 登录\\n或\\n使用 邮箱或用户名 登录\\n没有账户？ 注册\\n© 2026 烁. 版权所有\\n设计与开发由 New API",
+      "timestamp": "2026-06-29 20:45:45",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "h-e"
+    },
+    {
+      "contentPreview": "Any Router\\n首页\\n控制台\\n定价\\n使用指南\\nL\\nlinuxdo_191037\\n控制台\\n数据看板\\nAPI令牌\\n使用日志\\n个人中心\\n钱包\\n个人设置\\nLI\\nlinuxdo_191037\\n普通用户\\nID: 191037\\n当前余额\\n$150.00\\n历史消耗\\n$0.00\\n请求次数\\n0\\n用户分组\\ndefault\\n账户绑定\\n通知设置\\n个人设置\\nAPI令牌\\n钱包\\n退出",
+      "timestamp": "2026-06-29 20:47:03",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "anyrouter"
+    },
+    {
+      "contentPreview": "PBH-BTN BBS\\nBTN网络\\n Schalkiii\\n欢迎来到 PBH-BTN BBS\\n这里是一个讨论与 BitTorrent 有关内容的综合论坛。从左侧挑选一个标签开始浏览吧！\\n签到发布主题\\n全部主题\\n私密主题\\n我的关注\\n徽章\\n主题书签夹\\n标签\\n问答区\\n月读茶馆\\n冒险家协会\\nBitTorrent\\nGeekLab\\n下载器讨论\\nPT讨论\\nPeerBanHelper\\nBT资源\\n站务小桌\\n沙盒\\nBTN网络\\nqBittorrent\\n网络\\n更多标签...\\n最新回复\\n本站全站支持 RSS 订阅和邮件提醒推送\\n站务小桌\\n Jonathan Chiu 回复于 3月15日\\n 3.4千\\n为了方便大家订阅本站的最新内容，本站全站已支持全文 RSS 订阅，并支持通过邮件推送提醒信息。 RSS 订阅范围 首先要了解的是，RSS 订阅可见内容取决于你的账号权限。换言之，如果某些内容必须登录可见，则你的 RSS 阅读器也要配置登录。 对于带浏览器的 RSS 阅读，直接登录论坛即可。否则，你要在个人设置的安全选项卡创建开发者令牌，并根据这个文档配置鉴",
+      "timestamp": "2026-06-29 20:47:31",
+      "action": "pattern_discovery",
+      "signal": "UNKNOWN",
+      "site": "pbh-btn"
     }
-  ]
+  ],
+  "results": [
+    {
+      "url": "https://www.52pojie.cn/forum.php",
+      "status": "TIMEOUT",
+      "strategy": "browser-open",
+      "index": 1,
+      "name": "52pojie",
+      "signal": "NAV_FAIL",
+      "elapsed": "20.3s"
+    },
+    {
+      "url": "https://www.hdkyl.in/attendance.php",
+      "status": "SUCCESS",
+      "strategy": "browser-open",
+      "index": 2,
+      "name": "HDKYL",
+      "signal": "SIGN_OK",
+      "elapsed": "64.7s"
+    },
+    {
+      "url": "https://www.nodeseek.com/board",
+      "status": "SUCCESS",
+      "strategy": "browser-open",
+      "index": 3,
+      "name": "NodeSeek",
+      "signal": "SIGN_OK",
+      "elapsed": "22.1s"
+    },
+    {
+      "url": "https://ourbits.club/attendance.php",
+      "status": "VISITED",
+      "strategy": "browser-visit",
+      "index": 4,
+      "name": "OurBits",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "136.6s"
+    },
+    {
+      "url": "https://piggo.me/attendance.php?id=18989",
+      "status": "SUCCESS",
+      "strategy": "browser-open",
+      "index": 5,
+      "name": "PigGo",
+      "signal": "SIGN_OK",
+      "elapsed": "23.9s"
+    },
+    {
+      "url": "https://pt.0ff.cc/attendance.php",
+      "status": "SKIPPED",
+      "strategy": "manual",
+      "index": 6,
+      "name": "FreeFarm",
+      "signal": null,
+      "elapsed": "0s"
+    },
+    {
+      "url": "https://ubits.club/attendance.php",
+      "status": "CF_BLOCKED",
+      "strategy": "browser-open",
+      "index": 7,
+      "name": "UBits",
+      "signal": "CF_CHALLENGE",
+      "elapsed": "1108.8s"
+    },
+    {
+      "url": "https://www.v2ex.com/mission/daily",
+      "status": "SUCCESS",
+      "strategy": "browser-open",
+      "index": 8,
+      "name": "V2EX",
+      "signal": "SIGN_OK",
+      "elapsed": "14.8s"
+    },
+    {
+      "url": "https://13city.org/usercp.php?action=personal#signin",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 9,
+      "name": "13City",
+      "signal": "",
+      "elapsed": "169.4s"
+    },
+    {
+      "url": "https://asiandvdclub.org/index.php",
+      "status": "VISITED",
+      "strategy": "browser-visit",
+      "index": 10,
+      "name": "AsianDVDClub",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "132.9s"
+    },
+    {
+      "url": "https://bilibili.download/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 11,
+      "name": "BiliDownload",
+      "signal": "",
+      "elapsed": "168.5s"
+    },
+    {
+      "url": "https://pt.btschool.club/attendance.php",
+      "status": "SUCCESS",
+      "strategy": "browser-open",
+      "index": 12,
+      "name": "BTSchool",
+      "signal": "SIGN_OK",
+      "elapsed": "18.5s"
+    },
+    {
+      "url": "https://dstudio.me/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 13,
+      "name": "DepthStudio",
+      "signal": "",
+      "elapsed": "169.1s"
+    },
+    {
+      "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
+      "status": "VISITED",
+      "strategy": "browser-visit",
+      "index": 14,
+      "name": "DigitalCore",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "133.3s"
+    },
+    {
+      "url": "https://www.gamegamept.com/attendance.php",
+      "status": "SUCCESS",
+      "strategy": "browser-open",
+      "index": 15,
+      "name": "GGPT",
+      "signal": "SIGN_OK",
+      "elapsed": "16.2s"
+    },
+    {
+      "url": "https://pt.hdclone.top/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 16,
+      "name": "HDClone",
+      "signal": "",
+      "elapsed": "174.6s"
+    },
+    {
+      "url": "https://www.hddolby.com/attendance.php",
+      "status": "SUCCESS",
+      "strategy": "browser-open",
+      "index": 17,
+      "name": "HDDolby",
+      "signal": "SIGN_OK",
+      "elapsed": "14.6s"
+    },
+    {
+      "url": "https://hdhome.org/attendance.php",
+      "status": "SUCCESS",
+      "strategy": "browser-open",
+      "index": 18,
+      "name": "HDHome",
+      "signal": "SIGN_OK",
+      "elapsed": "17.4s"
+    },
+    {
+      "url": "https://hdvideo.top/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 19,
+      "name": "HDVideo",
+      "signal": "",
+      "elapsed": "168.4s"
+    },
+    {
+      "url": "https://hhanclub.net/attendance.php",
+      "status": "ERROR",
+      "strategy": "browser-open",
+      "index": 20,
+      "name": "HHCLUB",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "139.5s"
+    },
+    {
+      "url": "https://www.htpt.cc/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 21,
+      "name": "HTCPT",
+      "signal": "",
+      "elapsed": "168.3s"
+    },
+    {
+      "url": "https://kufirc.com/index.php",
+      "status": "VISITED",
+      "strategy": "browser-visit",
+      "index": 22,
+      "name": "Kufirc",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "133.1s"
+    },
+    {
+      "url": "https://kp.m-team.cc/index",
+      "status": "VISITED",
+      "strategy": "browser-visit",
+      "index": 23,
+      "name": "M-Team",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "133.3s"
+    },
+    {
+      "url": "https://www.momentpt.top/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 24,
+      "name": "Moment",
+      "signal": "",
+      "elapsed": "168.4s"
+    },
+    {
+      "url": "https://newinsane.info/browse.php",
+      "status": "VISITED",
+      "strategy": "browser-visit",
+      "index": 25,
+      "name": "NewInsane",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "132.5s"
+    },
+    {
+      "url": "https://rousi.pro/points",
+      "status": "EVAL_FAIL",
+      "strategy": "browser-eval-click",
+      "index": 26,
+      "name": "Rousi",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "369.8s"
+    },
+    {
+      "url": "https://sbpt.link/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 27,
+      "name": "SBPT",
+      "signal": "",
+      "elapsed": "168.5s"
+    },
+    {
+      "url": "https://speedapp.io/adult",
+      "status": "VISITED",
+      "strategy": "browser-visit",
+      "index": 28,
+      "name": "SpeedApp",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "132.9s"
+    },
+    {
+      "url": "https://www.tjupt.org/attendance.php",
+      "status": "SKIPPED",
+      "strategy": "manual",
+      "index": 29,
+      "name": "TJUPT",
+      "signal": null,
+      "elapsed": "0s"
+    },
+    {
+      "url": "https://www.tokyo-manga.top/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 30,
+      "name": "Tokyo",
+      "signal": "",
+      "elapsed": "168.2s"
+    },
+    {
+      "url": "https://usefultrash.net/browse.php",
+      "status": "VISITED",
+      "strategy": "browser-visit",
+      "index": 31,
+      "name": "UsefulTrash",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "132.6s"
+    },
+    {
+      "url": "https://mua.xloli.cc/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 32,
+      "name": "xloli",
+      "signal": "",
+      "elapsed": "168.3s"
+    },
+    {
+      "url": "https://www.yemapt.org/#/consumer/checkIn",
+      "status": "TIMEOUT",
+      "strategy": "browser-open",
+      "index": 33,
+      "name": "Yemapt",
+      "signal": "NAV_FAIL",
+      "elapsed": "51.3s"
+    },
+    {
+      "url": "https://www.yhpp.cc/attendance.php",
+      "status": "NO_ARTICLE",
+      "strategy": "web-read",
+      "index": 34,
+      "name": "YHPP",
+      "signal": "",
+      "elapsed": "169.6s"
+    },
+    {
+      "url": "https://bbs.pcbeta.com/forum-win11-1.html",
+      "status": "TIMEOUT",
+      "strategy": "browser-open",
+      "index": 35,
+      "name": "远景论坛",
+      "signal": "NAV_FAIL",
+      "elapsed": "80.7s"
+    },
+    {
+      "url": "https://fearnopeer.com/",
+      "status": "ERROR",
+      "strategy": "browser-open",
+      "index": 36,
+      "name": "fearnopeer",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "133.1s"
+    },
+    {
+      "url": "https://dreamingtree.org/user.php?id=37099",
+      "status": "ERROR",
+      "strategy": "browser-open",
+      "index": 37,
+      "name": "dreamingtree",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "132.9s"
+    },
+    {
+      "url": "https://cysic.xyz/stake",
+      "status": "ERROR",
+      "strategy": "browser-open",
+      "index": 38,
+      "name": "cysic",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "133.3s"
+    }
+  ],
+  "regressions": [
+    "52pojie",
+    "UBits",
+    "13City",
+    "BiliDownload",
+    "DepthStudio",
+    "HDClone",
+    "HDVideo",
+    "HHCLUB",
+    "HTCPT",
+    "Moment",
+    "Rousi",
+    "SBPT",
+    "Tokyo",
+    "xloli",
+    "Yemapt",
+    "YHPP",
+    "远景论坛"
+  ],
+  "new_successes": [],
+  "iterations": 40
 }

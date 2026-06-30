@@ -264,40 +264,6 @@ $WebSignInConfigs = @{
 })()
 '@
     }
-    "UBits" = @{
-        Url = "https://ubits.club/attendance.php"
-        WaitMs = 25000
-        NavTimeoutSec = 90
-        PostClickMs = 5000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
-  return 'UNKNOWN';
-})()
-'@
-        Click = @'
-(function(){
-  var all = document.querySelectorAll('a,span,b,font,button,input[type=submit]');
-  for(var i=0;i<all.length;i++){
-    var v = (all[i].textContent||all[i].value||'').trim();
-    if(v.indexOf('签到得魔力')>-1||v.indexOf('签到')>-1||v.indexOf('打卡')>-1){
-      all[i].click(); return 'CLICKED:'+v.substring(0,40);
-    }
-  }
-  return 'NO_BTN';
-})()
-'@
-    }
-
     "GGPT" = @{
         Url = "https://www.gamegamept.com/attendance.php"
         WaitMs = 12000
@@ -431,36 +397,21 @@ $WebSignInConfigs = @{
     }
 
     "BTSchool" = @{
-        Url = "https://pt.btschool.club/attendance.php"
+        Url = "https://pt.btschool.club/index.php"
         WaitMs = 12000
-        PostClickMs = 5000
+        PostClickMs = 0
         Detect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1||t.indexOf('签到得')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  if(t.indexOf('欢迎回来')>-1||t.indexOf('歡迎回來')>-1) return 'SIGN_OK';
   if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
+  if(t.indexOf('404')>-1&&t.length<200) return 'REDIRECTING';
   if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
   return 'UNKNOWN';
 })()
 '@
-        Click = @'
-(function(){
-  var all = document.querySelectorAll('a,span,b,font,button,input[type=submit]');
-  for(var i=0;i<all.length;i++){
-    var v = (all[i].textContent||all[i].value||'').trim();
-    if(v.indexOf('签到得魔力')>-1||v.indexOf('签到')>-1||v.indexOf('打卡')>-1){
-      all[i].click(); return 'CLICKED:'+v.substring(0,40);
-    }
-  }
-  return 'NO_BTN';
-})()
-'@
+        Click = $null
     }
 
     "远景论坛" = @{
@@ -529,31 +480,26 @@ $WebSignInConfigs = @{
 '@
     }
 
-    "Yemapt" = @{
-        Url = "https://www.yemapt.org/#/consumer/checkIn"
-        WaitMs = 20000
+    "Rousi" = @{
+        Url = "https://rousi.pro/points"
+        WaitMs = 12000
         PostClickMs = 5000
         Detect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
-  if(t.indexOf('人机验证加载中')>-1||t.indexOf('验证中')>-1) return 'CAPTCHA';
-  if(t.indexOf('连续签到')>-1&&t.indexOf('天')>-1&&t.indexOf('尚未签到')<0) return 'SIGN_OK';
-  if(t.indexOf('尚未签到')>-1) return 'NEED_SIGN';
-  if(t.indexOf('签到成功')>-1||t.indexOf('已签到')>-1) return 'SIGN_OK';
+  if(t.indexOf('签到成功')>-1||t.indexOf('已签到')>-1||t.indexOf('连续签到')>-1) return 'SIGN_OK';
   if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1) return 'LOGIN_REQUIRED';
   return 'UNKNOWN';
 })()
 '@
         Click = @'
 (function(){
-  var t = document.body.innerText||'';
-  if(t.indexOf('人机验证加载中')>-1) return 'CAPTCHA_BLOCKED';
-  var btns = document.querySelectorAll('button');
-  for(var i=0;i<btns.length;i++){
-    var v = (btns[i].textContent||'').trim();
-    if(v.indexOf('签到')>-1||v.indexOf('Sign')>-1||v.indexOf('sign')>-1){
-      btns[i].click(); return 'CLICKED:'+v.substring(0,40);
+  var all = document.querySelectorAll('a,button,.sign-btn,.checkin-btn');
+  for(var i=0;i<all.length;i++){
+    var v = (all[i].textContent||'').trim();
+    if(v.indexOf('签到')>-1&&v.indexOf('数')===-1){
+      all[i].click(); return 'CLICKED';
     }
   }
   return 'NO_BTN';
@@ -564,7 +510,9 @@ $WebSignInConfigs = @{
 
 function Invoke-WebSignIn {
     param(
-        [string]$SiteName
+        [string]$SiteName,
+        [bool]$SaveDebugSnapshot = $false,
+        [string]$DebugDir = ""
     )
     $cfg = $WebSignInConfigs[$SiteName]
     if (-not $cfg) {
@@ -579,7 +527,11 @@ function Invoke-WebSignIn {
         ClickEval = $cfg.Click
         WaitMs = $cfg.WaitMs
         PostClickWaitMs = $cfg.PostClickMs
+        SaveDebugSnapshot = $SaveDebugSnapshot
+        DebugDir = $DebugDir
     }
     if ($cfg.NavTimeoutSec) { $params.NavTimeoutSec = $cfg.NavTimeoutSec }
+    if ($cfg.CfRetryCount) { $params.CfRetryCount = $cfg.CfRetryCount }
+    if ($cfg.CfRetryWaitMs) { $params.CfRetryWaitMs = $cfg.CfRetryWaitMs }
     return Test-WebBridgeSignIn @params
 }

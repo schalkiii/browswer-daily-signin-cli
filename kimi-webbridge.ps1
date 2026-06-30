@@ -91,7 +91,11 @@ function Test-WebBridgeSignIn {
         [string]$ClickEval,
         [int]$WaitMs = 5000,
         [int]$PostClickWaitMs = 3000,
-        [int]$NavTimeoutSec = 60
+        [int]$NavTimeoutSec = 60,
+        [int]$CfRetryCount = 3,
+        [int]$CfRetryWaitMs = 10000,
+        [bool]$SaveDebugSnapshot = $false,
+        [string]$DebugDir = ""
     )
     $session = "daily-signin"
 
@@ -107,6 +111,7 @@ function Test-WebBridgeSignIn {
     Write-Host "  [WebBridge] $SiteName : evaluate detect"
     $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
     if (-not $detect) {
+        Save-DebugSnapshot $SiteName $session "detect_fail" $DebugDir $SaveDebugSnapshot
         return "EVAL_FAIL"
     }
 
@@ -116,21 +121,34 @@ function Test-WebBridgeSignIn {
     Write-Host "  [WebBridge] $SiteName : signal=$signal"
 
     if ($signal -match "SIGN_OK|ALREADY_SIGNED") {
+        Save-DebugSnapshot $SiteName $session "sign_ok" $DebugDir $SaveDebugSnapshot
         return "SIGN_OK"
     }
     if ($signal -match "LOGIN_REQUIRED|SLIDER|CAPTCHA") {
+        Save-DebugSnapshot $SiteName $session $signal $DebugDir $SaveDebugSnapshot
         return $signal
     }
 
     if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
-        $retryWaits = @(10, 15, 20)
-        for ($retry = 0; $retry -lt $retryWaits.Count; $retry++) {
-            Write-Host "  [WebBridge] $SiteName : CF/BODY retry $($retry+1)/$($retryWaits.Count), wait $($retryWaits[$retry])s..."
-            Start-Sleep -Seconds $retryWaits[$retry]
+        for ($retry = 0; $retry -lt $CfRetryCount; $retry++) {
+            # 尝试点击CF验证按钮（请验证您是真人 / Verify you are human / turnstile）
+            $cfClickResult = Invoke-CfVerifyClick $session $SiteName
+            if ($cfClickResult) { Write-Host "  [WebBridge] $SiteName : CF verify button clicked: $cfClickResult" }
+
+            $waitSec = [math]::Round($CfRetryWaitMs / 1000 * ($retry + 1), 0)
+            Write-Host "  [WebBridge] $SiteName : CF/BODY retry $($retry+1)/$CfRetryCount, wait ${waitSec}s..."
+            Start-Sleep -Seconds $waitSec
+            # 奇数次重试时刷新页面，帮助 CF 重新验证
+            if (($retry + 1) % 2 -eq 1) {
+                Write-Host "  [WebBridge] $SiteName : reloading page for CF re-check..."
+                $null = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = "location.reload()" } -Session $session -TimeoutSec 15
+                Start-Sleep -Seconds 5
+            }
             $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
             $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
             Write-Host "  [WebBridge] $SiteName : retry signal=$reSig"
             if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
+                Save-DebugSnapshot $SiteName $session "sign_ok_after_cf" $DebugDir $SaveDebugSnapshot
                 return "SIGN_OK"
             }
             if ($reSig -match "NEED_SIGN|UNKNOWN") {
@@ -138,10 +156,12 @@ function Test-WebBridgeSignIn {
                 break
             }
             if ($reSig -match "LOGIN_REQUIRED") {
+                Save-DebugSnapshot $SiteName $session "login_required" $DebugDir $SaveDebugSnapshot
                 return "LOGIN_REQUIRED"
             }
         }
         if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
+            Save-DebugSnapshot $SiteName $session "cf_blocked_final" $DebugDir $SaveDebugSnapshot
             return $signal
         }
     }
@@ -158,10 +178,147 @@ function Test-WebBridgeSignIn {
         $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
         $recheckSig = if ($recheck -is [string]) { $recheck } elseif ($recheck.value) { "$($recheck.value)" } else { "$recheck" }
         if ($recheckSig -match "SIGN_OK|ALREADY_SIGNED") {
+            Save-DebugSnapshot $SiteName $session "sign_ok_after_click" $DebugDir $SaveDebugSnapshot
             return "SIGN_OK"
         }
         $signal = $recheckSig
     }
 
+    Save-DebugSnapshot $SiteName $session "final_$signal" $DebugDir $SaveDebugSnapshot
     return $signal
+}
+
+# 尝试点击 CF 验证按钮（"请验证您是真人" / "Verify you are human" / turnstile checkbox）
+# 返回点击结果描述，未找到返回 $null
+function Invoke-CfVerifyClick {
+    param(
+        [string]$Session,
+        [string]$SiteName
+    )
+    $cfClickJS = @'
+(function(){
+  // 1. 点击 turnstile widget 中的 checkbox / 验证框
+  var selectors = [
+    'input[type="checkbox"]',
+    '.cf-turnstile',
+    '#challenge-stage',
+    '.g-recaptcha',
+    '[class*="turnstile"]',
+    '[class*="captcha"]',
+    '[id*="challenge"]',
+    'iframe[src*="challenges.cloudflare.com"]',
+    'iframe[src*="turnstile"]'
+  ];
+  var clicked = [];
+  for(var i=0;i<selectors.length;i++){
+    var els = document.querySelectorAll(selectors[i]);
+    for(var j=0;j<els.length;j++){
+      var el = els[j];
+      try {
+        // 尝试点击
+        el.click();
+        clicked.push(selectors[i]);
+      } catch(e) {}
+      // 如果是 iframe，尝试触发其内容
+      if(el.tagName === 'IFRAME'){
+        try { el.contentDocument.body.click(); } catch(e) {}
+      }
+    }
+  }
+  // 2. 查找页面上包含验证文字的可点击元素
+  var texts = ['请验证您是真人','验证您是真人','我不是机器人','我是人类','Verify you are human','I am human','I\'m not a robot','Not a robot'];
+  var allClickable = document.querySelectorAll('a,button,span,div,label');
+  for(var k=0;k<allClickable.length;k++){
+    var txt = (allClickable[k].textContent||'').trim();
+    for(var m=0;m<texts.length;m++){
+      if(txt.indexOf(texts[m])>-1 && txt.length < 50){
+        try {
+          allClickable[k].click();
+          clicked.push('text:"'+texts[m]+'"');
+        } catch(e) {}
+        break;
+      }
+    }
+  }
+  if(clicked.length > 0) return 'clicked:' + clicked.join(';');
+  return null;
+})()
+'@
+    try {
+        $result = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $cfClickJS } -Session $Session -TimeoutSec 10
+        if ($result -and $result.value) { return "$($result.value)" }
+        if ($result -is [string] -and $result) { return $result }
+    } catch {}
+    return $null
+}
+
+# 保存页面调试快照为 JSON
+# 包含: URL, title, body innerText, body outerHTML(截断), 检测信号, 时间戳
+function Save-DebugSnapshot {
+    param(
+        [string]$SiteName,
+        [string]$Session,
+        [string]$Stage,
+        [string]$DebugDir,
+        [bool]$Enabled
+    )
+    if (-not $Enabled -or [string]::IsNullOrEmpty($DebugDir)) { return }
+
+    try {
+        if (-not (Test-Path $DebugDir)) {
+            New-Item -ItemType Directory -Path $DebugDir -Force | Out-Null
+        }
+
+        $snapshotJS = @'
+(function(){
+  var r = {
+    url: location.href,
+    title: document.title,
+    readyState: document.readyState,
+    bodyText: document.body ? document.body.innerText.substring(0, 5000) : '',
+    bodyHtmlLen: document.body ? document.body.innerHTML.length : 0,
+    bodyHtml: document.body ? document.body.innerHTML.substring(0, 30000) : '',
+    cfIframes: [],
+    signTexts: []
+  };
+  // 收集 CF 相关 iframe
+  var iframes = document.querySelectorAll('iframe');
+  for(var i=0;i<iframes.length;i++){
+    var src = iframes[i].src || '';
+    if(src.indexOf('cloudflare')>-1 || src.indexOf('turnstile')>-1 || src.indexOf('captcha')>-1){
+      r.cfIframes.push(src);
+    }
+  }
+  // 收集页面中包含签到/验证/登录的文本片段
+  var keywords = ['签到','打卡','验证','登录','注册','欢迎','魔力','attendance','sign','check','verify','human','robot','captcha','turnstile','cloudflare'];
+  var allText = document.body ? document.body.innerText : '';
+  for(var k=0;k<keywords.length;k++){
+    var idx = allText.toLowerCase().indexOf(keywords[k].toLowerCase());
+    if(idx > -1){
+      r.signTexts.push(keywords[k] + ': ...' + allText.substring(Math.max(0,idx-20), Math.min(allText.length,idx+40)).replace(/\s+/g,' ') + '...');
+    }
+  }
+  return JSON.stringify(r);
+})()
+'@
+        $snapData = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $snapshotJS } -Session $Session -TimeoutSec 15
+        $snapJson = if ($snapData -is [string]) { $snapData } elseif ($snapData.value) { "$($snapData.value)" } else { "{}" }
+
+        $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $safeName = $SiteName -replace '[\\/:*?"<>|]', '_'
+        $fileName = "$safeName`_$Stage`_$timestamp.json"
+        $filePath = Join-Path $DebugDir $fileName
+
+        # 包装成完整对象
+        $wrapper = @{
+            site = $SiteName
+            stage = $Stage
+            timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+            page = ($snapJson | ConvertFrom-Json -ErrorAction SilentlyContinue)
+        }
+        $wrapper | ConvertTo-Json -Depth 6 | Out-File $filePath -Encoding UTF8
+        Write-Host "  [Debug] Snapshot saved: $fileName"
+    } catch {
+        Write-Host "  [Debug] Snapshot save failed: $($_.Exception.Message)"
+    }
 }

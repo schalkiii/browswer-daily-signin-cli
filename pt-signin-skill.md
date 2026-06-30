@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, slider captcha API bypass,
   click-to-sign pages, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-06-22 (v4.6 — Yemapt moved to manual: SPA site with human verification cannot be automated)
+updated: 2026-06-23 (v4.8 — Debug快照机制；CF验证按钮点击；AI调试反馈循环方法论）
 ---
 
 # PT Site Sign-in Automation
@@ -854,7 +854,111 @@ Every sign-in session must follow this complete workflow. No step may be skipped
 24. **SPA sites with human verification = manual site (v4.6)**: Yemapt on 2026-06-22 consistently returned NEED_SIGN even after clicking the "立即签到" button.
     - **Diagnosis**: After webbridge navigate to `https://www.yemapt.org/#/consumer/checkIn`, detect returned NEED_SIGN, click returned CLICKED:立即签到, but re-check still returned NEED_SIGN. Historical records show this site uses SPA architecture and on 2026-06-02 displayed "人机验证加载中" (human verification loading).
     - **Root cause**: SPA sign-in logic likely depends on asynchronous API calls; the click event may not trigger the actual sign-in request, or additional frontend validation may be required
-    - **Fix**:
-      1. `sites.json`: strategy changed from `browser-open` to `manual`, note records "2026-06-22: SPA site with human verification, webbridge click does not change state, cannot automate, moved to manual"
-      2. `baseline.json`: moved Yemapt from `sites` to `manual_sites`, auto_total 40, manual_total 5
-    - **Lesson**: SPA sites (especially those with human verification) are difficult to automate. When multiple attempts (including increased wait times, retries) still fail, move to manual promptly to avoid wasting daily sign-in opportunities.
+    - **Fix** (v4.7 update): Yemapt was restored to automated on 2026-06-23. The original assessment was premature — with proper webbridge configuration, Yemapt sign-in works correctly (SIGN_OK). The earlier failure may have been caused by timing issues or temporary site state.
+    - **Lesson**: Don't move to manual too quickly. Multiple retry attempts with progressively longer waits and page reloads should be tried first before giving up on automation.
+
+25. **Never auto-add manual strategy — notify only (v4.7)**: Automation must never automatically change a site's strategy to `manual`. Sites that appear to need manual intervention must be flagged in a `needs_manual_review` list and reported via Feishu, but the actual strategy change requires explicit user approval.
+    - **Why**: Auto-moving sites to manual is irreversible without user awareness. False positives (sites that just need more wait/retry) permanently remove sites from automation unnecessarily.
+    - **Implementation**:
+      1. `$tracking.needs_manual_review` tracks sites with CF_BLOCKED or SLIDER_FAIL
+      2. Feishu card shows "需人工审核" section with warning
+      3. `signin-log.json` includes `needs_manual_review` field
+      4. Console prints `[REVIEW]` line with reminder
+      5. No code path sets strategy to "manual" automatically
+    - **Rule**: Only the user can manually edit `sites.json` to change strategy to `manual`. The code only reports, never decides.
+
+26. **Bookmark folder path matching bug (v4.7)**: The `Walk-BookmarkNodes` function used `$node.name` (leaf folder name only, e.g. "签到") to match against `$bookmarkFolderPattern` (full path like "PT/签到"). The leaf name never matches the full path pattern, so bookmark sync was completely broken — no new sites were ever discovered.
+    - **Fix**: Pass accumulated `$path` parameter through recursive calls, building `$curPath = "$path/$($node.name)"` and matching against the full path.
+    - **Affected files**: `signin-batch.ps1` (Sync-Bookmarks), `scan-bookmarks.ps1` (Walk-All, Collect-Urls)
+    - **Lesson**: Always test path-based matching against the full path, not just the leaf name. Test with actual bookmark structure verification.
+
+27. **CF retry enhancement: progressive wait + page reload (v4.7)**: For stubborn CF Managed Challenge sites (UBits), increase CF retry count and add page reload on odd-numbered retries to trigger CF re-evaluation.
+    - **Config**: `CfRetryCount` (default 3) and `CfRetryWaitMs` (default 10000) are configurable per site in `signin-web.ps1`
+    - **Pattern**: Wait grows linearly (1×, 2×, 3×... of base `CfRetryWaitMs`
+    - **Page reload**: Every odd retry reloads the page via `location.reload()` to give CF a fresh chance to evaluate the client
+    - **UBits config**: `WaitMs=45000, CfRetryCount=5, CfRetryWaitMs=20000` (total ~5min max wait)
+
+28. **Visit-only sites (v4.7)**: Some PT sites don't have a sign-in/attendance feature. For these, "success" means just visiting the site while logged in (account activity maintenance).
+    - **Example**: BTSchool — `attendance.php` returns 404, no sign-in button anywhere on the site
+    - **Detection**: Check for "欢迎回来" (welcome back) in page text → return SIGN_OK
+    - **Strategy**: `browser-open` + webbridge, no `Click = $null
+    - **URL**: Use `index.php` (home page), not `attendance.php`
+    - **Purpose**: Maintain account activity and share ratio visibility
+    - **Report as**: SUCCESS / VISITED (logged-in visit counts as success)
+
+29. **BTSchool is alive, attendance.php is dead (v4.7)**: Earlier conclusion that BTSchool was closed was incorrect — the site is fully operational. The mistake was testing only `attendance.php` which returns 404; the actual site works fine.
+    - **Correct URL**: `https://pt.btschool.club/index.php` (home page works, user is logged in, 5.6TB upload, 72+ share ratio
+    - **Why the mistake**: Only tested `attendance.php` (returns 404), never checked other pages
+    - **Lesson**: Don't declare a site "closed" based on one URL returning 404. Always check the homepage and other key pages first.
+    - **Fix**: Changed to visit-only strategy (see #28 above)
+
+30. **Yemapt works with webbridge (v4.7)**: Yemapt was moved to manual in v4.6 due to SPA + human verification concerns. Re-tested in v4.7 with webbridge and it returns SIGN_OK on first attempt.
+    - **URL**: `https://www.yemapt.org/#/consumer/checkIn`
+    - **WaitMs**: 20000
+    - **Result**: SIGN_OK (detects "连续签到N天" pattern
+    - **Lesson**: Don't give up on SPA sites too quickly. Webbridge with proper wait time and retry logic can handle many SPA sign-in pages.
+
+31. **Debug Snapshot System (v4.8)**: Every webbridge sign-in session can save full page snapshots as JSON files for post-mortem analysis. Snapshots are saved when `SaveDebugSnapshot = $true` and include:
+    - **What's saved**: URL, title, readyState, bodyText (5000 chars), bodyHtml (30000 chars), cfIframes list, signTexts (keyword context snippets)
+    - **When saved**: At key stages: detect_fail, sign_ok, login_required, cf_blocked_final, sign_ok_after_cf, sign_ok_after_click, final_<signal>
+    - **File location**: `debug-snapshots/<SiteName>_<Stage>_<timestamp>.json`
+    - **How to enable**: `.\signin-batch.ps1 -SaveDebugSnapshot` or pass `-SaveDebugSnapshot $true -DebugDir <path>` to `Invoke-WebSignIn`
+    - **Purpose**: Replace blind guessing about "what was on the page" with concrete evidence. Enables AI-driven diagnosis without needing to re-run.
+
+32. **CF verify button auto-click (v4.8)**: `Invoke-CfVerifyClick` function automatically attempts to click CF challenge buttons during retry loops:
+    - **What it clicks**: turnstile widgets, captcha checkboxes, challenge-stage elements, iframes containing cloudflare/turnstile/captcha
+    - **Text matching**: "请验证您是真人", "验证您是真人", "我不是机器人", "Verify you are human", "I am human", "I'm not a robot", "Not a robot"
+    - **When it runs**: At the start of each CF_CHALLENGE retry iteration
+    - **Limitation**: CF Managed Challenge (automatic, no visible button) cannot be clicked through — this only helps with Turnstile widget style challenges that require a click to start
+    - **For Managed Challenge**: The user must manually pass CF once to establish a trusted browser session/CF cookie. After that, webbridge can use the authenticated session.
+
+33. **AI Debug Feedback Loop (v4.8) — MANDATORY METHODOLOGY**: When a site fails sign-in, AI must follow this structured feedback loop using debug snapshots. Do NOT skip steps.
+
+    **Phase 1 — Evidence Collection (must do before hypothesizing)**
+    1. Locate the debug snapshot: `debug-snapshots/<SiteName>_*_<latest_timestamp>.json`
+    2. Read ALL fields: url, title, bodyText, bodyHtml, cfIframes, signTexts
+    3. Check `signin-log.json` for the exact failure status and signal
+    4. Check `iterations.json` for any prior attempts/fixes for this site
+
+    **Phase 2 — Diagnosis (3+ hypotheses, ranked)**
+    Generate at least 3 falsifiable hypotheses for why the sign-in failed. Rank them by likelihood.
+    Example hypotheses:
+    - H1: CF Managed Challenge — browser fingerprint detected as automated (evidence: title="请稍候…", body contains "正在进行安全验证")
+    - H2: Login session expired (evidence: body contains "请登录"/"未登录")
+    - H3: Sign-in button pattern mismatch (evidence: page has sign-in text but our detect JS doesn't match)
+
+    **Phase 3 — Targeted Test (one variable at a time)**
+    For the top hypothesis, design a targeted test using webbridge:
+    - If CF challenge: Increase WaitMs, add more retries, try page reload, check if manual pass helps
+    - If login issue: Verify by navigating to homepage and checking for username
+    - If pattern mismatch: Extract page text, find actual sign-in text, update detect JS
+    - If missing button: Inspect HTML for actual button tag/class, update click JS
+
+    **Phase 4 — Fix & Verify**
+    1. Update the relevant config in `signin-web.ps1` (detect JS, click JS, WaitMs, CfRetryCount, etc.)
+    2. Run `Invoke-WebSignIn -SiteName "<Name>" -SaveDebugSnapshot $true -DebugDir "<path>"` to verify
+    3. Save the debug snapshot from the successful run as evidence
+    4. If the fix works → solidify: update baseline, update skill doc, add lesson learned
+
+    **Phase 5 — Solidification (must do after every successful fix)**
+    After a site starts working:
+    1. Update `baseline.json` if it's a new success
+    2. Add a numbered lesson to this skill doc (like #31, #32, etc.)
+    3. Update `README.md` if the feature affects user-facing documentation
+    4. Update `CHANGELOG.md`
+    5. Commit and push the changes
+
+    **Anti-patterns to avoid**:
+    - ❌ Guessing at the cause without reading debug snapshots
+    - ❌ Changing multiple variables at once (e.g., both WaitMs and detect JS)
+    - ❌ Declaring a site "impossible" after one attempt
+    - ❌ Moving to manual without going through the full feedback loop first
+    - ❌ Fixing and then forgetting to document the lesson
+
+    **Rule**: If you can't explain WHY the fix worked (based on snapshot evidence), you haven't finished debugging. The fix might be a fluke.
+
+34. **CF Managed Challenge vs Turnstile Widget (v4.8)**: Two different CF challenge types, two different approaches:
+    - **CF Turnstile Widget**: Visible checkbox/widget, requires click to start. `Invoke-CfVerifyClick` can help. Often passes automatically after click.
+    - **CF Managed Challenge**: No visible button, automatic browser fingerprinting in background. `Invoke-CfVerifyClick` does nothing. May pass automatically if browser looks "human enough"; if not, requires user to manually pass once to establish trust.
+    - **How to tell**: Check bodyHtml for `cType: 'managed'` (Managed) vs turnstile iframe with checkbox (Widget). Check page title: "请稍候…" = Managed; "Just a moment" with checkbox = Widget.
+    - **For Managed Challenge failures**: The best strategy is (1) increase wait time + retries + page reloads, (2) if still failing, user manually passes once in the same browser profile, (3) subsequent runs should work via preserved cookies/session.

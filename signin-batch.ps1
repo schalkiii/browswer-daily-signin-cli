@@ -2,8 +2,10 @@ param(
     [string]$ConfigFile = "$PSScriptRoot\sites.json",
     [string]$ResultFile = "$PSScriptRoot\signin-log.json",
     [string]$WebArticlesDir = "$PSScriptRoot\web-articles",
+    [string]$DebugDir = "$PSScriptRoot\debug-snapshots",
     [string]$FeishuChatId = "",
-    [string]$FeishuWebhook = ""
+    [string]$FeishuWebhook = "",
+    [switch]$SaveDebugSnapshot
 )
 
 $ErrorActionPreference = "Continue"
@@ -63,7 +65,7 @@ if (Test-Path $BaselineFile) {
         $baseline = @{ sites = @(); manual_sites = @() }
     }
 }
-$tracking = @{ new_sites = @(); regressions = @(); exploratory_total = 0 }
+$tracking = @{ new_sites = @(); regressions = @(); exploratory_total = 0; needs_manual_review = @() }
 Write-Output "Baseline: $($baseline.sites.Count) known-success sites"
 
 # Signal check function - the deterministic pass/fail signal
@@ -283,6 +285,10 @@ function Invoke-PatternDiscovery {
     }
 }
 
+# 同步浏览器书签中的 PT 站点列表
+# ⚠️  禁止自动添加 manual 策略：新增站点统一使用 web-read 或 browser-open。
+# 如需标记为 manual，必须由用户人工确认后手动修改 sites.json。
+# 失败站点仅记入 needs_manual_review 列表，通过飞书通知用户处理。
 function Sync-Bookmarks {
     param($ConfigFile, $ConfigObject)
     $bookmarkFile = if ($GlobalCfg -and $GlobalCfg.browser -and $GlobalCfg.browser.userDataPath -and $GlobalCfg.browser.profilePath) {
@@ -302,17 +308,18 @@ function Sync-Bookmarks {
     Write-Output "[SYNC] Scanning Edge bookmarks..."
     $bookmarks = Get-Content $bookmarkFile -Raw -Encoding UTF8 | ConvertFrom-Json
     $bookmarkUrls = [System.Collections.Generic.List[string]]::new()
-    function Walk-BookmarkNodes($node, $list) {
+    function Walk-BookmarkNodes($node, $path, $list) {
         if ($node.type -eq 'folder') {
-            if ($node.name -match $bookmarkFolderPattern) {
+            $curPath = "$path/$($node.name)"
+            if ($curPath -match $bookmarkFolderPattern) {
                 foreach ($child in $node.children) {
                     if ($child.type -eq 'url') { $list.Add($child.url) }
                 }
             }
-            foreach ($child in $node.children) { Walk-BookmarkNodes $child $list }
+            foreach ($child in $node.children) { Walk-BookmarkNodes $child $curPath $list }
         }
     }
-    Walk-BookmarkNodes $bookmarks.roots.bookmark_bar $bookmarkUrls
+    Walk-BookmarkNodes $bookmarks.roots.bookmark_bar "" $bookmarkUrls
     $bookmarkUrls = $bookmarkUrls | Select-Object -Unique
     if ($bookmarkUrls.Count -eq 0) {
         Write-Output "[SYNC] No PT签到 bookmarks found, keeping all existing sites"
@@ -469,7 +476,7 @@ foreach ($site in $config.sites) {
                         $r.status = "SKIPPED"; $r.signal = "DAEMON_DOWN"
                         $signals.skip_sites += $site.name; Write-Output "  => SKIPPED (webbridge daemon 不可用)"
                     } else {
-                        $wbResult = Invoke-WebSignIn $site.name
+                        $wbResult = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir
                         $r.signal = $wbResult
                         switch -Wildcard ($wbResult) {
                             "SIGN_OK"       { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
@@ -488,7 +495,7 @@ foreach ($site in $config.sites) {
                             for ($retry = 1; $retry -le 2; $retry++) {
                                 Write-Output "  [RETRY $retry/2] $($site.name) - waiting 10s..."
                                 Start-Sleep -Seconds 10
-                                $wbResult2 = Invoke-WebSignIn $site.name
+                                $wbResult2 = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir
                                 $r.signal = $wbResult2
                                 if ($wbResult2 -eq "SIGN_OK") {
                                     $r.status = "SUCCESS"
@@ -499,6 +506,11 @@ foreach ($site in $config.sites) {
                                 }
                                 Write-Output "  [RETRY $retry/2] $site.name => $wbResult2"
                             }
+                        }
+                        # ⚠️  禁止自动添加 manual：失败站点仅记入需人工审核列表，不改策略
+                        if ($r.status -eq "CF_BLOCKED" -or $r.status -eq "SLIDER_FAIL") {
+                            $tracking.needs_manual_review += "$($site.name)($($r.status))"
+                            Write-Output "  [REVIEW] 需人工审核: $($site.name) - $($r.status)（不会自动改为 manual）"
                         }
                     }
                 } else {
@@ -683,6 +695,7 @@ $summary = @{
     baseline_known= $baseline.sites.Count
     new_successes = $tracking.new_sites
     regressions   = $tracking.regressions
+    needs_manual_review = $tracking.needs_manual_review
     ok_sites      = $signals.ok_sites
     fail_sites    = $signals.fail_sites
     skip_sites    = $signals.skip_sites
@@ -696,6 +709,7 @@ Write-Output "=== Signal ==="
 Write-Output "PASS: $([string]$signals.ok). AUTO_OK=$($signals.ok_sites.Count) AUTO_FAIL=$($signals.fail_sites.Count) MANUAL_SKIP=$($signals.skip_sites.Count) BASELINE=$($baseline.sites.Count)"
 if ($tracking.new_sites.Count -gt 0) { Write-Output "NEW:  $($tracking.new_sites -join ', ')" }
 if ($tracking.regressions.Count -gt 0) { Write-Output "REGR: $($tracking.regressions -join ', ')" }
+if ($tracking.needs_manual_review.Count -gt 0) { Write-Output "REVIEW: $($tracking.needs_manual_review -join ', ') (需人工确认，不会自动改manual)" }
 Write-Output "OK:   $($signals.ok_sites -join ', ')"
 if ($signals.fail_sites.Count -gt 0) { Write-Output "FAIL: $($signals.fail_sites -join ', ')" }
 Write-Output "Log:  $ResultFile"
@@ -821,6 +835,17 @@ function Send-FeishuSummary {
         $cardElements += @{
             tag = "div"
             text = @{ tag = "lark_md"; content = $failMd }
+        }
+    }
+
+    # --- Needs manual review section (仅通知，不自动改策略) ---
+    if ($tracking.needs_manual_review.Count -gt 0) {
+        $cardElements += @{ tag = "hr" }
+        $reviewJoined = ($tracking.needs_manual_review | Sort-Object) -join ", "
+        $reviewMd = "**$e_alarm 需人工审核 ($($tracking.needs_manual_review.Count))**`n$reviewJoined`n⚠️  系统不会自动改为 manual，请人工确认后手动修改"
+        $cardElements += @{
+            tag = "div"
+            text = @{ tag = "lark_md"; content = $reviewMd }
         }
     }
 

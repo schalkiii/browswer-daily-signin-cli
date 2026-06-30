@@ -1,6 +1,6 @@
 {
   "version": "v3.9",
-  "total": 39,
+  "total": 38,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -14,12 +14,6 @@
       "url": "https://www.hdkyl.in/attendance.php",
       "strategy": "browser-open",
       "note": "书签同步: HDKYL - webbridge"
-    },
-    {
-      "name": "InvitesFun",
-      "url": "https://www.invites.fun/?sort=newest",
-      "strategy": "browser-open",
-      "note": "书签同步: InvitesFun - webbridge"
     },
     {
       "name": "NodeSeek",
@@ -42,14 +36,14 @@
     {
       "name": "FreeFarm",
       "url": "https://pt.0ff.cc/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: FreeFarm - webbridge (2026-06-19: 滑块验证持续拦截，webbridge无法绕过)"
+      "strategy": "manual",
+      "note": "2026-06-23: 滑块验证持续拦截，webbridge无法绕过，移入manual（禁止自动添加manual，需人工确认）"
     },
     {
       "name": "UBits",
       "url": "https://ubits.club/attendance.php",
       "strategy": "manual",
-      "note": "2026-06-20: 站点启用Cloudflare托管挑战（需人机交互验证），webbridge无法绕过，改为手动"
+      "note": "2026-07-01: CF托管挑战15轮重试全失败，webbridge无法绕过，改回manual"
     },
     {
       "name": "V2EX",
@@ -78,8 +72,8 @@
     {
       "name": "BTSchool",
       "url": "https://pt.btschool.club/attendance.php",
-      "strategy": "manual",
-      "note": "2026-06-10: 站点持续返回404/REDIRECTING，疑似已关闭或更换域名，改为手动"
+      "strategy": "browser-open",
+      "note": "书签同步: BTSchool - webbridge (2026-06-23: 移出manual，用户确认浏览器可访问，尝试webbridge适配)"
     },
     {
       "name": "DepthStudio",
@@ -98,12 +92,6 @@
       "url": "https://www.gamegamept.com/attendance.php",
       "strategy": "browser-open",
       "note": "书签同步: GGPT签到 - webbridge (web-read被CF拦截，改用webbridge)"
-    },
-    {
-      "name": "HDBao",
-      "url": "https://hdbao.cc/attendance.php",
-      "strategy": "browser-open",
-      "note": "书签同步: HDBao - webbridge (web-read假成功，需点击签到按钮)"
     },
     {
       "name": "HDClone",
@@ -160,29 +148,16 @@
       "note": "书签同步: Moment签到"
     },
     {
-      "name": "Musopia",
-      "url": "https://www.musopia.vip/attendance.php",
-      "strategy": "web-read",
-      "note": "书签同步: 音乐乌托邦签到 (2026-06-09: 站点无法访问，web-read和browser-open均失败)"
-    },
-    {
       "name": "NewInsane",
       "url": "https://newinsane.info/browse.php",
       "strategy": "browser-visit",
       "note": "书签同步: NewInsane 仅访问"
     },
     {
-      "name": "PTLAO",
-      "url": "https://ptlao.top/attendance.php",
-      "strategy": "web-read",
-      "note": "书签同步: PTLAO签到"
-    },
-    {
       "name": "Rousi",
       "url": "https://rousi.pro/points",
-      "strategy": "browser-eval-click",
-      "eval": "(function(){var t=document.body.innerText||'';if(t.indexOf('签到成功')>-1||t.indexOf('已签到')>-1||t.indexOf('连续签到')>-1)return'SIGN_OK';var all=document.querySelectorAll('a,button,.sign-btn,.checkin-btn');for(var i=0;i<all.length;i++){var v=all[i].textContent||'';if(v.indexOf('签到')>-1&&v.indexOf('数')==-1){all[i].click();return'CLICKED'}}return'NO_BTN'})()",
-      "note": "书签同步: Rousi签到"
+      "strategy": "browser-open",
+      "note": "书签同步: Rousi签到 - 改用webbridge避免opencli daemon端口冲突"
     },
     {
       "name": "SBPT",
@@ -224,7 +199,7 @@
       "name": "Yemapt",
       "url": "https://www.yemapt.org/#/consumer/checkIn",
       "strategy": "manual",
-      "note": "2026-06-22: SPA站点且有人机验证加载中，webbridge点击签到后状态未变更，无法自动化，改为手动"
+      "note": "2026-07-01: webbridge导航超时+tab丢失，SPA人机验证无法自动化，改回manual"
     },
     {
       "name": "YHPP",
@@ -237,6 +212,24 @@
       "url": "https://bbs.pcbeta.com/forum-win11-1.html",
       "strategy": "browser-open",
       "note": "书签同步: 远景论坛签到 - webbridge (browser-eval-click不稳定，改用webbridge)"
+    },
+    {
+      "name": "fearnopeer",
+      "url": "https://fearnopeer.com/",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "dreamingtree",
+      "url": "https://dreamingtree.org/user.php?id=37099",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "cysic",
+      "url": "https://cysic.xyz/stake",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
     }
   ],
   "batch": {

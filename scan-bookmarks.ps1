@@ -34,7 +34,7 @@ $b = Get-Content $bookmarkFile -Raw -Encoding UTF8 | ConvertFrom-Json
 function Walk-All($node, $path) {
     if ($node.type -eq 'folder') {
         $curPath = $path + '/' + $node.name
-        if ($node.name -match $bookmarkPattern) {
+        if ($curPath -match $bookmarkPattern) {
             Write-Host ('FOLDER: ' + $curPath)
             foreach ($c in $node.children) {
                 if ($c.type -eq 'url') {
@@ -50,16 +50,17 @@ Walk-All $b.roots.bookmark_bar '/bookmark_bar'
 
 Write-Output ""
 Write-Output "=== 总计 ==="
-$allUrls = @()
-function Collect-Urls($node) {
+function Collect-Urls($node, $path, $list) {
     if ($node.type -eq 'folder') {
-        if ($node.name -match $bookmarkPattern) {
+        $curPath = "$path/$($node.name)"
+        if ($curPath -match $bookmarkPattern) {
             foreach ($c in $node.children) {
-                if ($c.type -eq 'url') { $allUrls += $c.url }
+                if ($c.type -eq 'url') { $list.Add($c.url) }
             }
         }
-        foreach ($c in $node.children) { Collect-Urls $c }
+        foreach ($c in $node.children) { Collect-Urls $c $curPath $list }
     }
 }
-Collect-Urls $b.roots.bookmark_bar
-Write-Output "匹配到 $($allUrls.Count) 个书签 URL"
+$allUrlList = [System.Collections.Generic.List[string]]::new()
+Collect-Urls $b.roots.bookmark_bar "" $allUrlList
+Write-Output "匹配到 $($allUrlList.Count) 个书签 URL"

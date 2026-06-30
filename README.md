@@ -115,11 +115,21 @@ signin-batch.ps1（主调度）
 | 策略                       | 站点数 | 原理                              | 适用场景                  |
 | -------------------------- | ------ | --------------------------------- | ------------------------- |
 | `web-read`                 | 22     | 直接 HTTP GET，服务端自动记录签到 | NexusPHP attendance.php   |
-| `browser-open` (webbridge) | 6      | 操控真实浏览器，CF 零挑战         | CF/WAF 保护站点、论坛签到 |
+| `browser-open` (webbridge) | 15     | 操控真实浏览器，CF 零挑战         | CF/WAF 保护站点、论坛签到 |
 | `browser-open` (opencli)   | 2      | 浏览器扩展打开页面 + JS eval      | 需 JS 执行的简单签到      |
 | `browser-eval-click`       | 3      | 定位按钮 → 点击 → 检测结果        | 论坛点击签到              |
 | `browser-visit`            | 7      | 仅访问主页面                      | 纯浏览类站点              |
-| `manual`                   | 2      | 跳过                              | 验证码/人工确认           |
+| `manual`                   | 3      | 跳过                              | 验证码/人工确认           |
+
+### 重要规则：禁止自动添加 manual
+
+**系统永远不会自动将站点改为 `manual` 策略。** 遇到疑似需要人工处理的站点（CF 拦截、滑块验证等），系统只会：
+
+1. 在控制台输出 `[REVIEW] 需人工审核` 提示
+2. 在飞书卡片中显示"需人工审核"区块
+3. 在 `signin-log.json` 中记录 `needs_manual_review` 列表
+
+是否改为 `manual` 策略，**必须由用户人工确认后手动修改 `sites.json`**。
 
 ### Kimi WebBridge 优势
 
@@ -207,6 +217,50 @@ signin-batch.ps1（主调度）
 2. 将要签到的站点书签放入该文件夹
 3. 每次运行自动同步：新增站点自动加入、删除站点自动移除
 4. `sites.json` 中的 `note` 字段记录同步状态
+
+## 调试与排错
+
+### Debug 快照（v4.8+）
+
+签到失败时，可以保存页面的完整 HTML/文本快照为 JSON，用于事后分析。
+
+```powershell
+# 批量签到时保存所有站点的快照
+.\signin-batch.ps1 -SaveDebugSnapshot
+
+# 快照保存位置
+debug-snapshots/
+  ├── UBits_cf_blocked_final_20260623-212533.json
+  ├── BTSchool_sign_ok_20260623-212015.json
+  └── ...
+```
+
+每个快照包含：
+- `url` / `title` / `readyState` — 页面基本信息
+- `bodyText` — 页面文本内容（前 5000 字）
+- `bodyHtml` — 页面 HTML（前 30000 字）
+- `cfIframes` — 检测到的 Cloudflare iframe 列表
+- `signTexts` — 包含签到/验证/登录等关键词的上下文片段
+
+### 单站点调试
+
+```powershell
+# 加载工具函数
+. .\signin-web.ps1
+
+# 单站点调试（保存快照）
+Invoke-WebSignIn -SiteName "UBits" -SaveDebugSnapshot $true -DebugDir ".\debug-snapshots"
+```
+
+### AI 调试反馈循环
+
+遇到签到失败的站点时，按以下步骤系统性排查（详见 `pt-signin-skill.md` #33）：
+
+1. **收集证据** — 读取 debug 快照 JSON，分析页面实际内容
+2. **提出假设** — 至少 3 个可证伪的失败原因假设
+3. **定向测试** — 每次只改一个变量，验证假设
+4. **修复验证** — 修复后重新运行，确认 SIGN_OK
+5. **固化沉淀** — 更新配置、基线、skill 文档
 
 ## 常见问题
 

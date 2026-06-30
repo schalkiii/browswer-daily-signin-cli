@@ -1,6 +1,6 @@
 {
-  "version": "v3.9",
-  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v3.9: 集成 kimi webbridge 替代 opencli 浏览器扩展，CF 绕过成功率 100%。",
+  "version": "v4.7",
+  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v4.7: UBits/Yemapt 改回manual（CF托管挑战/SPA人机验证），Rousi 改用webbridge。",
   "sites": [
     "GGPT",
     "V2EX",
@@ -20,7 +20,6 @@
     "13City",
     "HDCITY",
     "OurBits",
-    "FreeFarm",
     "DepthStudio",
     "PTLAO",
     "音乐乌托邦",
@@ -29,7 +28,6 @@
     "Rousi",
     "52pojie",
     "远景论坛",
-    "Yemapt",
     "BiliDownload",
     "HTCPT",
     "Musopia",
@@ -42,16 +40,22 @@
     "InvitesFun",
     "HDKYL",
     "PigGo",
-    "NodeSeek"
+    "NodeSeek",
+    "BTSchool",
+    "521",
+    "vclib",
+    "audiences",
+    "pbh-btn",
+    "invites"
   ],
   "manual_sites": [
     "北洋园PT",
     "TJUPT",
-    "BTSchool",
+    "FreeFarm",
     "UBits",
     "Yemapt"
   ],
-  "auto_total": 40,
+  "auto_total": 45,
   "manual_total": 5,
-  "last_updated": "2026-06-22 02:19:09"
+  "last_updated": "2026-07-01 02:30:00"
 }
