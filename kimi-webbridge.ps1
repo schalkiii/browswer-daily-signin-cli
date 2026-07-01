@@ -99,93 +99,106 @@ function Test-WebBridgeSignIn {
     )
     $session = "daily-signin"
 
-    Write-Host "  [WebBridge] $SiteName : navigate -> $Url"
-    $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
-    if (-not $nav -or -not $nav.success) {
-        return "NAV_FAIL"
-    }
+    # 清理上一站点或上一次重试残留的 tab，避免标签累积
+    try { $null = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{} -Session $session -TimeoutSec 5 } catch {}
 
-    Write-Host "  [WebBridge] $SiteName : waiting ${WaitMs}ms for page load"
-    Start-Sleep -Milliseconds $WaitMs
-
-    Write-Host "  [WebBridge] $SiteName : evaluate detect"
-    $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-    if (-not $detect) {
-        Save-DebugSnapshot $SiteName $session "detect_fail" $DebugDir $SaveDebugSnapshot
-        return "EVAL_FAIL"
-    }
-
-    if ($detect -is [string]) { $signal = $detect }
-    elseif ($detect.value) { $signal = "$($detect.value)" }
-    else { $signal = "$detect" }
-    Write-Host "  [WebBridge] $SiteName : signal=$signal"
-
-    if ($signal -match "SIGN_OK|ALREADY_SIGNED") {
-        Save-DebugSnapshot $SiteName $session "sign_ok" $DebugDir $SaveDebugSnapshot
-        return "SIGN_OK"
-    }
-    if ($signal -match "LOGIN_REQUIRED|SLIDER|CAPTCHA") {
-        Save-DebugSnapshot $SiteName $session $signal $DebugDir $SaveDebugSnapshot
-        return $signal
-    }
-
-    if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
-        for ($retry = 0; $retry -lt $CfRetryCount; $retry++) {
-            # 尝试点击CF验证按钮（请验证您是真人 / Verify you are human / turnstile）
-            $cfClickResult = Invoke-CfVerifyClick $session $SiteName
-            if ($cfClickResult) { Write-Host "  [WebBridge] $SiteName : CF verify button clicked: $cfClickResult" }
-
-            $waitSec = [math]::Round($CfRetryWaitMs / 1000 * ($retry + 1), 0)
-            Write-Host "  [WebBridge] $SiteName : CF/BODY retry $($retry+1)/$CfRetryCount, wait ${waitSec}s..."
-            Start-Sleep -Seconds $waitSec
-            # 奇数次重试时刷新页面，帮助 CF 重新验证
-            if (($retry + 1) % 2 -eq 1) {
-                Write-Host "  [WebBridge] $SiteName : reloading page for CF re-check..."
-                $null = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = "location.reload()" } -Session $session -TimeoutSec 15
-                Start-Sleep -Seconds 5
-            }
-            $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-            $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
-            Write-Host "  [WebBridge] $SiteName : retry signal=$reSig"
-            if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
-                Save-DebugSnapshot $SiteName $session "sign_ok_after_cf" $DebugDir $SaveDebugSnapshot
-                return "SIGN_OK"
-            }
-            if ($reSig -match "NEED_SIGN|UNKNOWN") {
-                $signal = $reSig
-                break
-            }
-            if ($reSig -match "LOGIN_REQUIRED") {
-                Save-DebugSnapshot $SiteName $session "login_required" $DebugDir $SaveDebugSnapshot
-                return "LOGIN_REQUIRED"
-            }
+    try {
+        Write-Host "  [WebBridge] $SiteName : navigate -> $Url"
+        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+        if (-not $nav -or -not $nav.success) {
+            return "NAV_FAIL"
         }
-        if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
-            Save-DebugSnapshot $SiteName $session "cf_blocked_final" $DebugDir $SaveDebugSnapshot
+
+        Write-Host "  [WebBridge] $SiteName : waiting ${WaitMs}ms for page load"
+        Start-Sleep -Milliseconds $WaitMs
+
+        Write-Host "  [WebBridge] $SiteName : evaluate detect"
+        $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+        if (-not $detect) {
+            Save-DebugSnapshot $SiteName $session "detect_fail" $DebugDir $SaveDebugSnapshot
+            return "EVAL_FAIL"
+        }
+
+        if ($detect -is [string]) { $signal = $detect }
+        elseif ($detect.value) { $signal = "$($detect.value)" }
+        else { $signal = "$detect" }
+        Write-Host "  [WebBridge] $SiteName : signal=$signal"
+
+        # 状态转换验证：区分"访问即签到"与"今天已签到"
+        # - 无 ClickEval（如 BTSchool）：访问即签到，SIGN_OK 为真实本次成功
+        # - 有 ClickEval（需点击的站点）：首次 SIGN_OK 表示今天已签到，非本次签到成功 → ALREADY_SIGNED
+        if ($signal -match "SIGN_OK|ALREADY_SIGNED") {
+            $firstSignal = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
+            Save-DebugSnapshot $SiteName $session "sign_ok" $DebugDir $SaveDebugSnapshot
+            return $firstSignal
+        }
+        if ($signal -match "LOGIN_REQUIRED|SLIDER|CAPTCHA") {
+            Save-DebugSnapshot $SiteName $session $signal $DebugDir $SaveDebugSnapshot
             return $signal
         }
-    }
 
-    if ($ClickEval) {
-        Write-Host "  [WebBridge] $SiteName : evaluate click"
-        $clicked = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $ClickEval } -Session $session -TimeoutSec 15
-        Write-Host "  [WebBridge] $SiteName : click result=$clicked"
+        if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
+            for ($retry = 0; $retry -lt $CfRetryCount; $retry++) {
+                $cfClickResult = Invoke-CfVerifyClick $session $SiteName
+                if ($cfClickResult) { Write-Host "  [WebBridge] $SiteName : CF verify button clicked: $cfClickResult" }
 
-        Write-Host "  [WebBridge] $SiteName : waiting ${PostClickWaitMs}ms post-click"
-        Start-Sleep -Milliseconds $PostClickWaitMs
-
-        Write-Host "  [WebBridge] $SiteName : evaluate re-check"
-        $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-        $recheckSig = if ($recheck -is [string]) { $recheck } elseif ($recheck.value) { "$($recheck.value)" } else { "$recheck" }
-        if ($recheckSig -match "SIGN_OK|ALREADY_SIGNED") {
-            Save-DebugSnapshot $SiteName $session "sign_ok_after_click" $DebugDir $SaveDebugSnapshot
-            return "SIGN_OK"
+                $waitSec = [math]::Round($CfRetryWaitMs / 1000 * ($retry + 1), 0)
+                Write-Host "  [WebBridge] $SiteName : CF/BODY retry $($retry+1)/$CfRetryCount, wait ${waitSec}s..."
+                Start-Sleep -Seconds $waitSec
+                if (($retry + 1) % 2 -eq 1) {
+                    Write-Host "  [WebBridge] $SiteName : reloading page for CF re-check..."
+                    $null = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = "location.reload()" } -Session $session -TimeoutSec 15
+                    Start-Sleep -Seconds 5
+                }
+                $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+                $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
+                Write-Host "  [WebBridge] $SiteName : retry signal=$reSig"
+                if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
+                    $cfPassSignal = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
+                    Save-DebugSnapshot $SiteName $session "sign_ok_after_cf" $DebugDir $SaveDebugSnapshot
+                    return $cfPassSignal
+                }
+                if ($reSig -match "NEED_SIGN|UNKNOWN") {
+                    $signal = $reSig
+                    break
+                }
+                if ($reSig -match "LOGIN_REQUIRED") {
+                    Save-DebugSnapshot $SiteName $session "login_required" $DebugDir $SaveDebugSnapshot
+                    return "LOGIN_REQUIRED"
+                }
+            }
+            if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
+                Save-DebugSnapshot $SiteName $session "cf_blocked_final" $DebugDir $SaveDebugSnapshot
+                return $signal
+            }
         }
-        $signal = $recheckSig
-    }
 
-    Save-DebugSnapshot $SiteName $session "final_$signal" $DebugDir $SaveDebugSnapshot
-    return $signal
+        if ($ClickEval) {
+            Write-Host "  [WebBridge] $SiteName : evaluate click"
+            $clicked = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $ClickEval } -Session $session -TimeoutSec 15
+            Write-Host "  [WebBridge] $SiteName : click result=$clicked"
+
+            Write-Host "  [WebBridge] $SiteName : waiting ${PostClickWaitMs}ms post-click"
+            Start-Sleep -Milliseconds $PostClickWaitMs
+
+            Write-Host "  [WebBridge] $SiteName : evaluate re-check"
+            $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+            $recheckSig = if ($recheck -is [string]) { $recheck } elseif ($recheck.value) { "$($recheck.value)" } else { "$recheck" }
+            # 点击后检测到已签到 → 本次签到成功（非 ALREADY_SIGNED）
+            if ($recheckSig -match "SIGN_OK|ALREADY_SIGNED") {
+                Save-DebugSnapshot $SiteName $session "sign_ok_after_click" $DebugDir $SaveDebugSnapshot
+                return "SIGN_OK"
+            }
+            $signal = $recheckSig
+        }
+
+        Save-DebugSnapshot $SiteName $session "final_$signal" $DebugDir $SaveDebugSnapshot
+        return $signal
+    }
+    finally {
+        # 函数结束关闭本站点 tab，确保不残留给下一个站点
+        try { $null = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{} -Session $session -TimeoutSec 5 } catch {}
+    }
 }
 
 # 尝试点击 CF 验证按钮（"请验证您是真人" / "Verify you are human" / turnstile checkbox）

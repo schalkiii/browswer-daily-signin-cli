@@ -155,6 +155,7 @@ signin-batch.ps1（主调度）
 | `baseline.json`       | 基线追踪（记录曾成功签到的站点）                           |
 | `iterations.json`     | 自迭代修复日志                                             |
 | `signin-log.json`     | 每次运行的结构化日志                                       |
+| `sync-log.json`       | 书签同步日志（保留最近 50 条，排查新书签未同步问题）       |
 
 ## 使用指南
 
@@ -236,11 +237,38 @@ debug-snapshots/
 ```
 
 每个快照包含：
+
 - `url` / `title` / `readyState` — 页面基本信息
 - `bodyText` — 页面文本内容（前 5000 字）
 - `bodyHtml` — 页面 HTML（前 30000 字）
 - `cfIframes` — 检测到的 Cloudflare iframe 列表
 - `signTexts` — 包含签到/验证/登录等关键词的上下文片段
+
+### 书签同步排查（v4.9+）
+
+如果发现新书签没被同步进 `sites.json`，查 `sync-log.json`：
+
+```powershell
+# 查看最近一次同步记录
+Get-Content .\sync-log.json -Raw -Encoding UTF8 | ConvertFrom-Json | Select-Object -Last 1
+```
+
+每条记录含 `bookmarkCount`（匹配到的书签数）、`added`/`removed`（增删列表）。常见原因：
+
+- `bookmarkCount=0`：书签文件夹名与 `config.json` 的 `browser.bookmarkFolder` 不匹配
+- 新书签不在 `added` 且 domain 已存在：被 domain 去重（同 domain 不同 URL 视为同站点）
+- 新书签在签到文件夹的子文件夹下：当前 `Walk-BookmarkNodes` 只收集匹配文件夹的直接 url 子节点，不递归子文件夹
+
+### 签到状态语义（v4.9+）
+
+webbridge 站点的签到结果新增 `ALREADY_SIGNED` 信号，与 `SIGN_OK` 区分：
+
+| 信号             | 含义                                   | 报告状态     |
+| ---------------- | -------------------------------------- | ------------ |
+| `SIGN_OK`        | 本次点击后检测到签到成功               | SUCCESS      |
+| `ALREADY_SIGNED` | 今天已签到（无需点击，非本次签到成功） | ALREADY_DONE |
+
+需点击的站点（有 ClickEval）首次检测到 SIGN_OK 即返回 `ALREADY_SIGNED`，避免误把"今天已签到"当"本次签到成功"。访问即签到的站点（无 ClickEval，如 BTSchool）首次 SIGN_OK 仍为真实成功。
 
 ### 单站点调试
 

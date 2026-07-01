@@ -71,7 +71,7 @@ Write-Output "Baseline: $($baseline.sites.Count) known-success sites"
 # Signal check function - the deterministic pass/fail signal
 function Test-SignIn($session) {
     $checkJS = @'
-(function(){var t=document.body.innerText||'';if(t.indexOf('\u7B7E\u5230\u6210\u529F')>-1||t.indexOf('\u7C3D\u5230\u6210\u529F')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u5DF2\u5F97')>-1||t.indexOf('\u7C3D\u5230\u5DF2\u5F97')>-1||t.indexOf('\u7B7E\u5230\u5F97')>-1||t.indexOf('\u7C3D\u5230\u5F97')>-1)return'SIGN_OK';if(t.indexOf('\u5DF2\u7B7E\u5230')>-1||t.indexOf('\u5DF2\u7C3D\u5230')>-1)return'SIGN_OK';if(t.indexOf('\u8FD9\u662F\u60A8\u7684\u7B2C')>-1||t.indexOf('\u9019\u662F\u60A8\u7684\u7B2C')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u83B7\u5F97')>-1||t.indexOf('\u7C3D\u5230\u7372\u5F97')>-1)return'SIGN_OK';if(t.indexOf('Already checked')>-1||t.indexOf('Daily Bonus')>-1)return'SIGN_OK';if(t.indexOf('\u6BCF\u65E5\u767B\u5F55\u5956\u52B1\u5DF2\u9886\u53D6')>-1)return'SIGN_OK';if(t.indexOf('\u6253\u5361\u6210\u529F')>-1||t.indexOf('\u5DF2\u5B8C\u6210')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u9886\u5956')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u5B8C\u6210')>-1)return'SIGN_OK';if(t.indexOf('\u8FDE\u7EED\u7B7E\u5230')>-1)return'SIGN_OK';if(t.indexOf('\u83B7\u5F97\u5956\u52B1')>-1||t.indexOf('\u7372\u5F97\u5956\u52F5')>-1)return'SIGN_OK';if(t.indexOf('cf-turnstile')>-1||t.indexOf('challenges.cloudflare')>-1||t.indexOf('\u5B89\u5168\u9A57\u8B49')>-1||t.indexOf('\u5B89\u5168\u9A8C\u8BC1')>-1)return'CF_CHALLENGE';if(t.indexOf('\u8BF7\u7A0D\u5019')>-1)return'WAITING';if(t.indexOf('\u6ED1\u52A8')>-1||t.indexOf('\u62D6\u52A8\u6ED1\u5757')>-1)return'SLIDER';if(t.indexOf('\u8BF7\u767B\u5F55')>-1||t.indexOf('\u5FC5\u9808\u767B\u9304')>-1)return'LOGIN_REQUIRED';if(t.indexOf('\u6B22\u8FCE\u56DE\u6765')>-1||t.indexOf('\u6B61\u8FCE\u56DE\u4F86')>-1)return'LOGGED_IN';return'UNKNOWN';})()
+(function(){var t=document.body.innerText||'';if(t.indexOf('\u7B7E\u5230\u6210\u529F')>-1||t.indexOf('\u7C3D\u5230\u6210\u529F')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u5DF2\u5F97')>-1||t.indexOf('\u7C3D\u5230\u5DF2\u5F97')>-1||t.indexOf('\u7B7E\u5230\u5F97')>-1||t.indexOf('\u7C3D\u5230\u5F97')>-1)return'SIGN_OK';if(t.indexOf('\u5DF2\u7B7E\u5230')>-1||t.indexOf('\u5DF2\u7C3D\u5230')>-1)return'SIGN_OK';if(t.indexOf('\u8FD9\u662F\u60A8\u7684\u7B2C')>-1||t.indexOf('\u9019\u662F\u60A8\u7684\u7B2C')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u83B7\u5F97')>-1||t.indexOf('\u7C3D\u5230\u7372\u5F97')>-1)return'SIGN_OK';if(t.indexOf('Already checked')>-1)return'SIGN_OK';if(t.indexOf('\u6BCF\u65E5\u767B\u5F55\u5956\u52B1\u5DF2\u9886\u53D6')>-1)return'SIGN_OK';if(t.indexOf('\u6253\u5361\u6210\u529F')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u9886\u5956')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u5B8C\u6210')>-1)return'SIGN_OK';if(t.indexOf('\u8FDE\u7EED\u7B7E\u5230')>-1)return'SIGN_OK';if(t.indexOf('\u83B7\u5F97\u5956\u52B1')>-1||t.indexOf('\u7372\u5F97\u5956\u52F5')>-1)return'SIGN_OK';if(t.indexOf('cf-turnstile')>-1||t.indexOf('challenges.cloudflare')>-1||t.indexOf('\u5B89\u5168\u9A57\u8B49')>-1||t.indexOf('\u5B89\u5168\u9A8C\u8BC1')>-1)return'CF_CHALLENGE';if(t.indexOf('\u8BF7\u7A0D\u5019')>-1)return'WAITING';if(t.indexOf('\u6ED1\u52A8')>-1||t.indexOf('\u62D6\u52A8\u6ED1\u5757')>-1)return'SLIDER';if(t.indexOf('\u8BF7\u767B\u5F55')>-1||t.indexOf('\u5FC5\u9808\u767B\u9304')>-1)return'LOGIN_REQUIRED';if(t.indexOf('\u6B22\u8FCE\u56DE\u6765')>-1||t.indexOf('\u6B61\u8FCE\u56DE\u4F86')>-1)return'LOGGED_IN';return'UNKNOWN';})()
 '@
     $result = opencli browser $session eval $checkJS 2>&1
     $combined = if ($result -is [array]) { $result -join "`n" } else { [string]$result }
@@ -378,6 +378,31 @@ function Sync-Bookmarks {
     } else {
         Write-Output "[SYNC] No changes"
     }
+
+    # 同步日志落盘，便于排查"新书签为何没同步进来"
+    $syncLogFile = "$PSScriptRoot\sync-log.json"
+    $syncRecord = [PSCustomObject]@{
+        timestamp      = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+        bookmarkCount  = $bookmarkUrls.Count
+        total          = $newSites.Count
+        added          = @($added)
+        removed        = @($removed)
+    }
+    try {
+        $syncLog = @()
+        if (Test-Path $syncLogFile) {
+            $slRaw = Get-Content $syncLogFile -Raw -Encoding UTF8
+            $slRaw = $slRaw -replace '^\uFEFF', ''
+            $syncLog = @($slRaw | ConvertFrom-Json)
+        }
+        $syncLog = @($syncLog) + $syncRecord
+        # 只保留最近 50 条，避免无限增长
+        if ($syncLog.Count -gt 50) { $syncLog = $syncLog[($syncLog.Count - 50)..($syncLog.Count - 1)] }
+        $syncLog | ConvertTo-Json -Depth 3 | Out-File $syncLogFile -Encoding UTF8
+    } catch {
+        Write-Output "[SYNC] log write failed: $($_.Exception.Message)"
+    }
+
     return $ConfigObject
 }
 
@@ -480,6 +505,7 @@ foreach ($site in $config.sites) {
                         $r.signal = $wbResult
                         switch -Wildcard ($wbResult) {
                             "SIGN_OK"       { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
+                            "ALREADY_SIGNED"{ $r.status = "ALREADY_DONE"; $signals.ok_sites += $site.name; Write-Output "  => ALREADY_DONE (今日已签到，非本次点击)" }
                             "LOGIN_REQUIRED"{ $r.status = "NO_LOGIN"; $signals.login_expired += $site.name; Write-Output "  => NO_LOGIN" }
                             "CF_CHALLENGE"  { $r.status = "CF_BLOCKED"; $signals.fail_sites += $site.name; Write-Output "  => CF_BLOCKED" }
                             "SLIDER"        { $r.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL" }

@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, slider captcha API bypass,
   click-to-sign pages, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-06-23 (v4.8 — Debug快照机制；CF验证按钮点击；AI调试反馈循环方法论）
+updated: 2026-07-01 (v4.9 — 假pass防御：状态转换验证+ALREADY_SIGNED；tab生命周期：close_tab防累积；sync-log落盘）
 ---
 
 # PT Site Sign-in Automation
@@ -81,12 +81,7 @@ This applies to both `sites.json` and `iterations.json` reads.
   // All Chinese comparison happens in the browser, NOT in PowerShell
   if (t.indexOf("签到成功") > -1 || t.indexOf("簽到成功") > -1)
     return "SIGN_OK";
-  if (
-    t.indexOf("签到已得") > -1 ||
-    t.indexOf("簽到已得") > -1 ||
-    t.indexOf("签到得") > -1 ||
-    t.indexOf("簽到得") > -1
-  )
+  if (t.indexOf("签到已得") > -1 || t.indexOf("簽到已得") > -1)
     return "SIGN_OK";
   if (t.indexOf("已签到") > -1 || t.indexOf("已簽到") > -1) return "SIGN_OK";
   if (t.indexOf("这是您的第") > -1 || t.indexOf("這是您的第") > -1)
@@ -95,7 +90,7 @@ This applies to both `sites.json` and `iterations.json` reads.
     return "SIGN_OK";
   if (t.indexOf("每日登录奖励已领取") > -1) return "SIGN_OK";
   if (t.indexOf("Already checked") > -1) return "SIGN_OK";
-  if (t.indexOf("打卡成功") > -1 || t.indexOf("已完成") > -1) return "SIGN_OK";
+  if (t.indexOf("打卡成功") > -1) return "SIGN_OK";
   if (t.indexOf("签到领奖") > -1) return "SIGN_OK";
   if (t.indexOf("签到完成") > -1) return "SIGN_OK";
   if (t.indexOf("连续签到") > -1) return "SIGN_OK";
@@ -124,7 +119,8 @@ This applies to both `sites.json` and `iterations.json` reads.
 
 | Signal           | Meaning                                  | Action                       |
 | ---------------- | ---------------------------------------- | ---------------------------- |
-| `SIGN_OK`        | Sign-in succeeded or already done today  | Report SUCCESS               |
+| `SIGN_OK`        | Sign-in succeeded (click → recheck OK)   | Report SUCCESS               |
+| `ALREADY_SIGNED` | Already signed today (no click this run) | Report ALREADY_DONE          |
 | `CF_CHALLENGE`   | Cloudflare Turnstile/JS challenge page   | Wait 8s, retry eval          |
 | `WAITING`        | Page says "please wait" (loading)        | Allow more time              |
 | `SLIDER`         | Slider captcha detected                  | Need API bypass (Category D) |
@@ -337,7 +333,10 @@ function Invoke-WebBridgeCommand {
 function Test-WebBridgeSignIn {
     param([string]$SiteName, [string]$Url, [string]$DetectEval,
           [string]$ClickEval, [int]$WaitMs, [int]$PostClickWaitMs)
-    # Flow: navigate → wait → detect → [click] → re-check → close
+    # Flow: close_tab → navigate → wait → detect → [click] → re-check → close_tab
+    # Tab lifecycle: close_tab at start (clean residue) + try/finally close_tab at end
+    # State transition: NEED_SIGN → click → SIGN_OK = real success;
+    #   first SIGN_OK with ClickEval = ALREADY_SIGNED (already done today)
 }
 ```
 
@@ -363,12 +362,7 @@ function Test-WebBridgeSignIn {
   var t = document.body.innerText || "";
   if (t.indexOf("签到成功") > -1 || t.indexOf("簽到成功") > -1)
     return "SIGN_OK";
-  if (
-    t.indexOf("签到已得") > -1 ||
-    t.indexOf("簽到已得") > -1 ||
-    t.indexOf("签到得") > -1 ||
-    t.indexOf("簽到得") > -1
-  )
+  if (t.indexOf("签到已得") > -1 || t.indexOf("簽到已得") > -1)
     return "SIGN_OK";
   if (t.indexOf("已签到") > -1 || t.indexOf("已簽到") > -1) return "SIGN_OK";
   if (t.indexOf("这是您的第") > -1 || t.indexOf("這是您的第") > -1)
@@ -377,7 +371,7 @@ function Test-WebBridgeSignIn {
     return "SIGN_OK";
   if (t.indexOf("每日登录奖励已领取") > -1) return "SIGN_OK";
   if (t.indexOf("Already checked") > -1) return "SIGN_OK";
-  if (t.indexOf("打卡成功") > -1 || t.indexOf("已完成") > -1) return "SIGN_OK";
+  if (t.indexOf("打卡成功") > -1) return "SIGN_OK";
   if (t.indexOf("签到领奖") > -1) return "SIGN_OK";
   if (t.indexOf("签到完成") > -1) return "SIGN_OK";
   if (t.indexOf("连续签到") > -1) return "SIGN_OK";
@@ -837,7 +831,7 @@ Every sign-in session must follow this complete workflow. No step may be skipped
 
 22. **Image captcha = manual site (v4.4)**: TJUPT (北洋园PT) 在 2026-06-11 启用图片验证码（选择与图片对应的影视名称），这是无法自动化的验证类型。与 BTSchool 不同，这不是站点关闭，而是验证升级。
     - **诊断**: webbridge navigate 成功，但页面显示"签到验证码"要求选择图片对应的影视名称
-    - **修复**: 
+    - **修复**:
       1. `sites.json`: strategy 从 `browser-open` 改为 `manual`，note 记录"2026-06-11: 站点启用图片验证码，无法自动化"
       2. `baseline.json`: 将 TJUPT 从 `sites` 移到 `manual_sites`，auto_total 42，manual_total 3
     - **区别**: 图片验证码 (v4.4) vs 站点关闭 (v4.2) — 前者是验证升级需人工处理，后者是基础设施问题。两者都转为 manual，但原因不同。
@@ -900,7 +894,7 @@ Every sign-in session must follow this complete workflow. No step may be skipped
 
 31. **Debug Snapshot System (v4.8)**: Every webbridge sign-in session can save full page snapshots as JSON files for post-mortem analysis. Snapshots are saved when `SaveDebugSnapshot = $true` and include:
     - **What's saved**: URL, title, readyState, bodyText (5000 chars), bodyHtml (30000 chars), cfIframes list, signTexts (keyword context snippets)
-    - **When saved**: At key stages: detect_fail, sign_ok, login_required, cf_blocked_final, sign_ok_after_cf, sign_ok_after_click, final_<signal>
+    - **When saved**: At key stages: detect*fail, sign_ok, login_required, cf_blocked_final, sign_ok_after_cf, sign_ok_after_click, final*<signal>
     - **File location**: `debug-snapshots/<SiteName>_<Stage>_<timestamp>.json`
     - **How to enable**: `.\signin-batch.ps1 -SaveDebugSnapshot` or pass `-SaveDebugSnapshot $true -DebugDir <path>` to `Invoke-WebSignIn`
     - **Purpose**: Replace blind guessing about "what was on the page" with concrete evidence. Enables AI-driven diagnosis without needing to re-run.
@@ -962,3 +956,21 @@ Every sign-in session must follow this complete workflow. No step may be skipped
     - **CF Managed Challenge**: No visible button, automatic browser fingerprinting in background. `Invoke-CfVerifyClick` does nothing. May pass automatically if browser looks "human enough"; if not, requires user to manually pass once to establish trust.
     - **How to tell**: Check bodyHtml for `cType: 'managed'` (Managed) vs turnstile iframe with checkbox (Widget). Check page title: "请稍候…" = Managed; "Just a moment" with checkbox = Widget.
     - **For Managed Challenge failures**: The best strategy is (1) increase wait time + retries + page reloads, (2) if still failing, user manually passes once in the same browser profile, (3) subsequent runs should work via preserved cookies/session.
+
+35. **False-pass defense: state-transition verification + keyword tightening (v4.9)**: Some sites reported SIGN_OK but had not actually signed in — the detect JS matched button text like "签到得魔力" (a clickable button, not a success state).
+    - **Root cause**: `签到得` is a substring of the button label "签到得魔力" (sign-in to get magic), which means NEED_SIGN, not SIGN_OK. The detect JS `t.indexOf('签到得')>-1 → SIGN_OK` was a false positive that fired on page load before any click.
+    - **Fix 1 — keyword tightening**: Removed `签到得` from SIGN_OK detection in `signin-web.ps1` (PigGo/GGPT/HDDolby/HDHome/TJUPT, 5 sites). Removed overly broad `已完成` and `Daily Bonus` from `Test-SignIn` in `signin-batch.ps1` — "已完成" appears in many non-signin contexts, "Daily Bonus" is often a menu/title.
+    - **Fix 2 — state-transition verification**: `Test-WebBridgeSignIn` now distinguishes:
+      - **No ClickEval** (visit-only sites like BTSchool): first SIGN_OK → `SIGN_OK` (real success, visit IS the sign-in)
+      - **With ClickEval** (click-to-sign sites): first SIGN_OK → `ALREADY_SIGNED` (already done today, not this run's success)
+      - Click → recheck SIGN_OK → `SIGN_OK` (this run's actual success)
+    - **New signal**: `ALREADY_SIGNED` maps to status `ALREADY_DONE`, counted in `ok_sites` (signed, just not by this run), not retryable.
+    - **Lesson**: Detect JS must be mutually exclusive — the same text cannot mean both "can sign" and "already signed". When a button label contains a sign-in keyword, it's almost certainly NEED_SIGN, not SIGN_OK. Always require the NEED_SIGN → click → SIGN_OK state transition for click-based sites.
+
+36. **Tab lifecycle management: close_tab prevents accumulation (v4.9)**: Retries and multi-site runs accumulated browser tabs — "previous tab still open when next one opens" — because every `navigate` used `newTab=$true` and nothing closed tabs until the final `close_session`.
+    - **Webbridge API**: `close_tab` action (confirmed via probe: returns `{closed:false, reason:"session has no tab"}` when empty) and `list_tabs` are supported by the daemon.
+    - **Fix**: `Test-WebBridgeSignIn` now wraps its body in `try/finally`:
+      - **Start**: `close_tab` to clean any residual tab from the previous site or retry attempt
+      - **End (finally)**: `close_tab` to close this site's tab immediately
+    - **Result**: Each site keeps exactly 1 tab during its sign-in; retries close the old tab before opening a new one. No accumulation across the whole batch.
+    - **Lesson**: Any function that opens a browser tab must own its full lifecycle (open → use → close). `try/finally` is the reliable pattern — it closes the tab even on early return or exception. Never rely on a distant `close_session` to clean up mid-run tabs.
