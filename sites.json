@@ -1,6 +1,6 @@
 {
   "version": "v3.9",
-  "total": 38,
+  "total": 52,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -121,7 +121,7 @@
       "name": "HHCLUB",
       "url": "https://hhanclub.net/attendance.php",
       "strategy": "browser-open",
-      "note": "书签同步: HHCLUB签到 (web-read被CF拦截，改用browser-open)"
+      "note": "书签同步: HHCLUB签到 - webbridge (web-read被CF拦截，改用webbridge)"
     },
     {
       "name": "HTCPT",
@@ -214,20 +214,104 @@
       "note": "书签同步: 远景论坛签到 - webbridge (browser-eval-click不稳定，改用webbridge)"
     },
     {
-      "name": "fearnopeer",
-      "url": "https://fearnopeer.com/",
+      "name": "42w",
+      "url": "https://api.42w.shop/console/personal",
       "strategy": "browser-open",
       "note": "auto: 书签同步新增"
     },
     {
-      "name": "dreamingtree",
-      "url": "https://dreamingtree.org/user.php?id=37099",
+      "name": "h-e",
+      "url": "https://elysiver.h-e.top/console/personal",
       "strategy": "browser-open",
       "note": "auto: 书签同步新增"
     },
     {
-      "name": "cysic",
-      "url": "https://cysic.xyz/stake",
+      "name": "hdbao",
+      "url": "https://hdbao.cc/attendance.php",
+      "strategy": "web-read",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "zxiaoruan",
+      "url": "https://gyapi.zxiaoruan.cn/profile",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "pp",
+      "url": "https://ioll.pp.ua/console/personal",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "littlesheep",
+      "url": "https://ai.littlesheep.cc/profile",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "musopia",
+      "url": "https://www.musopia.vip/attendance.php",
+      "strategy": "web-read",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "onrender",
+      "url": "https://new-api-bxhm.onrender.com/console/personal",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "ptlao",
+      "url": "https://ptlao.top/attendance.php",
+      "strategy": "web-read",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "vclib",
+      "url": "https://pt.vclib.online/attendance.php",
+      "strategy": "web-read",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "521",
+      "url": "https://pt.521.best/attendance.php",
+      "strategy": "web-read",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "anyrouter",
+      "url": "https://anyrouter.top/console",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "audiences",
+      "url": "https://audiences.me/attendance.php",
+      "strategy": "web-read",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "huan666",
+      "url": "https://ai.huan666.de/console/personal",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "xt-url",
+      "url": "https://checkin.new-api.xt-url.com/",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "pbh-btn",
+      "url": "https://bbs.pbh-btn.com/",
+      "strategy": "browser-open",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "invites",
+      "url": "https://www.invites.fun/?sort=newest",
       "strategy": "browser-open",
       "note": "auto: 书签同步新增"
     }

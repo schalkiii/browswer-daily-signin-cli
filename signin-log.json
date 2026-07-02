@@ -1,39 +1,519 @@
 {
-  "baseline_known": 47,
-  "needs_manual_review": [
-    "UBits(CF_BLOCKED)"
-  ],
-  "failed": 20,
-  "skip_sites": [
-    "FreeFarm",
-    "TJUPT"
-  ],
-  "total": 38,
+  "needs_manual_review": [],
   "fail_sites": [
-    "52pojie",
-    "UBits",
     "13City",
     "BiliDownload",
     "DepthStudio",
     "HDClone",
+    "HDDolby",
     "HDVideo",
     "HHCLUB",
     "HTCPT",
     "Moment",
-    "Rousi",
     "SBPT",
     "Tokyo",
     "xloli",
-    "Yemapt",
     "YHPP",
-    "远景论坛",
-    "fearnopeer",
-    "dreamingtree",
-    "cysic"
+    "42w",
+    "h-e",
+    "hdbao",
+    "zxiaoruan",
+    "pp",
+    "littlesheep",
+    "musopia",
+    "onrender",
+    "ptlao",
+    "vclib",
+    "521",
+    "anyrouter",
+    "audiences",
+    "huan666",
+    "xt-url",
+    "pbh-btn",
+    "invites"
   ],
-  "skipped": 2,
-  "timestamp": "2026-07-01 03:30:02",
+  "iterations": 40,
+  "skipped": 4,
+  "skip_sites": [
+    "FreeFarm",
+    "UBits",
+    "TJUPT",
+    "Yemapt"
+  ],
+  "baseline_known": 45,
+  "new_successes": [],
+  "results": [
+    {
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "elapsed": "18.4s",
+      "index": 1,
+      "url": "https://www.52pojie.cn/forum.php",
+      "strategy": "browser-open",
+      "name": "52pojie"
+    },
+    {
+      "status": "ALREADY_DONE",
+      "signal": "ALREADY_SIGNED",
+      "elapsed": "18.2s",
+      "index": 2,
+      "url": "https://www.hdkyl.in/attendance.php",
+      "strategy": "browser-open",
+      "name": "HDKYL"
+    },
+    {
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "elapsed": "26.6s",
+      "index": 3,
+      "url": "https://www.nodeseek.com/board",
+      "strategy": "browser-open",
+      "name": "NodeSeek"
+    },
+    {
+      "status": "VISITED",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.8s",
+      "index": 4,
+      "url": "https://ourbits.club/attendance.php",
+      "strategy": "browser-visit",
+      "name": "OurBits"
+    },
+    {
+      "status": "ALREADY_DONE",
+      "signal": "ALREADY_SIGNED",
+      "elapsed": "60.1s",
+      "index": 5,
+      "url": "https://piggo.me/attendance.php?id=18989",
+      "strategy": "browser-open",
+      "name": "PigGo"
+    },
+    {
+      "status": "SKIPPED",
+      "signal": null,
+      "elapsed": "0s",
+      "index": 6,
+      "url": "https://pt.0ff.cc/attendance.php",
+      "strategy": "manual",
+      "name": "FreeFarm"
+    },
+    {
+      "status": "SKIPPED",
+      "signal": null,
+      "elapsed": "0s",
+      "index": 7,
+      "url": "https://ubits.club/attendance.php",
+      "strategy": "manual",
+      "name": "UBits"
+    },
+    {
+      "status": "ALREADY_DONE",
+      "signal": "ALREADY_SIGNED",
+      "elapsed": "20.2s",
+      "index": 8,
+      "url": "https://www.v2ex.com/mission/daily",
+      "strategy": "browser-open",
+      "name": "V2EX"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "136.2s",
+      "index": 9,
+      "url": "https://13city.org/usercp.php?action=personal#signin",
+      "strategy": "web-read",
+      "name": "13City"
+    },
+    {
+      "status": "VISITED",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.5s",
+      "index": 10,
+      "url": "https://asiandvdclub.org/index.php",
+      "strategy": "browser-visit",
+      "name": "AsianDVDClub"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.6s",
+      "index": 11,
+      "url": "https://bilibili.download/attendance.php",
+      "strategy": "web-read",
+      "name": "BiliDownload"
+    },
+    {
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "elapsed": "36s",
+      "index": 12,
+      "url": "https://pt.btschool.club/attendance.php",
+      "strategy": "browser-open",
+      "name": "BTSchool"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.4s",
+      "index": 13,
+      "url": "https://dstudio.me/attendance.php",
+      "strategy": "web-read",
+      "name": "DepthStudio"
+    },
+    {
+      "status": "VISITED",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.5s",
+      "index": 14,
+      "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
+      "strategy": "browser-visit",
+      "name": "DigitalCore"
+    },
+    {
+      "status": "ALREADY_DONE",
+      "signal": "ALREADY_SIGNED",
+      "elapsed": "18.5s",
+      "index": 15,
+      "url": "https://www.gamegamept.com/attendance.php",
+      "strategy": "browser-open",
+      "name": "GGPT"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.5s",
+      "index": 16,
+      "url": "https://pt.hdclone.top/attendance.php",
+      "strategy": "web-read",
+      "name": "HDClone"
+    },
+    {
+      "status": "NO_DETECT",
+      "signal": "NEED_SIGN:签到得鲸币 邀请 [发送]: 0/0 [捐赠",
+      "elapsed": "89.2s",
+      "index": 17,
+      "url": "https://www.hddolby.com/attendance.php",
+      "strategy": "browser-open",
+      "name": "HDDolby"
+    },
+    {
+      "status": "ALREADY_DONE",
+      "signal": "ALREADY_SIGNED",
+      "elapsed": "44.9s",
+      "index": 18,
+      "url": "https://hdhome.org/attendance.php",
+      "strategy": "browser-open",
+      "name": "HDHome"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.7s",
+      "index": 19,
+      "url": "https://hdvideo.top/attendance.php",
+      "strategy": "web-read",
+      "name": "HDVideo"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "136.9s",
+      "index": 20,
+      "url": "https://hhanclub.net/attendance.php",
+      "strategy": "browser-open",
+      "name": "HHCLUB"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.3s",
+      "index": 21,
+      "url": "https://www.htpt.cc/attendance.php",
+      "strategy": "web-read",
+      "name": "HTCPT"
+    },
+    {
+      "status": "VISITED",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.3s",
+      "index": 22,
+      "url": "https://kufirc.com/index.php",
+      "strategy": "browser-visit",
+      "name": "Kufirc"
+    },
+    {
+      "status": "VISITED",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.3s",
+      "index": 23,
+      "url": "https://kp.m-team.cc/index",
+      "strategy": "browser-visit",
+      "name": "M-Team"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.2s",
+      "index": 24,
+      "url": "https://www.momentpt.top/attendance.php",
+      "strategy": "web-read",
+      "name": "Moment"
+    },
+    {
+      "status": "VISITED",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "132s",
+      "index": 25,
+      "url": "https://newinsane.info/browse.php",
+      "strategy": "browser-visit",
+      "name": "NewInsane"
+    },
+    {
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "elapsed": "19.5s",
+      "index": 26,
+      "url": "https://rousi.pro/points",
+      "strategy": "browser-open",
+      "name": "Rousi"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.4s",
+      "index": 27,
+      "url": "https://sbpt.link/attendance.php",
+      "strategy": "web-read",
+      "name": "SBPT"
+    },
+    {
+      "status": "VISITED",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.4s",
+      "index": 28,
+      "url": "https://speedapp.io/adult",
+      "strategy": "browser-visit",
+      "name": "SpeedApp"
+    },
+    {
+      "status": "SKIPPED",
+      "signal": null,
+      "elapsed": "0s",
+      "index": 29,
+      "url": "https://www.tjupt.org/attendance.php",
+      "strategy": "manual",
+      "name": "TJUPT"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.3s",
+      "index": 30,
+      "url": "https://www.tokyo-manga.top/attendance.php",
+      "strategy": "web-read",
+      "name": "Tokyo"
+    },
+    {
+      "status": "VISITED",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130s",
+      "index": 31,
+      "url": "https://usefultrash.net/browse.php",
+      "strategy": "browser-visit",
+      "name": "UsefulTrash"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.4s",
+      "index": 32,
+      "url": "https://mua.xloli.cc/attendance.php",
+      "strategy": "web-read",
+      "name": "xloli"
+    },
+    {
+      "status": "SKIPPED",
+      "signal": null,
+      "elapsed": "0s",
+      "index": 33,
+      "url": "https://www.yemapt.org/#/consumer/checkIn",
+      "strategy": "manual",
+      "name": "Yemapt"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.1s",
+      "index": 34,
+      "url": "https://www.yhpp.cc/attendance.php",
+      "strategy": "web-read",
+      "name": "YHPP"
+    },
+    {
+      "status": "SUCCESS",
+      "signal": "SIGN_OK",
+      "elapsed": "20s",
+      "index": 35,
+      "url": "https://bbs.pcbeta.com/forum-win11-1.html",
+      "strategy": "browser-open",
+      "name": "远景论坛"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.4s",
+      "index": 36,
+      "url": "https://api.42w.shop/console/personal",
+      "strategy": "browser-open",
+      "name": "42w"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.4s",
+      "index": 37,
+      "url": "https://elysiver.h-e.top/console/personal",
+      "strategy": "browser-open",
+      "name": "h-e"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.3s",
+      "index": 38,
+      "url": "https://hdbao.cc/attendance.php",
+      "strategy": "web-read",
+      "name": "hdbao"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.7s",
+      "index": 39,
+      "url": "https://gyapi.zxiaoruan.cn/profile",
+      "strategy": "browser-open",
+      "name": "zxiaoruan"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.6s",
+      "index": 40,
+      "url": "https://ioll.pp.ua/console/personal",
+      "strategy": "browser-open",
+      "name": "pp"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.4s",
+      "index": 41,
+      "url": "https://ai.littlesheep.cc/profile",
+      "strategy": "browser-open",
+      "name": "littlesheep"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "135.7s",
+      "index": 42,
+      "url": "https://www.musopia.vip/attendance.php",
+      "strategy": "web-read",
+      "name": "musopia"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.2s",
+      "index": 43,
+      "url": "https://new-api-bxhm.onrender.com/console/personal",
+      "strategy": "browser-open",
+      "name": "onrender"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.5s",
+      "index": 44,
+      "url": "https://ptlao.top/attendance.php",
+      "strategy": "web-read",
+      "name": "ptlao"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.4s",
+      "index": 45,
+      "url": "https://pt.vclib.online/attendance.php",
+      "strategy": "web-read",
+      "name": "vclib"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "166s",
+      "index": 46,
+      "url": "https://pt.521.best/attendance.php",
+      "strategy": "web-read",
+      "name": "521"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.3s",
+      "index": 47,
+      "url": "https://anyrouter.top/console",
+      "strategy": "browser-open",
+      "name": "anyrouter"
+    },
+    {
+      "status": "NO_ARTICLE",
+      "signal": "",
+      "elapsed": "165.6s",
+      "index": 48,
+      "url": "https://audiences.me/attendance.php",
+      "strategy": "web-read",
+      "name": "audiences"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.2s",
+      "index": 49,
+      "url": "https://ai.huan666.de/console/personal",
+      "strategy": "browser-open",
+      "name": "huan666"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.3s",
+      "index": 50,
+      "url": "https://checkin.new-api.xt-url.com/",
+      "strategy": "browser-open",
+      "name": "xt-url"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.5s",
+      "index": 51,
+      "url": "https://bbs.pbh-btn.com/",
+      "strategy": "browser-open",
+      "name": "pbh-btn"
+    },
+    {
+      "status": "ERROR",
+      "signal": "ERROR_NO_SIGNAL",
+      "elapsed": "130.5s",
+      "index": 52,
+      "url": "https://www.invites.fun/?sort=newest",
+      "strategy": "browser-open",
+      "name": "invites"
+    }
+  ],
   "ok_sites": [
+    "52pojie",
     "HDKYL",
     "NodeSeek",
     "OurBits",
@@ -43,15 +523,40 @@
     "BTSchool",
     "DigitalCore",
     "GGPT",
-    "HDDolby",
     "HDHome",
     "Kufirc",
     "M-Team",
     "NewInsane",
+    "Rousi",
     "SpeedApp",
-    "UsefulTrash"
+    "UsefulTrash",
+    "远景论坛"
   ],
-  "success": 16,
+  "regressions": [
+    "13City",
+    "BiliDownload",
+    "DepthStudio",
+    "HDClone",
+    "HDDolby",
+    "HDVideo",
+    "HHCLUB",
+    "HTCPT",
+    "Moment",
+    "SBPT",
+    "Tokyo",
+    "xloli",
+    "YHPP",
+    "hdbao",
+    "musopia",
+    "ptlao",
+    "vclib",
+    "521",
+    "audiences",
+    "pbh-btn",
+    "invites"
+  ],
+  "success": 18,
+  "total": 52,
   "iteration_log": [
     {
       "value": [
@@ -400,369 +905,6 @@
       "site": "pbh-btn"
     }
   ],
-  "results": [
-    {
-      "url": "https://www.52pojie.cn/forum.php",
-      "status": "TIMEOUT",
-      "strategy": "browser-open",
-      "index": 1,
-      "name": "52pojie",
-      "signal": "NAV_FAIL",
-      "elapsed": "20.3s"
-    },
-    {
-      "url": "https://www.hdkyl.in/attendance.php",
-      "status": "SUCCESS",
-      "strategy": "browser-open",
-      "index": 2,
-      "name": "HDKYL",
-      "signal": "SIGN_OK",
-      "elapsed": "64.7s"
-    },
-    {
-      "url": "https://www.nodeseek.com/board",
-      "status": "SUCCESS",
-      "strategy": "browser-open",
-      "index": 3,
-      "name": "NodeSeek",
-      "signal": "SIGN_OK",
-      "elapsed": "22.1s"
-    },
-    {
-      "url": "https://ourbits.club/attendance.php",
-      "status": "VISITED",
-      "strategy": "browser-visit",
-      "index": 4,
-      "name": "OurBits",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "136.6s"
-    },
-    {
-      "url": "https://piggo.me/attendance.php?id=18989",
-      "status": "SUCCESS",
-      "strategy": "browser-open",
-      "index": 5,
-      "name": "PigGo",
-      "signal": "SIGN_OK",
-      "elapsed": "23.9s"
-    },
-    {
-      "url": "https://pt.0ff.cc/attendance.php",
-      "status": "SKIPPED",
-      "strategy": "manual",
-      "index": 6,
-      "name": "FreeFarm",
-      "signal": null,
-      "elapsed": "0s"
-    },
-    {
-      "url": "https://ubits.club/attendance.php",
-      "status": "CF_BLOCKED",
-      "strategy": "browser-open",
-      "index": 7,
-      "name": "UBits",
-      "signal": "CF_CHALLENGE",
-      "elapsed": "1108.8s"
-    },
-    {
-      "url": "https://www.v2ex.com/mission/daily",
-      "status": "SUCCESS",
-      "strategy": "browser-open",
-      "index": 8,
-      "name": "V2EX",
-      "signal": "SIGN_OK",
-      "elapsed": "14.8s"
-    },
-    {
-      "url": "https://13city.org/usercp.php?action=personal#signin",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 9,
-      "name": "13City",
-      "signal": "",
-      "elapsed": "169.4s"
-    },
-    {
-      "url": "https://asiandvdclub.org/index.php",
-      "status": "VISITED",
-      "strategy": "browser-visit",
-      "index": 10,
-      "name": "AsianDVDClub",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "132.9s"
-    },
-    {
-      "url": "https://bilibili.download/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 11,
-      "name": "BiliDownload",
-      "signal": "",
-      "elapsed": "168.5s"
-    },
-    {
-      "url": "https://pt.btschool.club/attendance.php",
-      "status": "SUCCESS",
-      "strategy": "browser-open",
-      "index": 12,
-      "name": "BTSchool",
-      "signal": "SIGN_OK",
-      "elapsed": "18.5s"
-    },
-    {
-      "url": "https://dstudio.me/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 13,
-      "name": "DepthStudio",
-      "signal": "",
-      "elapsed": "169.1s"
-    },
-    {
-      "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
-      "status": "VISITED",
-      "strategy": "browser-visit",
-      "index": 14,
-      "name": "DigitalCore",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "133.3s"
-    },
-    {
-      "url": "https://www.gamegamept.com/attendance.php",
-      "status": "SUCCESS",
-      "strategy": "browser-open",
-      "index": 15,
-      "name": "GGPT",
-      "signal": "SIGN_OK",
-      "elapsed": "16.2s"
-    },
-    {
-      "url": "https://pt.hdclone.top/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 16,
-      "name": "HDClone",
-      "signal": "",
-      "elapsed": "174.6s"
-    },
-    {
-      "url": "https://www.hddolby.com/attendance.php",
-      "status": "SUCCESS",
-      "strategy": "browser-open",
-      "index": 17,
-      "name": "HDDolby",
-      "signal": "SIGN_OK",
-      "elapsed": "14.6s"
-    },
-    {
-      "url": "https://hdhome.org/attendance.php",
-      "status": "SUCCESS",
-      "strategy": "browser-open",
-      "index": 18,
-      "name": "HDHome",
-      "signal": "SIGN_OK",
-      "elapsed": "17.4s"
-    },
-    {
-      "url": "https://hdvideo.top/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 19,
-      "name": "HDVideo",
-      "signal": "",
-      "elapsed": "168.4s"
-    },
-    {
-      "url": "https://hhanclub.net/attendance.php",
-      "status": "ERROR",
-      "strategy": "browser-open",
-      "index": 20,
-      "name": "HHCLUB",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "139.5s"
-    },
-    {
-      "url": "https://www.htpt.cc/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 21,
-      "name": "HTCPT",
-      "signal": "",
-      "elapsed": "168.3s"
-    },
-    {
-      "url": "https://kufirc.com/index.php",
-      "status": "VISITED",
-      "strategy": "browser-visit",
-      "index": 22,
-      "name": "Kufirc",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "133.1s"
-    },
-    {
-      "url": "https://kp.m-team.cc/index",
-      "status": "VISITED",
-      "strategy": "browser-visit",
-      "index": 23,
-      "name": "M-Team",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "133.3s"
-    },
-    {
-      "url": "https://www.momentpt.top/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 24,
-      "name": "Moment",
-      "signal": "",
-      "elapsed": "168.4s"
-    },
-    {
-      "url": "https://newinsane.info/browse.php",
-      "status": "VISITED",
-      "strategy": "browser-visit",
-      "index": 25,
-      "name": "NewInsane",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "132.5s"
-    },
-    {
-      "url": "https://rousi.pro/points",
-      "status": "EVAL_FAIL",
-      "strategy": "browser-eval-click",
-      "index": 26,
-      "name": "Rousi",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "369.8s"
-    },
-    {
-      "url": "https://sbpt.link/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 27,
-      "name": "SBPT",
-      "signal": "",
-      "elapsed": "168.5s"
-    },
-    {
-      "url": "https://speedapp.io/adult",
-      "status": "VISITED",
-      "strategy": "browser-visit",
-      "index": 28,
-      "name": "SpeedApp",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "132.9s"
-    },
-    {
-      "url": "https://www.tjupt.org/attendance.php",
-      "status": "SKIPPED",
-      "strategy": "manual",
-      "index": 29,
-      "name": "TJUPT",
-      "signal": null,
-      "elapsed": "0s"
-    },
-    {
-      "url": "https://www.tokyo-manga.top/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 30,
-      "name": "Tokyo",
-      "signal": "",
-      "elapsed": "168.2s"
-    },
-    {
-      "url": "https://usefultrash.net/browse.php",
-      "status": "VISITED",
-      "strategy": "browser-visit",
-      "index": 31,
-      "name": "UsefulTrash",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "132.6s"
-    },
-    {
-      "url": "https://mua.xloli.cc/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 32,
-      "name": "xloli",
-      "signal": "",
-      "elapsed": "168.3s"
-    },
-    {
-      "url": "https://www.yemapt.org/#/consumer/checkIn",
-      "status": "TIMEOUT",
-      "strategy": "browser-open",
-      "index": 33,
-      "name": "Yemapt",
-      "signal": "NAV_FAIL",
-      "elapsed": "51.3s"
-    },
-    {
-      "url": "https://www.yhpp.cc/attendance.php",
-      "status": "NO_ARTICLE",
-      "strategy": "web-read",
-      "index": 34,
-      "name": "YHPP",
-      "signal": "",
-      "elapsed": "169.6s"
-    },
-    {
-      "url": "https://bbs.pcbeta.com/forum-win11-1.html",
-      "status": "TIMEOUT",
-      "strategy": "browser-open",
-      "index": 35,
-      "name": "远景论坛",
-      "signal": "NAV_FAIL",
-      "elapsed": "80.7s"
-    },
-    {
-      "url": "https://fearnopeer.com/",
-      "status": "ERROR",
-      "strategy": "browser-open",
-      "index": 36,
-      "name": "fearnopeer",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "133.1s"
-    },
-    {
-      "url": "https://dreamingtree.org/user.php?id=37099",
-      "status": "ERROR",
-      "strategy": "browser-open",
-      "index": 37,
-      "name": "dreamingtree",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "132.9s"
-    },
-    {
-      "url": "https://cysic.xyz/stake",
-      "status": "ERROR",
-      "strategy": "browser-open",
-      "index": 38,
-      "name": "cysic",
-      "signal": "ERROR_NO_SIGNAL",
-      "elapsed": "133.3s"
-    }
-  ],
-  "regressions": [
-    "52pojie",
-    "UBits",
-    "13City",
-    "BiliDownload",
-    "DepthStudio",
-    "HDClone",
-    "HDVideo",
-    "HHCLUB",
-    "HTCPT",
-    "Moment",
-    "Rousi",
-    "SBPT",
-    "Tokyo",
-    "xloli",
-    "Yemapt",
-    "YHPP",
-    "远景论坛"
-  ],
-  "new_successes": [],
-  "iterations": 40
+  "failed": 30,
+  "timestamp": "2026-07-02 02:04:33"
 }

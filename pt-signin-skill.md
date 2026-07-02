@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, slider captcha API bypass,
   click-to-sign pages, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-07-01 (v4.9 — 假pass防御：状态转换验证+ALREADY_SIGNED；tab生命周期：close_tab防累积；sync-log落盘）
+updated: 2026-07-02 (v4.9.1 — Click JS 选择器加固：精确匹配+叶子节点过滤；HHCLUB webbridge 路由修复；lessons #37/#38）
 ---
 
 # PT Site Sign-in Automation
@@ -974,3 +974,18 @@ Every sign-in session must follow this complete workflow. No step may be skipped
       - **End (finally)**: `close_tab` to close this site's tab immediately
     - **Result**: Each site keeps exactly 1 tab during its sign-in; retries close the old tab before opening a new one. No accumulation across the whole batch.
     - **Lesson**: Any function that opens a browser tab must own its full lifecycle (open → use → close). `try/finally` is the reliable pattern — it closes the tab even on early return or exception. Never rely on a distant `close_session` to clean up mid-run tabs.
+
+37. **Click JS selector hardening: precise match + leaf-node filter (v4.9.1)**: HDDolby stuck in a 3x retry loop (`NEED_SIGN → click → recheck still NEED_SIGN`). The Click JS used `v.indexOf('签到')>-1` as fallback, which is too broad — it matched a navigation `<a>` element whose `textContent` was `"欢迎回来, Schalkiiii ( UID: 40534 ) [退出]    签到..."` (the full header container text included the sign-in keyword further down). The script clicked the wrong element (user-info link), so the sign-in button was never actually pressed.
+    - **Root cause**: `textContent` on a parent element includes all descendant text. A query like `querySelectorAll('a,span,b,font,button')` can match containers whose text happens to include "签到" somewhere in their subtree, even though the visible label is "欢迎回来...".
+    - **Fix — three-layer defense**:
+      1. **Exact match** (priority 1): `v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'` — equal to known button labels only.
+      2. **Prefix + length** (priority 2): `v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)` — starts with "签到得" and short enough to be a button (not a 200-char container).
+      3. **Leaf-node filter**: `if(el.children.length>1) continue` — skip elements with multiple children (containers); only click leaf nodes.
+    - **Also fixed**: HDDolby Detect JS keyword `签到得魔力` didn't match the site's actual `签到得鲸币`. Added `签到得鲸币` to the NEED_SIGN check.
+    - **Batch hardened**: same template applied to PigGo/OurBits/GGPT/HDHome/TJUPT (5 sites via replace_all) + HDBao (preserving its `input[value*="签到"]` priority match) + HHCLUB (new config).
+    - **Lesson**: Never use bare `indexOf('签到')` as a click selector — it's a substring that appears in navigation, user info, and footer text across NexusPHP sites. Always require exact equality or a strict prefix + length cap, and filter to leaf nodes. The `textContent` of a container includes all descendants, so a "签到" match doesn't mean the element IS the sign-in button.
+
+38. **webbridge routing gate: note must contain "webbridge" (v4.9.1)**: HHCLUB (a baseline site) returned `=> ERROR` with no `[WebBridge]` log output. Root cause: `signin-batch.ps1` line 499 gates webbridge routing on `if ($site.note -match "webbridge")`. HHCLUB's note was `"改用browser-open"` (the word "webbridge" absent), so it fell through to the opencli `Browser-SignIn` branch, which failed.
+    - **Impact**: Any `browser-open` site whose note lacks the literal "webbridge" silently uses the wrong backend. New auto-synced sites get note `"auto: 书签同步新增"` and never route to webbridge — 11 such sites (42w/h-e/zxiaoruan/pp/littlesheep/onrender/anyrouter/huan666/xt-url/pbh-btn/invites) all ERROR.
+    - **Fix for HHCLUB**: added config in `signin-web.ps1` + changed note to include "webbridge".
+    - **Lesson**: Routing decisions must not depend on a substring in a free-text note field — it's brittle and invisible. Either (a) use an explicit `backend` field (`webbridge`/`opencli`), or (b) default `browser-open` to webbridge when daemon is available. The note-gate is a hidden coupling that bites when notes are auto-generated or hand-edited.
