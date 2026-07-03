@@ -36,6 +36,12 @@
 | 42w         | URL 返回 404（页面未找到）                | 签到入口失效，需人工确认                  |
 | pp          | URL 返回 404（页面未找到）                | 签到入口失效，需人工确认                  |
 
+#### 修复5: EVAL_FAIL tab 丢失自动恢复（kimi-webbridge.ps1）
+
+- **根因**：v4.10.1 全量签到发现 5 个站点（SBPT/onrender/ptlao/huan666/HTCPT）EVAL_FAIL，错误 `session "daily-signin" has no tab`。webbridge daemon bug：navigate 返回 success=true 但 tab 在 WaitMs 等待期间消失。
+- **修复**：`Test-WebBridgeSignIn` 在 evaluate 失败时（$detect 为 null），自动重新 close_tab + navigate + evaluate 一次，恢复 tab 丢失场景。
+- **验证**：SBPT/onrender 单站点测试通过（SIGN_OK），确认 tab 丢失为间歇性问题，修复有效。
+
 #### 保留 webbridge（环境问题，非配置问题）
 
 - **OurBits / DepthStudio / xloli / audiences**：CF 挑战无法通过 turnstile checkbox 点击绕过，环境问题。

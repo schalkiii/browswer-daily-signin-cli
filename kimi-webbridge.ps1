@@ -121,6 +121,17 @@ function Test-WebBridgeSignIn {
         Write-Host "  [WebBridge] $SiteName : evaluate detect"
         $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
         if (-not $detect) {
+            # evaluate 失败常见于 tab 丢失（webbridge daemon bug: navigate 返回 success 但 tab 在等待期间消失）
+            # 修复：重新 navigate + evaluate 一次
+            Write-Host "  [WebBridge] $SiteName : evaluate failed (tab may be lost), retrying navigate..."
+            try { $null = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{} -Session $session -TimeoutSec 5 } catch {}
+            $navRetry = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+            if ($navRetry -and $navRetry.success) {
+                Start-Sleep -Milliseconds $WaitMs
+                $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+            }
+        }
+        if (-not $detect) {
             Save-DebugSnapshot $SiteName $session "detect_fail" $DebugDir $SaveDebugSnapshot
             return "EVAL_FAIL"
         }
