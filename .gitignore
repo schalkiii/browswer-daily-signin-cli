@@ -6,6 +6,10 @@ web-articles/
 debug-snapshots/
 *.log
 
+# 运行时日志（签到结果、书签同步日志，每次运行动态生成）
+signin-log.json
+sync-log.json
+
 # 临时验证脚本
 .tmp-*.ps1
 
