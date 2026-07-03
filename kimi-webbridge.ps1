@@ -199,7 +199,7 @@ function Test-WebBridgeSignIn {
             Start-Sleep -Milliseconds $PostClickWaitMs
 
             Write-Host "  [WebBridge] $SiteName : evaluate re-check"
-            $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+            $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 30
             $recheckSig = if ($recheck -is [string]) { $recheck } elseif ($recheck.value) { "$($recheck.value)" } else { "$recheck" }
             # 点击后检测到已签到 → 本次签到成功（非 ALREADY_SIGNED）
             if ($recheckSig -match "SIGN_OK|ALREADY_SIGNED") {

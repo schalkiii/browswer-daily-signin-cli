@@ -42,6 +42,24 @@
 - **修复**：`Test-WebBridgeSignIn` 在 evaluate 失败时（$detect 为 null），自动重新 close_tab + navigate + evaluate 一次，恢复 tab 丢失场景。
 - **验证**：SBPT/onrender 单站点测试通过（SIGN_OK），确认 tab 丢失为间歇性问题，修复有效。
 
+#### 修复6: HHCLUB 方括号按钮匹配 + detect 关键词（signin-web.ps1）
+
+- **根因**：HHCLUB 签到按钮文本为 `[签到得憨豆]`（方括号包裹），Click JS 精确匹配和前缀匹配均不匹配。detect 未识别 `已领取`/`本次签到获得` 等已签到文本。
+- **修复**：Click JS 增加 `vu.replace(/^\[|\]$/g,'')` 去方括号后匹配；Detect 加入 `签到得憨豆`/`已领取`/`本次签到获得` 关键词。
+- **验证**：单站点测试 ALREADY_SIGNED（因前次 click 已成功签到）。
+
+#### 修复7: re-check evaluate 超时增大（kimi-webbridge.ps1）
+
+- **根因**：点击后页面重载导致 tab 暂时不可用，re-check evaluate 15s 超时不够。
+- **修复**：re-check evaluate TimeoutSec 从 15 增至 30。
+
+#### v4.10.1+ 全量签到结果（AUTO_OK=34, AUTO_FAIL=6）
+
+- **成功 (34)**：52pojie, HDKYL, NodeSeek, PigGo, V2EX, 13City, AsianDVDClub, BiliDownload, BTSchool, DigitalCore, GGPT, HDClone, HDDolby, HDHome, HDVideo, HTCPT, Kufirc, M-Team, Moment, NewInsane, Rousi, SBPT, SpeedApp, Tokyo, UsefulTrash, YHPP, 远景论坛, h-e, hdbao, musopia, onrender, huan666, pbh-btn, invites
+- **失败 (6)**：OurBits(CF), DepthStudio(CF), HHCLUB(已修复), xloli(CF), ptlao(SERVER_ERROR), audiences(CF)
+- **Manual skip (11)**：FreeFarm, UBits, TJUPT, Yemapt, 42w, zxiaoruan, pp, littlesheep, vclib, 521, xt-url
+- **回归 (7)**：OurBits, DepthStudio, HHCLUB, xloli, ptlao, anyrouter, audiences — 其中 4 个 CF + 1 个 SERVER_ERROR + 1 个 LOGIN_REQUIRED(cookie失效) + HHCLUB(已修复)
+
 #### 保留 webbridge（环境问题，非配置问题）
 
 - **OurBits / DepthStudio / xloli / audiences**：CF 挑战无法通过 turnstile checkbox 点击绕过，环境问题。

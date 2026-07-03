@@ -592,15 +592,15 @@ $WebSignInConfigs = @{
     "HHCLUB" = @{
         Url = "https://hhanclub.net/attendance.php"
         WaitMs = 15000
-        PostClickMs = 5000
+        PostClickMs = 8000
         Detect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
   if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
   if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1||t.indexOf('Just a moment')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1||t.indexOf('已领取')>-1||t.indexOf('本次签到获得')>-1) return 'SIGN_OK';
+  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到得憨豆')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
   if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
   if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
   var match = t.match(/签到.{0,20}/);
@@ -611,13 +611,15 @@ $WebSignInConfigs = @{
         Click = @'
 (function(){
   // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
-  // v4.10.1: 支持 "签到获得XX憨豆" 等多样化按钮文本
+  // v4.10.1: 支持 "签到获得XX憨豆" / "[签到得憨豆]" 等多样化按钮文本
   var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
   for(var i=0;i<candidates.length;i++){
     var el = candidates[i];
     if(el.children.length>1) continue;
     var v = (el.textContent||el.value||'').trim();
-    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'){
+    // 去掉方括号包裹后匹配：[签到得憨豆] → 签到得憨豆
+    var vu = v.replace(/^\[|\]$/g,'');
+    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'||vu==='签到得憨豆'||vu==='签到得鲸币'||vu==='签到得魔力'){
       el.click(); return 'CLICKED_EXACT:'+v;
     }
   }
@@ -625,8 +627,9 @@ $WebSignInConfigs = @{
     var el2 = candidates[j];
     if(el2.children.length>1) continue;
     var v2 = (el2.textContent||el2.value||'').trim();
-    // 前缀匹配：签到得XX / 签到获得XX / 打卡XX
-    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('签到获得')===0||v2.indexOf('打卡')===0)){
+    var v2u = v2.replace(/^\[|\]$/g,'');
+    // 前缀匹配：签到得XX / 签到获得XX / 打卡XX（支持方括号包裹）
+    if(v2u.length<20 && (v2u.indexOf('签到得')===0||v2u.indexOf('签到获得')===0||v2u.indexOf('打卡')===0)){
       el2.click(); return 'CLICKED_PREFIX:'+v2;
     }
   }
