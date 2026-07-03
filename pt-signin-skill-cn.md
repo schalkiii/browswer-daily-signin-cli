@@ -5,7 +5,7 @@ description: |
   涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、点击签到页面、
   SPA 控制台站点和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-07-03 (v4.10 — opencli 全面替代为 kimi webbridge 单后端；33 个新站点配置；visit-only 模式）
+updated: 2026-07-03 (v4.10.1+ — EVAL_FAIL tab 丢失恢复、HHCLUB 方括号按钮、re-check 超时增大、7 站点改 manual)
 ---
 
 # PT 站点签到自动化
@@ -15,19 +15,19 @@ updated: 2026-07-03 (v4.10 — opencli 全面替代为 kimi webbridge 单后端�
 ```powershell
 cd d:\workspace\browswer-daily-signin-cli
 
-# 全量批处理: 48 个 webbridge 站点 + 4 个人工站点, 约 15-20 分钟
+# 全量批处理: 41 个 webbridge 站点 + 11 个人工站点, 约 15-25 分钟
 .\signin-batch.ps1
 ```
 
-## 覆盖范围 (v4.10 — 单 webbridge 后端)
+## 覆盖范围 (v4.10.1+ — 单 webbridge 后端)
 
 | 类别                            | 数量   | 描述                       |
 | ------------------------------- | ------ | -------------------------- |
-| webbridge (NexusPHP attendance) | 16     | 访问即签到 (Click=$null)   |
+| webbridge (NexusPHP attendance) | 15     | 访问即签到 (Click=$null)   |
 | webbridge (JS 点击签到)         | 17     | 点击按钮 + 重检（论坛/PT） |
-| webbridge (SPA 控制台)          | 10     | 登录态保持即视为成功       |
+| webbridge (SPA 控制台)          | 9      | 登录态保持即视为成功       |
 | webbridge (仅访问)              | 7      | 纯浏览类站点，不检测签到   |
-| webbridge (特殊 URL)            | 1      | 13City (usercp.php)        |
+| webbridge (特殊 URL)            | 1      | 13City (attendance.php)    |
 | manual（验证码/政策原因）       | 4      | 需人工交互                 |
 | **总计**                        | **52** | 全部书签站点均尝试         |
 
@@ -908,3 +908,25 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
       1. `sites.json`: strategy 从 `browser-open` 改为 `manual`，note 记录"2026-06-22: SPA站点且有人机验证加载中，webbridge点击签到后状态未变更，无法自动化，改为手动"
       2. `baseline.json`: 将 Yemapt 从 `sites` 移到 `manual_sites`，auto_total 40，manual_total 5
     - **经验**: SPA 站点（尤其是带人机验证的）自动化难度大，当多次尝试（包括增加等待时间、重试）仍失败后，应果断转为 manual 避免浪费每日签到机会。
+
+20. **EVAL_FAIL tab 丢失自动恢复（v4.10.1+）**: webbridge daemon 存在间歇性 bug：navigate 返回 success=true 但 tab 在 WaitMs 等待期间消失，导致后续 evaluate 报 `session "daily-signin" has no tab`。
+    - **症状**: 全量签到中多个站点（SBPT/onrender/ptlao/huan666/HTCPT/BTSchool/DepthStudio）报 EVAL_FAIL，单站点重测却 SIGN_OK，说明是非确定性问题
+    - **修复**: `Test-WebBridgeSignIn` 在 evaluate 失败时（$detect 为 null），自动 close_tab + navigate + evaluate 一次重试。重试成功则继续正常流程，重试仍失败才返回 EVAL_FAIL
+    - **验证**: 修复后全量签到 AUTO_OK 从 29 提升至 34，5 个原 EVAL_FAIL 站点全部 SIGN_OK
+    - **关键**: 间歇性 bug 必须加重试逻辑，单次失败不应直接判失败
+
+21. **HHCLUB 方括号按钮匹配（v4.10.1+）**: HHCLUB 签到按钮文本为 `[签到得憨豆]`（带方括号包裹），与常规 NexusPHP 按钮 `签到得魔力`/`签到得鲸币` 格式不同。
+    - **诊断**: debug 快照显示按钮是 `<A href="...attendance.php">[签到得憨豆]</A>`，detect 匹配到的是描述文本"签到获得10个憨豆"而非按钮文本
+    - **修复**: Click JS 增加 `v.replace(/^\[|\]$/g,'')` 去方括号后再匹配；Detect 加入 `签到得憨豆`/`已领取`/`本次签到获得` 关键词
+    - **经验**: 不同 PT 站点的按钮文本格式可能差异很大（方括号、圆括号、emoji 等），Click JS 应先规范化文本再匹配
+
+22. **re-check evaluate 超时需大于 click 后页面重载时间（v4.10.1+）**: 点击签到按钮后页面可能跳转/重载，tab 在重载期间暂时不可用，re-check evaluate 15s 超时不够。
+    - **症状**: HHCLUB click 成功（CLICKED_EXACT），但 re-check evaluate 超时报 HttpClient.Timeout
+    - **修复**: re-check evaluate TimeoutSec 从 15 增至 30，给页面重载足够时间
+    - **经验**: click → re-check 之间应有充足等待（PostClickMs）+ re-check 超时（≥30s），以应对页面重载
+
+23. **PowerShell 5.x vs 7.x 编码差异（v4.10.1+）**: PowerShell 5.x (powershell.exe) 按 GBK 读取无 BOM 的 .ps1 文件，中文字符被破坏；PowerShell 7.x (pwsh.exe) 默认按 UTF-8 读取，正确处理中文。
+    - **症状**: powershell.exe 运行 kimi-webbridge.ps1 报 "daemon 鍚姩鎴愬姛"（中文"启动成功"被 GBK 解码破坏）
+    - **修复**: 所有脚本验证和签到执行改用 pwsh（`pwsh -NoProfile -File signin-batch.ps1`）
+    - **附加**: PowerShell 5.x 解析 here-string `'@` 结束符要求 CRLF；LF 结尾会导致 here-string 无法正确终止。git core.autocrlf=true 在 checkout 时会转 CRLF，但 Edit/Write 工具用 LF 写入工作区文件，可能导致 here-string 解析失败
+    - **经验**: 含中文的 PowerShell 脚本必须用 pwsh 7.x 运行；here-string 必须保持 CRLF 行结束符
