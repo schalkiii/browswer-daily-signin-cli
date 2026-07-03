@@ -1,5 +1,52 @@
 # Changelog
 
+## [v4.10.1] - 2026-07-03
+
+### 全量签到调试修复（v4.10 首次全量签到反馈）
+
+基于 v4.10 全量签到的 16 个失败站点 debug 快照分析，按根因分类修复。AUTO_OK 从 31 提升至预期 38+。
+
+#### 修复1: $NexusPHPSignInDetect 繁体支持（影响 SBPT）
+
+- **根因**：SBPT 实际已签到成功（页面显示"簽到成功 這是您的第 210 次簽到"），但 detect JS 只匹配简体"签到成功"，返回 UNKNOWN。
+- **修复**：$NexusPHPSignInDetect 加入繁体匹配：簽到已得 / 今日已簽到 / 已簽到 / 簽到成功 / 簽到得魔力 / 簽到得鯨幣 / 簽到領取。
+- **新增 SERVER_ERROR 信号**：识别 chrome-error:// 页面和 HTTP ERROR 500/502，避免误判为 UNKNOWN（影响 ptlao 等服务器临时不可用场景）。
+
+#### 修复2: HHCLUB Click JS 按钮文本扩展
+
+- **根因**：detect 返回 NEED_SIGN:签到获得10个憨豆，但 Click JS 只匹配"签到得魔力/签到得鲸币/签到/打卡"，不匹配"签到获得XX憨豆"，返回 NO_BTN。
+- **修复**：Click JS 前缀匹配增加 `签到获得`，支持 HHCLUB 的"签到获得10个憨豆"按钮。
+
+#### 修复3: 13City URL 修正
+
+- **根因**：原 URL `usercp.php?action=personal#signin` 是一键签到聚合页（显示"→开始签到←"按钮和站点列表），detect JS 无法识别页面状态。
+- **修复**：改为 `attendance.php` 单站点签到页，与 NexusPHP 通用模板匹配。
+
+#### 修复4: 7 个站点改为 manual（无法自动化）
+
+基于 debug 快照确认根因后，将以下站点 strategy 改为 manual：
+
+| 站点        | 根因                                      | 备注                                      |
+| ----------- | ----------------------------------------- | ----------------------------------------- |
+| vclib       | 签到页需输入图片验证码（CAPTCHA）         | `<input name="imagestring">` + 验证码图片 |
+| 521         | 签到页需输入图片验证码（CAPTCHA）         | 同 vclib                                  |
+| zxiaoruan   | 重定向到 /sign-in 登录页（LinuxDO OAuth） | 未登录态无法签到                          |
+| littlesheep | 重定向到 /sign-in 登录页                  | 未登录态无法签到                          |
+| xt-url      | 页面显示"请先使用 Linux Do 登录"          | 未登录态无法签到                          |
+| 42w         | URL 返回 404（页面未找到）                | 签到入口失效，需人工确认                  |
+| pp          | URL 返回 404（页面未找到）                | 签到入口失效，需人工确认                  |
+
+#### 保留 webbridge（环境问题，非配置问题）
+
+- **OurBits / DepthStudio / xloli / audiences**：CF 挑战无法通过 turnstile checkbox 点击绕过，环境问题。
+- **ptlao**：服务器返回 HTTP 500，临时不可用（已加入 SERVER_ERROR 信号识别）。
+- **invites**：站点返回"您没有权限进行此操作"，可能账号权限问题，保留 retry。
+
+#### 数据同步
+
+- `baseline.json`：sites 列表移除 7 个改 manual 站点，manual_sites 增加 7 项；auto_total 48→41，manual_total 5→12。
+- `sites.json`：version 升级至 v4.10.1，13City URL 更新，7 站点 strategy 改为 manual 并补充 note。
+
 ## [v4.10] - 2026-07-03
 
 ### opencli 全面替代为 kimi webbridge（单后端架构）
@@ -45,12 +92,12 @@
 
 ### 架构变化
 
-| 维度       | v4.9.1（旧）                    | v4.10（新）                       |
-| ---------- | ------------------------------- | --------------------------------- |
-| 后端       | opencli + kimi webbridge（双） | kimi webbridge（单一）            |
-| strategy 值 | web-read / browser-open / browser-visit / browser-eval-click / manual | webbridge / manual                |
-| switch 分支 | 5 + note 路由门                 | 2（manual / default）             |
-| 配置覆盖率 | 17/52（33 个无配置走默认分支）  | 50/52（48 非 manual 全覆盖）      |
+| 维度        | v4.9.1（旧）                                                          | v4.10（新）                  |
+| ----------- | --------------------------------------------------------------------- | ---------------------------- |
+| 后端        | opencli + kimi webbridge（双）                                        | kimi webbridge（单一）       |
+| strategy 值 | web-read / browser-open / browser-visit / browser-eval-click / manual | webbridge / manual           |
+| switch 分支 | 5 + note 路由门                                                       | 2（manual / default）        |
+| 配置覆盖率  | 17/52（33 个无配置走默认分支）                                        | 50/52（48 非 manual 全覆盖） |
 
 ## [v4.9.1] - 2026-07-02
 

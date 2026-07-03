@@ -13,9 +13,14 @@ $NexusPHPSignInDetect = @'
   var t = document.body.innerText||'';
   if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
   if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1||t.indexOf('Just a moment')>-1) return 'CF_CHALLENGE';
+  // 简体 + 繁体匹配（SBPT 等繁体站点使用 "簽到成功"）
   if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
+  if(t.indexOf('簽到已得')>-1||t.indexOf('今日已簽到')>-1||t.indexOf('已簽到')>-1||t.indexOf('簽到成功')>-1) return 'SIGN_OK';
   if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  if(t.indexOf('簽到得魔力')>-1||t.indexOf('簽到得鯨幣')>-1||t.indexOf('簽到得鲸币')>-1||t.indexOf('簽到領取')>-1) return 'NEED_SIGN';
   if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('必须登录')>-1) return 'LOGIN_REQUIRED';
+  // chrome-error 页面（HTTP 500/502 等服务器错误）
+  if(location.protocol==='chrome-error:'||t.indexOf('HTTP ERROR')>-1||t.indexOf('当前无法使用此页面')>-1) return 'SERVER_ERROR';
   if(t.length<20) return 'BODY_NULL';
   return 'UNKNOWN';
 })()
@@ -606,6 +611,7 @@ $WebSignInConfigs = @{
         Click = @'
 (function(){
   // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
+  // v4.10.1: 支持 "签到获得XX憨豆" 等多样化按钮文本
   var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
   for(var i=0;i<candidates.length;i++){
     var el = candidates[i];
@@ -619,7 +625,8 @@ $WebSignInConfigs = @{
     var el2 = candidates[j];
     if(el2.children.length>1) continue;
     var v2 = (el2.textContent||el2.value||'').trim();
-    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)){
+    // 前缀匹配：签到得XX / 签到获得XX / 打卡XX
+    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('签到获得')===0||v2.indexOf('打卡')===0)){
       el2.click(); return 'CLICKED_PREFIX:'+v2;
     }
   }
@@ -765,9 +772,9 @@ $WebSignInConfigs = @{
         Click = $null
     }
 
-    # 13City: URL 非 attendance.php（usercp.php?action=personal#signin），用 NexusPHP 通用检测
+    # 13City: v4.10.1 修正 URL（原 usercp.php 是聚合签到页，改为单站点 attendance.php）
     "13City" = @{
-        Url = "https://13city.org/usercp.php?action=personal#signin"
+        Url = "https://13city.org/attendance.php"
         WaitMs = 12000
         PostClickMs = 5000
         Detect = $NexusPHPSignInDetect

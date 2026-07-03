@@ -1,5 +1,5 @@
 {
-  "version": "v4.10",
+  "version": "v4.10.1",
   "total": 52,
   "baseline_file": "baseline.json",
   "sites": [
@@ -53,9 +53,9 @@
     },
     {
       "name": "13City",
-      "url": "https://13city.org/usercp.php?action=personal#signin",
+      "url": "https://13city.org/attendance.php",
       "strategy": "webbridge",
-      "note": "书签同步: 13City签到"
+      "note": "v4.10.1: URL 从 usercp.php 聚合签到页改为 attendance.php 单站点签到页"
     },
     {
       "name": "AsianDVDClub",
@@ -216,8 +216,8 @@
     {
       "name": "42w",
       "url": "https://api.42w.shop/console/personal",
-      "strategy": "webbridge",
-      "note": "auto: 书签同步新增"
+      "strategy": "manual",
+      "note": "v4.10.1: URL 返回 404 (页面未找到)，签到入口失效，需人工确认正确URL后改回webbridge"
     },
     {
       "name": "h-e",
@@ -234,20 +234,20 @@
     {
       "name": "zxiaoruan",
       "url": "https://gyapi.zxiaoruan.cn/profile",
-      "strategy": "webbridge",
-      "note": "auto: 书签同步新增"
+      "strategy": "manual",
+      "note": "v4.10.1: 页面重定向到 /sign-in 登录页（LinuxDO OAuth），未登录态无法签到，需人工登录后改回webbridge"
     },
     {
       "name": "pp",
       "url": "https://ioll.pp.ua/console/personal",
-      "strategy": "webbridge",
-      "note": "auto: 书签同步新增"
+      "strategy": "manual",
+      "note": "v4.10.1: URL 返回 404 (页面未找到)，签到入口失效，需人工确认正确URL后改回webbridge"
     },
     {
       "name": "littlesheep",
       "url": "https://ai.littlesheep.cc/profile",
-      "strategy": "webbridge",
-      "note": "auto: 书签同步新增"
+      "strategy": "manual",
+      "note": "v4.10.1: 页面重定向到 /sign-in 登录页，未登录态无法签到，需人工登录后改回webbridge"
     },
     {
       "name": "musopia",
@@ -270,14 +270,14 @@
     {
       "name": "vclib",
       "url": "https://pt.vclib.online/attendance.php",
-      "strategy": "webbridge",
-      "note": "auto: 书签同步新增"
+      "strategy": "manual",
+      "note": "v4.10.1: 签到页需输入图片验证码（CAPTCHA），无法自动化，改为manual"
     },
     {
       "name": "521",
       "url": "https://pt.521.best/attendance.php",
-      "strategy": "webbridge",
-      "note": "auto: 书签同步新增"
+      "strategy": "manual",
+      "note": "v4.10.1: 签到页需输入图片验证码（CAPTCHA），无法自动化，改为manual"
     },
     {
       "name": "anyrouter",
@@ -300,8 +300,8 @@
     {
       "name": "xt-url",
       "url": "https://checkin.new-api.xt-url.com/",
-      "strategy": "webbridge",
-      "note": "auto: 书签同步新增"
+      "strategy": "manual",
+      "note": "v4.10.1: 页面要求 LinuxDO OAuth 登录后才能签到，未登录态显示登录提示，改为manual"
     },
     {
       "name": "pbh-btn",

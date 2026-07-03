@@ -1,6 +1,6 @@
 {
-  "version": "v4.7",
-  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v4.7: UBits/Yemapt 改回manual（CF托管挑战/SPA人机验证），Rousi 改用webbridge。",
+  "version": "v4.10.1",
+  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v4.10.1: vclib/521（验证码）、zxiaoruan/littlesheep/xt-url（OAuth登录）、42w/pp（URL失效）改为manual。",
   "sites": [
     "GGPT",
     "V2EX",
@@ -42,20 +42,29 @@
     "PigGo",
     "NodeSeek",
     "BTSchool",
-    "521",
-    "vclib",
     "audiences",
     "pbh-btn",
-    "invites"
+    "invites",
+    "h-e",
+    "onrender",
+    "huan666",
+    "anyrouter"
   ],
   "manual_sites": [
     "北洋园PT",
     "TJUPT",
     "FreeFarm",
     "UBits",
-    "Yemapt"
+    "Yemapt",
+    "vclib",
+    "521",
+    "zxiaoruan",
+    "littlesheep",
+    "xt-url",
+    "42w",
+    "pp"
   ],
-  "auto_total": 45,
-  "manual_total": 5,
-  "last_updated": "2026-07-01 02:30:00"
+  "auto_total": 47,
+  "manual_total": 12,
+  "last_updated": "2026-07-03 10:44:18"
 }
