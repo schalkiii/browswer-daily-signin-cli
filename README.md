@@ -111,17 +111,18 @@ v4.10 起统一为单一 `webbridge` 后端，移除 opencli 依赖。站点配�
 
 | 策略        | 站点数 | 原理                                      | 适用场景                       |
 | ----------- | ------ | ----------------------------------------- | ------------------------------ |
-| `webbridge` | 48     | 操控真实浏览器：navigate → detect → click | NexusPHP / 论坛 / SPA 控制台等 |
-| `manual`    | 4      | 跳过                                      | 验证码/滑块/人工确认           |
+| `webbridge` | 42     | 操控真实浏览器：navigate → detect → click | NexusPHP / 论坛 / SPA 控制台等 |
+| `manual`    | 7      | 跳过                                      | 验证码/滑块/未登录/人工确认    |
 
 **webbridge 站点配置类型**（由 `signin-web.ps1` 中的 Detect/Click 决定）：
 
-| 配置类型            | Detect       | Click   | 状态转换                                    |
-| ------------------- | ------------ | ------- | ------------------------------------------- |
-| NexusPHP attendance | 通用检测模板 | `$null` | 访问即签到，首次 SIGN_OK = 真实签到成功     |
-| 论坛/JS 点击        | 站点特定 JS  | 站点 JS | 首次 SIGN_OK = ALREADY_SIGNED（今天已签到） |
-| SPA 控制台          | SPA 模板     | `$null` | 登录态保持即视为成功                        |
-| visit-only          | `$null`      | `$null` | 仅访问，返回 VISITED                        |
+| 配置类型            | Detect       | Click   | 状态转换                                                                                |
+| ------------------- | ------------ | ------- | --------------------------------------------------------------------------------------- |
+| NexusPHP attendance | 通用检测模板 | `$null` | 访问即签到，首次 SIGN_OK = 真实签到成功                                                 |
+| 论坛/JS 点击        | 站点特定 JS  | 站点 JS | 首次 SIGN_OK = ALREADY_SIGNED（今天已签到）                                             |
+| SPA 控制台          | SPA 模板     | `$null` | 登录态保持即视为成功                                                                    |
+| visit-only          | `$null`      | `$null` | 仅访问，返回 VISITED                                                                    |
+| NexusPHP + 验证码   | 通用检测模板 | 轮询 JS | Click JS 用 setInterval 轮询 imagestring，待浏览器扩展填入后提交（v4.12.0+，vclib/521） |
 
 ### 重要规则：禁止自动添加 manual
 

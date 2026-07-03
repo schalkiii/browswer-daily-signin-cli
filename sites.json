@@ -1,6 +1,6 @@
 {
-  "version": "v4.11.0",
-  "total": 52,
+  "version": "v4.12.0",
+  "total": 49,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -246,20 +246,6 @@
       "note": "v4.10.1: 页面重定向到 /sign-in 登录页（LinuxDO OAuth），未登录态无法签到，需人工登录后改回webbridge"
     },
     {
-      "name": "pp",
-      "url": "https://ioll.pp.ua/console/personal",
-      "strategy": "manual",
-      "display_name": "PP控制台",
-      "note": "v4.10.1: URL 返回 404 (页面未找到)，签到入口失效，需人工确认正确URL后改回webbridge"
-    },
-    {
-      "name": "littlesheep",
-      "url": "https://ai.littlesheep.cc/profile",
-      "strategy": "manual",
-      "display_name": "小羊AI",
-      "note": "v4.10.1: 页面重定向到 /sign-in 登录页，未登录态无法签到，需人工登录后改回webbridge"
-    },
-    {
       "name": "musopia",
       "url": "https://www.musopia.vip/attendance.php",
       "strategy": "webbridge",
@@ -283,22 +269,16 @@
     {
       "name": "vclib",
       "url": "https://pt.vclib.online/attendance.php",
-      "strategy": "manual",
+      "strategy": "webbridge",
       "display_name": "VCLib",
-      "note": "v4.10.1: 签到页需输入图片验证码（CAPTCHA），无法自动化，改为manual"
+      "note": "v4.12.0: 用户浏览器配备验证码自动输入扩展，改回webbridge + Click JS 等待 imagestring 自动填入后点击提交"
     },
     {
       "name": "521",
       "url": "https://pt.521.best/attendance.php",
-      "strategy": "manual",
-      "display_name": "521PT",
-      "note": "v4.10.1: 签到页需输入图片验证码（CAPTCHA），无法自动化，改为manual"
-    },
-    {
-      "name": "anyrouter",
-      "url": "https://anyrouter.top/console",
       "strategy": "webbridge",
-      "note": "auto: 书签同步新增"
+      "display_name": "521PT",
+      "note": "v4.12.0: 用户浏览器配备验证码自动输入扩展，改回webbridge + Click JS 等待 imagestring 自动填入后点击提交"
     },
     {
       "name": "audiences",

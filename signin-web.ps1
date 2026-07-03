@@ -79,6 +79,10 @@ $WebSignInConfigs = @{
         Detect = @'
 (function(){
   var t = document.body.innerText||'';
+  var title = document.title||'';
+  // v4.12.0: CF managed challenge 拦截（title="请稍候…" + "正在进行安全验证"）
+  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage,[name="cf-turnstile-response"]')) return 'CF_CHALLENGE';
+  if(title.indexOf('请稍候')>-1||t.indexOf('正在进行安全验证')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
   if(t.indexOf('每日登录奖励已领取')>-1||t.indexOf('已连续登录')>-1) return 'SIGN_OK';
   if(t.indexOf('未登录')>-1||t.indexOf('请登录')>-1) return 'LOGIN_REQUIRED';
   var btn = document.querySelector('input[value*="领取"]');
@@ -371,6 +375,8 @@ $WebSignInConfigs = @{
 (function(){
   if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
+  // v4.12.0: 异地登录触发 2FA 验证（URL 跳转到 take2fa.php），需人工输入两步验证码
+  if(location.pathname.indexOf('take2fa.php')>-1||t.indexOf('异地登录')>-1||t.indexOf('两步验证')>-1) return 'LOGIN_REQUIRED';
   if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
   if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
   if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
@@ -755,17 +761,72 @@ $WebSignInConfigs = @{
     }
     "vclib" = @{
         Url = "https://pt.vclib.online/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
+        WaitMs = 15000
+        PostClickMs = 30000
         Detect = $NexusPHPSignInDetect
-        Click = $null
+        # v4.12.0: 用户浏览器配备验证码自动输入扩展，Click JS 用 setInterval 轮询 imagestring
+        # 字段，待扩展自动填入后点击"立即签到"提交按钮；evaluate 同步返回 CLICK_SCHEDULED，
+        # PostClickMs 期间 setInterval 异步执行
+        # v4.12.1: 轮询窗口从 12 秒扩到 28 秒，PostClickMs 从 15 秒扩到 30 秒，给扩展更长的识别时间
+        Click = @'
+(function(){
+  var form = document.querySelector('form[action*="attendance"]');
+  if(!form) return 'NO_FORM';
+  var input = form.querySelector('input[name="imagestring"]');
+  if(!input) return 'NO_INPUT';
+  var submit = form.querySelector('input[type=submit][value*="签到"]') || form.querySelector('input[type=submit]');
+  if(!submit) return 'NO_SUBMIT';
+  // 立即检查 imagestring 是否已被扩展填入
+  if(input.value && input.value.length > 0){
+    submit.click();
+    return 'CLICKED_NOW:'+input.value;
+  }
+  // 未填入，启动 setInterval 轮询（异步），最多等 28 秒
+  var elapsed = 0;
+  var timer = setInterval(function(){
+    elapsed += 1000;
+    if(input.value && input.value.length > 0){
+      clearInterval(timer);
+      submit.click();
+    } else if(elapsed >= 28000){
+      clearInterval(timer);
+    }
+  }, 1000);
+  return 'CLICK_SCHEDULED';
+})()
+'@
     }
     "521" = @{
         Url = "https://pt.521.best/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
+        WaitMs = 15000
+        PostClickMs = 30000
         Detect = $NexusPHPSignInDetect
-        Click = $null
+        Click = @'
+(function(){
+  var form = document.querySelector('form[action*="attendance"]');
+  if(!form) return 'NO_FORM';
+  var input = form.querySelector('input[name="imagestring"]');
+  if(!input) return 'NO_INPUT';
+  var submit = form.querySelector('input[type=submit][value*="签到"]') || form.querySelector('input[type=submit]');
+  if(!submit) return 'NO_SUBMIT';
+  if(input.value && input.value.length > 0){
+    submit.click();
+    return 'CLICKED_NOW:'+input.value;
+  }
+  // v4.12.1: 扩展填入验证码可能需要较长时间，轮询窗口扩到 28 秒
+  var elapsed = 0;
+  var timer = setInterval(function(){
+    elapsed += 1000;
+    if(input.value && input.value.length > 0){
+      clearInterval(timer);
+      submit.click();
+    } else if(elapsed >= 28000){
+      clearInterval(timer);
+    }
+  }, 1000);
+  return 'CLICK_SCHEDULED';
+})()
+'@
     }
     "audiences" = @{
         Url = "https://audiences.me/attendance.php"

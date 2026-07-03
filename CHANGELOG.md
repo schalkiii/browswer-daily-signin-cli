@@ -1,5 +1,48 @@
 # Changelog
 
+## [v4.12.0] - 2026-07-04
+
+### 验证码站点改回 webbridge + CF/2FA 检测增强
+
+基于用户反馈"浏览器已配备验证码自动输入脚本"，对之前因验证码改为 manual 的站点重新启用 webbridge，并增强 CF/2FA 异常状态识别。
+
+#### 改动1: vclib/521 改回 webbridge + Click JS 轮询验证码
+
+- **背景**：v4.10.1 将 vclib/521 改为 manual（NexusPHP 图片验证码阻塞）。用户反馈浏览器扩展可自动填入验证码
+- **改动**：strategy 从 `manual` 改回 `webbridge`
+- **Click JS 方案**：因 webbridge evaluate 同步执行不支持 Promise，用 `setInterval` 异步轮询 `input[name="imagestring"]`：
+  - evaluate 立即返回 `CLICK_SCHEDULED`
+  - PostClickMs 期间 setInterval 每秒检查 imagestring.value
+  - 检测到值时 `submit.click()` 提交表单
+- **v4.12.1 调优**：轮询窗口从 12 秒扩到 28 秒，PostClickMs 从 15 秒扩到 30 秒（扩展识别 NexusPHP 图片验证码可能需要更长时间）
+- **已知限制**：521 实测扩展未自动填入（28 秒内 imagestring 仍为空），需用户确认浏览器扩展是否在 pt.521.best 域名下启用
+
+#### 改动2: V2EX Detect 增加 CF_CHALLENGE 识别
+
+- **根因**：V2EX 触发 Cloudflare managed challenge（title="请稍候…" + "正在进行安全验证"），原 Detect 未识别返回 UNKNOWN
+- **修复**：Detect 增加 CF_CHALLENGE 信号，检测以下特征：
+  - `.cf-turnstile` / `iframe[src*="challenges.cloudflare.com"]` / `#challenge-stage` / `[name="cf-turnstile-response"]` 元素
+  - title 含"请稍候" / bodyText 含"正在进行安全验证" / "安全验证"
+- **效果**：CF_CHALLENGE 归入 capSites 分类，避免误判为 baseline 回归
+
+#### 改动3: HDDolby Detect 增加 2FA 异地登录检测
+
+- **根因**：HDDolby 异地登录跳转 `take2fa.php`，要求输入两步验证码。原 Detect 未识别，Click JS 误点导航栏链接
+- **修复**：Detect 增加 LOGIN_REQUIRED 信号，检测以下特征：
+  - URL pathname 含 `take2fa.php`
+  - bodyText 含"异地登录" / "两步验证"
+- **效果**：归入 login_required 分类，触发飞书卡片提醒用户人工处理
+
+#### 全量测试结果（2026-07-04 01:25）
+
+- **总站点**：49（已跳过 9 个 manual）
+- **成功**：36 个站点（SUCCESS + ALREADY_DONE + VISITED）
+- **失败**：4 个站点
+  - V2EX: CF managed challenge 拦截（已修复 Detect，待明日验证）
+  - HDDolby: 异地登录 2FA（已修复 Detect，待明日验证）
+  - xloli: CF Turnstile 持续拦截 284 秒重试全失败（需人工介入）
+  - ptlao: HTTP ERROR 500 服务器错误（等待服务器恢复）
+
 ## [v4.11.0] - 2026-07-03
 
 ### display_name 字段 + 飞书可点击链接

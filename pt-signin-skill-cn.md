@@ -5,7 +5,7 @@ description: |
   涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、点击签到页面、
   SPA 控制台站点和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-07-03 (v4.11.0 — display_name 字段 + 飞书可点击链接 + Sync-Bookmarks 提取书签名)
+updated: 2026-07-04 (v4.12.0 — 验证码站点改回 webbridge + CF/2FA 检测增强)
 ---
 
 # PT 站点签到自动化
@@ -945,3 +945,15 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
     - **背景**：Sync-Bookmarks 从 URL 域名倒数第二段生成 name（如 `42w`/`pp`/`audiences`），cryptic 不可读
     - **设计**：`display_name` 不参与任何匹配逻辑，仅用于飞书卡片推送和日志展示
     - **经验**：当主键字段被多处依赖时，新增展示字段比修改主键更安全；字段回退逻辑（`if ($dn) { $dn } else { $name }`）保证向后兼容
+
+25. **验证码扩展自动填入方案（v4.12.0）**: 当用户浏览器配备验证码自动输入扩展时，可用 `setInterval` 异步轮询方案让 Click JS 等待扩展填入后再提交。
+    - **背景**：vclib/521 等 NexusPHP 站点签到需输入图片验证码（`<input name="imagestring">` + `<img src="image.php?action=regimage">`），v4.10.1 改为 manual。用户反馈浏览器扩展可自动填入
+    - **方案**：因 webbridge evaluate 同步执行不支持 Promise/awaitPromise，Click JS 用 `setInterval` 每 1 秒检查 `input.value`，evaluate 立即返回 `CLICK_SCHEDULED`，PostClickMs 期间 setInterval 在浏览器中异步执行
+    - **调优**：v4.12.1 将轮询窗口从 12 秒扩到 28 秒，PostClickMs 从 15 秒扩到 30 秒
+    - **限制**：521 实测扩展未在 28 秒内填入 imagestring，可能是扩展未在该域名下启用或不支持 NexusPHP 图片验证码格式。需用户确认扩展配置
+    - **经验**：异步轮询方案绕过了 evaluate 同步限制，但需要扩展确实在目标域名下工作。设计时应假设扩展可能有域名白名单/格式限制，提供快速失败 + 人工兜底
+
+26. **CF managed challenge 与异地登录 2FA 检测（v4.12.0）**: Detect 应识别"非签到页"的异常状态页面，避免 Click JS 误操作。
+    - **CF managed challenge**：title="请稍候…" + bodyText 含"正在进行安全验证"，检测 `.cf-turnstile` / `iframe[src*="challenges.cloudflare.com"]` / `[name="cf-turnstile-response"]` 元素。返回 `CF_CHALLENGE` 信号归入 capSites
+    - **异地登录 2FA**：URL 跳转到 `take2fa.php`，bodyText 含"异地登录"/"两步验证"。返回 `LOGIN_REQUIRED` 触发飞书提醒
+    - **经验**：Detect 不仅识别"签到状态"，还要识别"页面异常状态"（CF 拦截/2FA/登录失效/服务器错误）。否则 Click JS 在异常页面上误点导航元素，产生难以 debug 的副作用
