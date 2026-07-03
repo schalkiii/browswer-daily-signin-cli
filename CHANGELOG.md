@@ -1,5 +1,57 @@
 # Changelog
 
+## [v4.10] - 2026-07-03
+
+### opencli 全面替代为 kimi webbridge（单后端架构）
+
+**目标**：消除对 opencli 的依赖，所有非 manual 站点统一走 kimi webbridge 后端，简化架构。
+
+#### Phase 1: kimi-webbridge.ps1 支持 visit-only 模式
+
+- `Test-WebBridgeSignIn` 在 navigate + wait 之后、detect 之前加 visit-only 分支：`DetectEval` 为空时返回 `VISITED`，支持"仅访问"类站点（M-Team / SpeedApp 等）。
+
+#### Phase 2: signin-batch.ps1 简化 switch + 移除 opencli 代码
+
+- 移除 8 个 opencli 专用函数：`Test-SignIn` / `Wait-PageReady` / `Browser-SignIn` / `Get-PageContent` / `Find-NewSignPatterns` / `Invoke-FreeFarmTokenRefresh` / `Invoke-WebReadFallback` / `Invoke-PatternDiscovery`。
+- 主 switch 从 5 分支（web-read / browser-open / browser-eval / browser-eval-click / browser-visit / manual）简化为 2 分支（manual / default → webbridge）。
+- 新增 `VISITED` 返回值处理（visit-only 站点）。
+- 移除 catch 中的 `opencli browser $session close`。
+- 文件从 997 行精简至 633 行。
+
+#### Phase 3: signin-web.ps1 批量添加站点配置
+
+- 新增两个通用 JS 模板：`$NexusPHPSignInDetect`（NexusPHP attendance.php 通用检测）和 `$SPASignInDetect`（SPA 控制台/资料页通用检测），减少 32 个站点配置的重复代码。
+- 新增 33 个站点配置：
+  - 15 个 NexusPHP attendance.php（Click=$null，访问即签到）：BiliDownload / DepthStudio / HDClone / HDVideo / HTCPT / Moment / SBPT / Tokyo / xloli / YHPP / musopia / ptlao / vclib / 521 / audiences
+  - 1 个 13City（特殊 URL `usercp.php?action=personal#signin`）
+  - 7 个 visit-only（Detect=$null, Click=$null）：AsianDVDClub / DigitalCore / Kufirc / M-Team / NewInsane / SpeedApp / UsefulTrash
+  - 9 个 SPA 控制台（使用 `$SPASignInDetect`）：42w / h-e / zxiaoruan / pp / littlesheep / onrender / huan666 / xt-url / pbh-btn
+  - 1 个 invites（https://invites.top/console，SPA 控制台类）
+- 重命名 `InvitesFun` → `invites`（与 sites.json 键名对齐）。
+- 总配置数：50（17 原有 + 33 新增），覆盖全部 48 个非 manual 站点。
+
+#### Phase 4: sites.json 统一 strategy
+
+- 48 个非 manual 站点 strategy 统一改为 `webbridge`（原 browser-open 23 / web-read 17 / browser-visit 8）。
+- 4 个 manual 站点保留（FreeFarm / UBits / TJUPT / Yemapt）。
+- version 升级至 `v4.10`。
+- 清理 note 中 opencli 引用（OurBits / Rousi）。
+
+#### Phase 5: 文档与脚本同步
+
+- `signin-single.ps1` 重写为调用 webbridge（移除全部 opencli 调用）。
+- `README.md` 更新：架构图、签到策略表、Kimi WebBridge 优势、前提条件、配置项说明。
+- 移除脚本中所有 opencli 注释引用。
+
+### 架构变化
+
+| 维度       | v4.9.1（旧）                    | v4.10（新）                       |
+| ---------- | ------------------------------- | --------------------------------- |
+| 后端       | opencli + kimi webbridge（双） | kimi webbridge（单一）            |
+| strategy 值 | web-read / browser-open / browser-visit / browser-eval-click / manual | webbridge / manual                |
+| switch 分支 | 5 + note 路由门                 | 2（manual / default）             |
+| 配置覆盖率 | 17/52（33 个无配置走默认分支）  | 50/52（48 非 manual 全覆盖）      |
+
 ## [v4.9.1] - 2026-07-02
 
 ### 全量签到调试修复

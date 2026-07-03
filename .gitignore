@@ -3,7 +3,14 @@ config.json
 
 # 运行时中间产物
 web-articles/
+debug-snapshots/
 *.log
+
+# 临时验证脚本
+.tmp-*.ps1
+
+# Trae 工作目录
+.trae/
 
 # 操作系统
 Thumbs.db

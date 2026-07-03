@@ -68,75 +68,9 @@ if (Test-Path $BaselineFile) {
 $tracking = @{ new_sites = @(); regressions = @(); exploratory_total = 0; needs_manual_review = @() }
 Write-Output "Baseline: $($baseline.sites.Count) known-success sites"
 
-# Signal check function - the deterministic pass/fail signal
-function Test-SignIn($session) {
-    $checkJS = @'
-(function(){var t=document.body.innerText||'';if(t.indexOf('\u7B7E\u5230\u6210\u529F')>-1||t.indexOf('\u7C3D\u5230\u6210\u529F')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u5DF2\u5F97')>-1||t.indexOf('\u7C3D\u5230\u5DF2\u5F97')>-1||t.indexOf('\u7B7E\u5230\u5F97')>-1||t.indexOf('\u7C3D\u5230\u5F97')>-1)return'SIGN_OK';if(t.indexOf('\u5DF2\u7B7E\u5230')>-1||t.indexOf('\u5DF2\u7C3D\u5230')>-1)return'SIGN_OK';if(t.indexOf('\u8FD9\u662F\u60A8\u7684\u7B2C')>-1||t.indexOf('\u9019\u662F\u60A8\u7684\u7B2C')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u83B7\u5F97')>-1||t.indexOf('\u7C3D\u5230\u7372\u5F97')>-1)return'SIGN_OK';if(t.indexOf('Already checked')>-1)return'SIGN_OK';if(t.indexOf('\u6BCF\u65E5\u767B\u5F55\u5956\u52B1\u5DF2\u9886\u53D6')>-1)return'SIGN_OK';if(t.indexOf('\u6253\u5361\u6210\u529F')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u9886\u5956')>-1)return'SIGN_OK';if(t.indexOf('\u7B7E\u5230\u5B8C\u6210')>-1)return'SIGN_OK';if(t.indexOf('\u8FDE\u7EED\u7B7E\u5230')>-1)return'SIGN_OK';if(t.indexOf('\u83B7\u5F97\u5956\u52B1')>-1||t.indexOf('\u7372\u5F97\u5956\u52F5')>-1)return'SIGN_OK';if(t.indexOf('cf-turnstile')>-1||t.indexOf('challenges.cloudflare')>-1||t.indexOf('\u5B89\u5168\u9A57\u8B49')>-1||t.indexOf('\u5B89\u5168\u9A8C\u8BC1')>-1)return'CF_CHALLENGE';if(t.indexOf('\u8BF7\u7A0D\u5019')>-1)return'WAITING';if(t.indexOf('\u6ED1\u52A8')>-1||t.indexOf('\u62D6\u52A8\u6ED1\u5757')>-1)return'SLIDER';if(t.indexOf('\u8BF7\u767B\u5F55')>-1||t.indexOf('\u5FC5\u9808\u767B\u9304')>-1)return'LOGIN_REQUIRED';if(t.indexOf('\u6B22\u8FCE\u56DE\u6765')>-1||t.indexOf('\u6B61\u8FCE\u56DE\u4F86')>-1)return'LOGGED_IN';return'UNKNOWN';})()
-'@
-    $result = opencli browser $session eval $checkJS 2>&1
-    $combined = if ($result -is [array]) { $result -join "`n" } else { [string]$result }
-    $allMatches = [System.Collections.Generic.List[string]]::new()
-    foreach ($line in ($combined -split '\r?\n')) {
-        if ($line -match '\b(SIGN_OK|CF_CHALLENGE|WAITING|SLIDER|LOGIN_REQUIRED|LOGGED_IN|UNKNOWN)\b') {
-            $allMatches.Add($matches[1])
-        }
-    }
-    if ($allMatches.Count -gt 0) {
-        return $allMatches[0].Trim()
-    } else {
-        return "ERROR_NO_SIGNAL"
-    }
-}
-
-function Wait-PageReady($session, $maxWaitSec) {
-    $readyJS = @'
-(function(){ return document.readyState || 'unknown'; })()
-'@
-    $end = (Get-Date).AddSeconds($maxWaitSec)
-    while ((Get-Date) -lt $end) {
-        $out = opencli browser $session eval $readyJS 2>&1
-        $resultStr = if ($out -is [array]) { $out -join "`n" } else { [string]$out }
-        if ($resultStr -match 'complete') { return $true }
-        Start-Sleep -Milliseconds 500
-    }
-    return $false
-}
-
-function Browser-SignIn($site, $session) {
-    $r = @{ status = "UNKNOWN"; signal = "" }
-    $baseWait = 8
-    if ($site.note -match "CF") { $baseWait = 15 }
-    if ($site.name -eq "UBits") { $baseWait = 15 }
-
-    $null = opencli browser $session open $site.url 2>&1
-    Start-Sleep -Seconds $baseWait
-
-    $ready = Wait-PageReady $session 5
-    if (-not $ready) { Write-Output "  [WARN] page not ready after ${baseWait}s" }
-
-    $signal = Test-SignIn $session
-    $r.signal = $signal
-
-    if ($signal -eq "UNKNOWN" -or $signal -eq "CF_CHALLENGE") {
-        Write-Output "  [RETRY] signal=$signal, waiting 10s..."
-        Start-Sleep -Seconds 10
-        $signal = Test-SignIn $session
-        $r.signal = $signal
-    }
-
-    switch ($signal) {
-        "SIGN_OK"       { $r.status = "SUCCESS" }
-        "CF_CHALLENGE"  { $r.status = "CF_BLOCKED" }
-        "SLIDER"        { $r.status = "SLIDER" }
-        "LOGIN_REQUIRED"{ $r.status = "NO_LOGIN" }
-        "LOGGED_IN"     { $r.status = "LOGGED_IN" }
-        "UNKNOWN"       { $r.status = "NO_DETECT" }
-        default         { $r.status = "ERROR"; $r.signal = $signal }
-    }
-    return $r
-}
-
 # === SELF-ITERATION: Web page change detection & auto-repair ===
+# 注: v4.10 起，签到迭代统一改用 kimi webbridge 后端（Test-WebBridgeSignIn 内置检测+点击+重试）。
+# $script:iterationLog 框架保留以兼容现有输出。
 
 $script:iterationLog = @()
 $iterationLogFile = "$PSScriptRoot\iterations.json"
@@ -146,143 +80,6 @@ if (Test-Path $iterationLogFile) {
 
 function Save-IterationLog {
     $script:iterationLog | ConvertTo-Json -Depth 3 | Out-File $iterationLogFile -Encoding UTF8
-}
-
-function Get-PageContent($session) {
-    $dumpJS = @'
-(function(){var t=document.body.innerText||'';return t.substring(0,800).replace(/[\r\n]+/g,'\\n');})()
-'@
-    $out = opencli browser $session eval $dumpJS 2>&1
-    $resultStr = if ($out -is [array]) { $out -join "`n" } else { [string]$out }
-    $content = ($resultStr -split '\r?\n' | Where-Object { $_ -notmatch '^\s*$' -and $_ -notmatch 'Warning:|Update available|npm install|node --trace' } | Select-Object -First 1)
-    if ($null -eq $content) { return "" }
-    return $content.Trim()
-}
-
-function Find-NewSignPatterns($content) {
-    $found = @()
-    if ($content -match '(sign.?in|check.?in|attendance|sign|check)') {
-        $found += "has sign-in related text"
-    }
-    return $found
-}
-
-function Invoke-FreeFarmTokenRefresh {
-    param($session, $siteName, $configFile)
-    Write-Output "  [ITER] Attempting FreeFarm token refresh..."
-    try {
-        $scriptsOut = opencli browser $session eval @'
-JSON.stringify(Array.from(document.querySelectorAll('script[src]')).map(s=>s.src))
-'@ 2>&1 | Out-String
-        $scriptsJson = ($scriptsOut -split '\r?\n' | Where-Object { $_ -match 'slide_check_' } | Select-Object -First 1)
-        if (-not $scriptsJson) {
-            Write-Output "  [ITER] No slide_check script found in page"
-            return $false
-        }
-        $slideUrl = ($scriptsJson -replace '.*"(https://pt\.0ff\.cc/slide_check_[^"]+\.js)".*', '$1')
-        if ($slideUrl -notmatch 'slide_check_') {
-            Write-Output "  [ITER] Could not extract slide URL from: $scriptsJson"
-            return $false
-        }
-        Write-Output "  [ITER] Slide JS: $slideUrl"
-
-        $fetchJS = "fetch('$slideUrl').then(r=>r.text())"
-        $jsOut = opencli browser $session eval $fetchJS 2>&1 | Out-String
-        $tokenMatch = [regex]::Match($jsOut, 'https://pt\.0ff\.cc/set_access_token-[a-f0-9]+-[a-f0-9]+-YWNs-\d+\+5Yiw-')
-        if (-not $tokenMatch.Success) {
-            Write-Output "  [ITER] No set_access_token URL found in slide JS"
-            return $false
-        }
-        $newTokenUrl = $tokenMatch.Value
-        Write-Output "  [ITER] New token: $newTokenUrl"
-
-        $cfgRaw145 = Get-Content $configFile -Raw -Encoding UTF8
-        $cfgRaw145 = $cfgRaw145 -replace '^\uFEFF', ''
-        $cfg = $cfgRaw145 | ConvertFrom-Json
-        foreach ($s in $cfg.sites) {
-            if ($s.name -eq $siteName) {
-                $newEval = "fetch('$newTokenUrl').then(()=>setTimeout(()=>location.reload(),2000))"
-                $s.eval = $newEval
-            }
-        }
-        $cfg | ConvertTo-Json -Depth 4 | Out-File $configFile -Encoding UTF8
-        Write-Output "  [ITER] sites.json updated with new token"
-
-        opencli browser $session eval "fetch('$newTokenUrl').then(()=>setTimeout(()=>location.reload(),2000))" 2>&1 | Out-Null
-        Start-Sleep -Seconds 10
-
-        $script:iterationLog += @{
-            timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-            site = $siteName
-            action = "token_refresh"
-            oldToken = $site.eval
-            newToken = $newEval
-        }
-        Save-IterationLog
-        return $true
-    } catch {
-        Write-Output "  [ITER] Token refresh error: $($_.Exception.Message)"
-        return $false
-    }
-}
-
-function Invoke-WebReadFallback {
-    param($site, $session)
-    Write-Output "  [ITER] web-read failed, attempting browser-open fallback..."
-    try {
-        opencli browser $session open $site.url 2>&1 | Out-Null
-        Start-Sleep -Seconds 10
-        $content = Get-PageContent $session
-        $patterns = Find-NewSignPatterns $content
-        Write-Output "  [ITER] Page content (200 chars): $($content.Substring(0, [Math]::Min(200, $content.Length)))"
-        Write-Output "  [ITER] Detected patterns: $($patterns -join ', ')"
-
-        if ($content -match "cf-turnstile|Cloudflare|Ray ID|challenges.cloudflare|just a moment") {
-            Write-Output "  [ITER] Site now behind CF challenge -> recommend switching to browser-open+CF"
-            $script:iterationLog += @{
-                timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-                site = $site.name
-                action = "cf_detected_on_webread"
-                content = $content.Substring(0, [Math]::Min(500, $content.Length))
-            }
-            Save-IterationLog
-            try { opencli browser $session close 2>&1 | Out-Null } catch {}
-            return @{ status = "CF_DETECTED"; signal = "CF_ON_WEBREAD" }
-        }
-
-        $signal = Test-SignIn $session
-        try { opencli browser $session close 2>&1 | Out-Null } catch {}
-        return @{ status = $signal; signal = $signal }
-    } catch {
-        Write-Output "  [ITER] Fallback error: $($_.Exception.Message)"
-        try { opencli browser $session close 2>&1 | Out-Null } catch {}
-        return @{ status = "FALLBACK_ERROR"; signal = $_.Exception.Message }
-    }
-}
-
-function Invoke-PatternDiscovery {
-    param($session, $siteName)
-    Write-Output "  [ITER] Discovering page content for unknown signal..."
-    try {
-        $content = Get-PageContent $session
-        $signal = Test-SignIn $session
-        $found = ($signal -eq "SIGN_OK" -or $signal -eq "LOGGED_IN")
-        Write-Output "  [ITER] Browser sign-in signal: $signal"
-        Write-Output "  [ITER] Content preview (200 chars): $($content.Substring(0, [Math]::Min(200, $content.Length)))"
-
-        $script:iterationLog += @{
-            timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-            site = $siteName
-            action = "pattern_discovery"
-            signal = $signal
-            contentPreview = $content.Substring(0, [Math]::Min(500, $content.Length))
-        }
-        Save-IterationLog
-        return @{ found = $found; signal = $signal }
-    } catch {
-        Write-Output "  [ITER] Discovery error: $($_.Exception.Message)"
-        return @{ found = $false; signal = "ERROR" }
-    }
 }
 
 # 同步浏览器书签中的 PT 站点列表
@@ -454,230 +251,68 @@ foreach ($site in $config.sites) {
     Write-Output "[$idx/$total] $($site.name) [$($site.strategy)]"
 
     try {
+        # v4.10: 所有非 manual 站点统一走 kimi webbridge（兼容旧 strategy 值 web-read/browser-open/
+        # browser-eval/browser-eval-click/browser-visit，由 default 分支兜底）
         switch ($site.strategy) {
-            "web-read" {
-                $before = @(Get-ChildItem $WebArticlesDir -Directory -EA SilentlyContinue | % Name)
-                opencli web read --url $site.url 2>&1 | Out-Null
-                Start-Sleep -Seconds 3
-                $after = @(Get-ChildItem $WebArticlesDir -Directory -EA SilentlyContinue | % Name)
-                $newDir = $after | Where-Object { $_ -notin $before } | Select-Object -First 1
-
-                if ($newDir) {
-                    $md = Get-ChildItem "$WebArticlesDir\$newDir\*.md" -EA SilentlyContinue | Select-Object -First 1
-                    if ($md) {
-                        $c = Get-Content $md.FullName -Raw -EA SilentlyContinue
-                        if ($c -match 'Already checked' -or ($md.Length -gt 2000 -and $c -notmatch 'cf-turnstile')) {
-                            $r.status = "SUCCESS"; $r.signal = "SIGN_OK"
-                            $signals.ok_sites += $site.name; Write-Output "  => SUCCESS"
-                        } elseif ($md.Length -lt 800) {
-                            $r.status = "CAPTCHA"; $r.signal = "TOO_SMALL"
-                            $signals.fail_sites += $site.name; Write-Output "  => TOO_SMALL"
-                        } elseif ($c -match 'cf-turnstile') {
-                            $r.status = "CAPTCHA"; $r.signal = "CF_DETECTED"
-                            $signals.fail_sites += $site.name; Write-Output "  => CF_DETECTED"
-                        } else {
-                            $r.status = "NO_DETECT"; $r.signal = "UNKNOWN"
-                            $signals.fail_sites += $site.name; Write-Output "  => NO_DETECT"
-                        }
-                    } else { $r.status = "NO_ARTICLE"; $signals.fail_sites += $site.name }
-                } else { $r.status = "NO_ARTICLE"; $signals.fail_sites += $site.name }
-
-                if ($r.status -ne "SUCCESS") {
-                    Write-Output "  [ITER] web-read failed (status=$($r.status)), running fallback..."
-                    $fb = Invoke-WebReadFallback $site $session
-                    if ($fb.status -eq "SIGN_OK") {
-                        $r.status = "SUCCESS"; $r.signal = "SIGN_OK_ITER"
-                        $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $site.name })
-                        $signals.ok_sites += $site.name
-                        Write-Output "  => ITER_FIX: SIGN_OK via browser-open"
-                    } else {
-                        Write-Output "  => ITER: fallback also failed ($($fb.status))"
-                    }
-                }
-            }
-            "browser-open" {
-                if ($site.note -match "webbridge") {
-                    if (-not $script:webbridgeAvailable) {
-                        $r.status = "SKIPPED"; $r.signal = "DAEMON_DOWN"
-                        $signals.skip_sites += $site.name; Write-Output "  => SKIPPED (webbridge daemon 不可用)"
-                    } else {
-                        $wbResult = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir
-                        $r.signal = $wbResult
-                        switch -Wildcard ($wbResult) {
-                            "SIGN_OK"       { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
-                            "ALREADY_SIGNED"{ $r.status = "ALREADY_DONE"; $signals.ok_sites += $site.name; Write-Output "  => ALREADY_DONE (今日已签到，非本次点击)" }
-                            "LOGIN_REQUIRED"{ $r.status = "NO_LOGIN"; $signals.login_expired += $site.name; Write-Output "  => NO_LOGIN" }
-                            "CF_CHALLENGE"  { $r.status = "CF_BLOCKED"; $signals.fail_sites += $site.name; Write-Output "  => CF_BLOCKED" }
-                            "SLIDER"        { $r.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL" }
-                            "NAV_FAIL"      { $r.status = "TIMEOUT"; $signals.fail_sites += $site.name; Write-Output "  => TIMEOUT" }
-                            "NO_CONFIG"     { $r.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => NO_CONFIG" }
-                            "BODY_NULL"     { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (body null)" }
-                            "REDIRECTING"   { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => REDIRECTING" }
-                            default         { $r.status = "NO_DETECT"; $signals.fail_sites += $site.name; Write-Output "  => $wbResult (webbridge)" }
-                        }
-                        # 失败重试：CF_BLOCKED / SLIDER_FAIL / PAGE_ERROR / NO_DETECT / TIMEOUT 最多重试 2 次
-                        $retryable = @("CF_BLOCKED", "SLIDER_FAIL", "PAGE_ERROR", "NO_DETECT", "TIMEOUT")
-                        if ($r.status -in $retryable) {
-                            for ($retry = 1; $retry -le 2; $retry++) {
-                                Write-Output "  [RETRY $retry/2] $($site.name) - waiting 10s..."
-                                Start-Sleep -Seconds 10
-                                $wbResult2 = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir
-                                $r.signal = $wbResult2
-                                if ($wbResult2 -eq "SIGN_OK") {
-                                    $r.status = "SUCCESS"
-                                    $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $site.name })
-                                    $signals.ok_sites += $site.name
-                                    Write-Output "  => SIGN_OK (webbridge retry $retry)"
-                                    break
-                                }
-                                Write-Output "  [RETRY $retry/2] $site.name => $wbResult2"
-                            }
-                        }
-                        # ⚠️  禁止自动添加 manual：失败站点仅记入需人工审核列表，不改策略
-                        if ($r.status -eq "CF_BLOCKED" -or $r.status -eq "SLIDER_FAIL") {
-                            $tracking.needs_manual_review += "$($site.name)($($r.status))"
-                            Write-Output "  [REVIEW] 需人工审核: $($site.name) - $($r.status)（不会自动改为 manual）"
-                        }
-                    }
-                } else {
-                    $br = Browser-SignIn $site $session
-                    $r.signal = $br.signal
-                    $r.status = $br.status
-                    if ($r.status -eq "SUCCESS") {
-                        $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK"
-                    } else {
-                        $signals.fail_sites += $site.name; Write-Output "  => $($r.status)"
-                        if ($r.status -eq "NO_DETECT" -or $r.status -eq "UNKNOWN") {
-                            Write-Output "  [ITER] Running pattern discovery..."
-                            $pdResult = Invoke-PatternDiscovery $session $site.name
-                            if ($pdResult.found) {
-                                Write-Output "  [ITER] Sign-in text FOUND in page! Possible false negative."
-                                Write-Output "  [ITER] Signal from browser: $($pdResult.signal)"
-                            }
-                        }
-                    }
-                    try { opencli browser $session close 2>&1 | Out-Null } catch {}
-                }
-            }
-            "browser-eval" {
-                opencli browser $session open $site.url 2>&1 | Out-Null
-                Start-Sleep -Seconds 5
-                opencli browser $session eval $site.eval 2>&1 | Out-Null
-                Start-Sleep -Seconds 10
-                $signal = Test-SignIn $session
-                if ($signal -eq "UNKNOWN" -or $signal -eq "CF_CHALLENGE") {
-                    Write-Output "  [RETRY] signal=$signal, waiting 8s more..."
-                    Start-Sleep -Seconds 8
-                    $signal = Test-SignIn $session
-                    Write-Output "  [RETRY] result=$signal"
-                }
-                $r.signal = $signal
-                switch ($signal) {
-                    "SIGN_OK"  { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK" }
-                    "SLIDER"   {
-                        $r.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL"
-                        if ($site.name -eq "FreeFarm") {
-                            Write-Output "  [ITER] Detected FreeFarm token expiry, refreshing..."
-                            $refreshed = Invoke-FreeFarmTokenRefresh $session $site.name $ConfigFile
-                            if ($refreshed) {
-                                $signal = Test-SignIn $session
-                                $r.signal = $signal
-                                if ($signal -eq "SIGN_OK") {
-                                    $r.status = "SUCCESS"
-                                    $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $site.name })
-                                    $signals.ok_sites += $site.name
-                                    Write-Output "  => ITER_FIX: SIGN_OK after token refresh"
-                                } else {
-                                    Write-Output "  => ITER: refresh applied but signal=$signal"
-                                }
-                            }
-                        }
-                    }
-                    default    { $r.status = "EVAL_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => $signal" }
-                }
-                try { opencli browser $session close 2>&1 | Out-Null } catch {}
-            }
-            "browser-eval-click" {
-                opencli browser $session open $site.url 2>&1 | Out-Null
-                Start-Sleep -Seconds 6
-                if ($site.eval) {
-                    $clickResult = opencli browser $session eval $site.eval 2>&1
-                    Write-Output "  [CLICK] $($clickResult -join ' ')"
-                    Start-Sleep -Seconds 5
-                }
-                $signal = Test-SignIn $session
-                if ($signal -eq "UNKNOWN") {
-                    Write-Output "  [RETRY] signal=$signal, waiting 8s more..."
-                    Start-Sleep -Seconds 8
-                    $signal = Test-SignIn $session
-                    Write-Output "  [RETRY] result=$signal"
-                }
-                $r.signal = $signal
-                switch ($signal) {
-                    "SIGN_OK"  { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK" }
-                    "LOGGED_IN"{ $r.status = "ALREADY_DONE"; $signals.ok_sites += $site.name; Write-Output "  => ALREADY_DONE" }
-                    default    { $r.status = "EVAL_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => $signal" }
-                }
-                # 失败重试：EVAL_FAIL 最多重试 2 次
-                if ($r.status -eq "EVAL_FAIL") {
-                    for ($retry = 1; $retry -le 2; $retry++) {
-                        Write-Output "  [RETRY $retry/2] $($site.name) - waiting 10s..."
-                        Start-Sleep -Seconds 10
-                        opencli browser $session open $site.url 2>&1 | Out-Null
-                        Start-Sleep -Seconds 6
-                        if ($site.eval) {
-                            $clickResult2 = opencli browser $session eval $site.eval 2>&1
-                            Write-Output "  [CLICK R$retry] $($clickResult2 -join ' ')"
-                            Start-Sleep -Seconds 5
-                        }
-                        $signal2 = Test-SignIn $session
-                        Write-Output "  [RETRY $retry/2] $site.name => $signal2"
-                        if ($signal2 -eq "SIGN_OK" -or $signal2 -eq "LOGGED_IN") {
-                            $r.status = "SUCCESS"
-                            $r.signal = $signal2
-                            $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $site.name })
-                            $signals.ok_sites += $site.name
-                            Write-Output "  => SIGN_OK (eval-click retry $retry)"
-                            break
-                        }
-                    }
-                }
-                try { opencli browser $session close 2>&1 | Out-Null } catch {}
-            }
-            "browser-visit" {
-                $null = opencli browser $session open $site.url 2>&1
-                Start-Sleep -Seconds 8
-                $ready = Wait-PageReady $session 5
-                $signal = Test-SignIn $session
-                $r.signal = $signal
-                if ($signal -eq "LOGIN_REQUIRED") {
-                    $r.status = "NO_LOGIN"
-                    $signals.login_expired += $site.name
-                    Write-Output "  => NO_LOGIN (session expired!)"
-                } elseif ($signal -eq "LOGGED_IN") {
-                    $r.status = "VISITED"
-                    $signals.ok_sites += $site.name
-                    Write-Output "  => VISITED (logged in)"
-                } else {
-                    $r.status = "VISITED"
-                    $signals.ok_sites += $site.name
-                    Write-Output "  => VISITED"
-                }
-                try { opencli browser $session close 2>&1 | Out-Null } catch {}
-            }
             "manual" {
                 $r.status = "SKIPPED"; $r.signal = $site.reason
                 $signals.skip_sites += $site.name; Write-Output "  => SKIPPED"
             }
             default {
-                $r.status = "SKIPPED"; $r.signal = "UNKNOWN_STRATEGY"
-                $signals.skip_sites += $site.name
+                if (-not $script:webbridgeAvailable) {
+                    $r.status = "SKIPPED"; $r.signal = "DAEMON_DOWN"
+                    $signals.skip_sites += $site.name; Write-Output "  => SKIPPED (webbridge daemon 不可用)"
+                } else {
+                    $wbResult = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir
+                    $r.signal = $wbResult
+                    switch -Wildcard ($wbResult) {
+                        "SIGN_OK"       { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
+                        "ALREADY_SIGNED"{ $r.status = "ALREADY_DONE"; $signals.ok_sites += $site.name; Write-Output "  => ALREADY_DONE (今日已签到，非本次点击)" }
+                        "VISITED"       { $r.status = "VISITED"; $signals.ok_sites += $site.name; Write-Output "  => VISITED (visit-only)" }
+                        "LOGIN_REQUIRED"{ $r.status = "NO_LOGIN"; $signals.login_expired += $site.name; Write-Output "  => NO_LOGIN" }
+                        "CF_CHALLENGE"  { $r.status = "CF_BLOCKED"; $signals.fail_sites += $site.name; Write-Output "  => CF_BLOCKED" }
+                        "SLIDER"        { $r.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL" }
+                        "NAV_FAIL"      { $r.status = "TIMEOUT"; $signals.fail_sites += $site.name; Write-Output "  => TIMEOUT" }
+                        "NO_CONFIG"     { $r.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => NO_CONFIG" }
+                        "BODY_NULL"     { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (body null)" }
+                        "REDIRECTING"   { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => REDIRECTING" }
+                        default         { $r.status = "NO_DETECT"; $signals.fail_sites += $site.name; Write-Output "  => $wbResult (webbridge)" }
+                    }
+                    # 失败重试：CF_BLOCKED / SLIDER_FAIL / PAGE_ERROR / NO_DETECT / TIMEOUT 最多重试 2 次
+                    $retryable = @("CF_BLOCKED", "SLIDER_FAIL", "PAGE_ERROR", "NO_DETECT", "TIMEOUT")
+                    if ($r.status -in $retryable) {
+                        for ($retry = 1; $retry -le 2; $retry++) {
+                            Write-Output "  [RETRY $retry/2] $($site.name) - waiting 10s..."
+                            Start-Sleep -Seconds 10
+                            $wbResult2 = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir
+                            $r.signal = $wbResult2
+                            if ($wbResult2 -eq "SIGN_OK" -or $wbResult2 -eq "VISITED" -or $wbResult2 -eq "ALREADY_SIGNED") {
+                                if ($wbResult2 -eq "VISITED") {
+                                    $r.status = "VISITED"
+                                } elseif ($wbResult2 -eq "ALREADY_SIGNED") {
+                                    $r.status = "ALREADY_DONE"
+                                } else {
+                                    $r.status = "SUCCESS"
+                                }
+                                $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $site.name })
+                                $signals.ok_sites += $site.name
+                                Write-Output "  => $wbResult2 (webbridge retry $retry)"
+                                break
+                            }
+                            Write-Output "  [RETRY $retry/2] $($site.name) => $wbResult2"
+                        }
+                    }
+                    # ⚠️  禁止自动添加 manual：失败站点仅记入需人工审核列表，不改策略
+                    if ($r.status -eq "CF_BLOCKED" -or $r.status -eq "SLIDER_FAIL") {
+                        $tracking.needs_manual_review += "$($site.name)($($r.status))"
+                        Write-Output "  [REVIEW] 需人工审核: $($site.name) - $($r.status)（不会自动改为 manual）"
+                    }
+                }
             }
         }
     } catch {
         $r.status = "ERROR"; $r.signal = $_.Exception.Message
         $signals.fail_sites += $site.name; Write-Output "  => ERROR"
-        try { opencli browser $session close 2>&1 | Out-Null } catch {}
     }
 
     Track-Baseline $site.name $r.status

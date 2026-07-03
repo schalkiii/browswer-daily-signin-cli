@@ -4,6 +4,34 @@
 
 . "$PSScriptRoot\kimi-webbridge.ps1"
 
+# === v4.10: 通用检测 JS 模板（减少重复，便于维护）===
+
+# NexusPHP attendance.php 通用检测：访问即签到，无需点击
+$NexusPHPSignInDetect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var t = document.body.innerText||'';
+  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
+  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1||t.indexOf('Just a moment')>-1) return 'CF_CHALLENGE';
+  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
+  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('必须登录')>-1) return 'LOGIN_REQUIRED';
+  if(t.length<20) return 'BODY_NULL';
+  return 'UNKNOWN';
+})()
+'@
+
+# SPA 控制台/资料页通用检测：登录态保持即视为成功（API 控制台类站点）
+$SPASignInDetect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var t = document.body.innerText||'';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('login')>-1) return 'LOGIN_REQUIRED';
+  if(t.length>100) return 'SIGN_OK';
+  return 'BODY_NULL';
+})()
+'@
+
 $WebSignInConfigs = @{
 
     "52pojie" = @{
@@ -174,7 +202,7 @@ $WebSignInConfigs = @{
 })()
 '@
     }
-    "InvitesFun" = @{
+    "invites" = @{
         Url = "https://www.invites.fun/?sort=newest"
         WaitMs = 10000
         PostClickMs = 5000
@@ -625,6 +653,246 @@ $WebSignInConfigs = @{
   return 'NO_BTN';
 })()
 '@
+    }
+
+    # === v4.10: NexusPHP attendance.php 站点（访问即签到，Click=$null）===
+    # 这些站点通过 webbridge navigate 访问 attendance.php（HTTP GET 即签到）。
+    # 状态转换：无 ClickEval → 首次 SIGN_OK 视为本次签到成功（非 ALREADY_SIGNED）。
+
+    "BiliDownload" = @{
+        Url = "https://bilibili.download/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "DepthStudio" = @{
+        Url = "https://dstudio.me/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "HDClone" = @{
+        Url = "https://pt.hdclone.top/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "HDVideo" = @{
+        Url = "https://hdvideo.top/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "HTCPT" = @{
+        Url = "https://www.htpt.cc/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "Moment" = @{
+        Url = "https://www.momentpt.top/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "SBPT" = @{
+        Url = "https://sbpt.link/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "Tokyo" = @{
+        Url = "https://www.tokyo-manga.top/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "xloli" = @{
+        Url = "https://mua.xloli.cc/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "YHPP" = @{
+        Url = "https://www.yhpp.cc/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "musopia" = @{
+        Url = "https://www.musopia.vip/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "ptlao" = @{
+        Url = "https://ptlao.top/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "vclib" = @{
+        Url = "https://pt.vclib.online/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "521" = @{
+        Url = "https://pt.521.best/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "audiences" = @{
+        Url = "https://audiences.me/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+
+    # 13City: URL 非 attendance.php（usercp.php?action=personal#signin），用 NexusPHP 通用检测
+    "13City" = @{
+        Url = "https://13city.org/usercp.php?action=personal#signin"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+
+    # === v4.10: browser-visit 站点迁移（visit-only，无 Detect/Click）===
+    # kimi-webbridge.ps1 的 visit-only 分支：navigate + wait + close_tab，返回 "VISITED"。
+
+    "AsianDVDClub" = @{
+        Url = "https://asiandvdclub.org/index.php"
+        WaitMs = 8000
+        Detect = $null
+        Click = $null
+    }
+    "DigitalCore" = @{
+        Url = "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top"
+        WaitMs = 8000
+        Detect = $null
+        Click = $null
+    }
+    "Kufirc" = @{
+        Url = "https://kufirc.com/index.php"
+        WaitMs = 8000
+        Detect = $null
+        Click = $null
+    }
+    "M-Team" = @{
+        Url = "https://kp.m-team.cc/index"
+        WaitMs = 8000
+        Detect = $null
+        Click = $null
+    }
+    "NewInsane" = @{
+        Url = "https://newinsane.info/browse.php"
+        WaitMs = 8000
+        Detect = $null
+        Click = $null
+    }
+    "SpeedApp" = @{
+        Url = "https://speedapp.io/adult"
+        WaitMs = 8000
+        Detect = $null
+        Click = $null
+    }
+    "UsefulTrash" = @{
+        Url = "https://usefultrash.net/browse.php"
+        WaitMs = 8000
+        Detect = $null
+        Click = $null
+    }
+
+    # === v4.10: browser-open 新站点迁移（SPA 控制台/资料页，通用模板）===
+    # 这些站点是书签同步新增，签到结构未知。先用 SPA 通用模板（登录态保持即视为成功），
+    # 根据 signin-log.json 结果再迭代调整。
+
+    "42w" = @{
+        Url = "https://api.42w.shop/console/personal"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
+    }
+    "h-e" = @{
+        Url = "https://elysiver.h-e.top/console/personal"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
+    }
+    "zxiaoruan" = @{
+        Url = "https://gyapi.zxiaoruan.cn/profile"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
+    }
+    "pp" = @{
+        Url = "https://ioll.pp.ua/console/personal"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
+    }
+    "littlesheep" = @{
+        Url = "https://ai.littlesheep.cc/profile"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
+    }
+    "onrender" = @{
+        Url = "https://new-api-bxhm.onrender.com/console/personal"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
+    }
+    "huan666" = @{
+        Url = "https://ai.huan666.de/console/personal"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
+    }
+    "xt-url" = @{
+        Url = "https://checkin.new-api.xt-url.com/"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
+    }
+    "pbh-btn" = @{
+        Url = "https://bbs.pbh-btn.com/"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
+    }
+    "anyrouter" = @{
+        Url = "https://anyrouter.top/console"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = $SPASignInDetect
+        Click = $null
     }
 }
 

@@ -1,36 +1,36 @@
 {
-  "version": "v3.9",
+  "version": "v4.10",
   "total": 52,
   "baseline_file": "baseline.json",
   "sites": [
     {
       "name": "52pojie",
       "url": "https://www.52pojie.cn/forum.php",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: 吾爱破解 - webbridge (browser-eval-click不稳定，改用webbridge)"
     },
     {
       "name": "HDKYL",
       "url": "https://www.hdkyl.in/attendance.php",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: HDKYL - webbridge"
     },
     {
       "name": "NodeSeek",
       "url": "https://www.nodeseek.com/board",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: NodeSeek - webbridge"
     },
     {
       "name": "OurBits",
       "url": "https://ourbits.club/attendance.php",
-      "strategy": "browser-visit",
-      "note": "书签同步: OurBits - opencli"
+      "strategy": "webbridge",
+      "note": "书签同步: OurBits - webbridge (visit-only)"
     },
     {
       "name": "PigGo",
       "url": "https://piggo.me/attendance.php?id=18989",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: PigGo - webbridge (雷池WAF拦截HTTP请求)"
     },
     {
@@ -48,127 +48,127 @@
     {
       "name": "V2EX",
       "url": "https://www.v2ex.com/mission/daily",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: V2EX - webbridge (需点击领取按钮，browser-visit无法签到)"
     },
     {
       "name": "13City",
       "url": "https://13city.org/usercp.php?action=personal#signin",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: 13City签到"
     },
     {
       "name": "AsianDVDClub",
       "url": "https://asiandvdclub.org/index.php",
-      "strategy": "browser-visit",
+      "strategy": "webbridge",
       "note": "书签同步: AsianDVDClub 仅访问"
     },
     {
       "name": "BiliDownload",
       "url": "https://bilibili.download/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: RailgunPT签到"
     },
     {
       "name": "BTSchool",
       "url": "https://pt.btschool.club/attendance.php",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: BTSchool - webbridge (2026-06-23: 移出manual，用户确认浏览器可访问，尝试webbridge适配)"
     },
     {
       "name": "DepthStudio",
       "url": "https://dstudio.me/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: DepthStudio签到"
     },
     {
       "name": "DigitalCore",
       "url": "https://digitalcore.club/alltorrents?page=3&sort=up&fc=true#top",
-      "strategy": "browser-visit",
+      "strategy": "webbridge",
       "note": "书签同步: DigitalCore 仅访问"
     },
     {
       "name": "GGPT",
       "url": "https://www.gamegamept.com/attendance.php",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: GGPT签到 - webbridge (web-read被CF拦截，改用webbridge)"
     },
     {
       "name": "HDClone",
       "url": "https://pt.hdclone.top/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: HDClone签到"
     },
     {
       "name": "HDDolby",
       "url": "https://www.hddolby.com/attendance.php",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: HDDolby签到 - webbridge (web-read被CF拦截，改用webbridge)"
     },
     {
       "name": "HDHome",
       "url": "https://hdhome.org/attendance.php",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: HDHome签到 - webbridge (web-read被CF拦截，改用webbridge)"
     },
     {
       "name": "HDVideo",
       "url": "https://hdvideo.top/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: HDVideo签到"
     },
     {
       "name": "HHCLUB",
       "url": "https://hhanclub.net/attendance.php",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: HHCLUB签到 - webbridge (web-read被CF拦截，改用webbridge)"
     },
     {
       "name": "HTCPT",
       "url": "https://www.htpt.cc/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: 海棠PT签到"
     },
     {
       "name": "Kufirc",
       "url": "https://kufirc.com/index.php",
-      "strategy": "browser-visit",
+      "strategy": "webbridge",
       "note": "书签同步: Kufirc 仅访问"
     },
     {
       "name": "M-Team",
       "url": "https://kp.m-team.cc/index",
-      "strategy": "browser-visit",
+      "strategy": "webbridge",
       "note": "书签同步: M-Team 仅访问"
     },
     {
       "name": "Moment",
       "url": "https://www.momentpt.top/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: Moment签到"
     },
     {
       "name": "NewInsane",
       "url": "https://newinsane.info/browse.php",
-      "strategy": "browser-visit",
+      "strategy": "webbridge",
       "note": "书签同步: NewInsane 仅访问"
     },
     {
       "name": "Rousi",
       "url": "https://rousi.pro/points",
-      "strategy": "browser-open",
-      "note": "书签同步: Rousi签到 - 改用webbridge避免opencli daemon端口冲突"
+      "strategy": "webbridge",
+      "note": "书签同步: Rousi签到 - webbridge"
     },
     {
       "name": "SBPT",
       "url": "https://sbpt.link/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: SBPT签到 (2026-06-19: web-read返回TOO_SMALL，browser-open回退也失败，需进一步分析)"
     },
     {
       "name": "SpeedApp",
       "url": "https://speedapp.io/adult",
-      "strategy": "browser-visit",
+      "strategy": "webbridge",
       "note": "书签同步: SpeedApp 仅访问"
     },
     {
@@ -180,19 +180,19 @@
     {
       "name": "Tokyo",
       "url": "https://www.tokyo-manga.top/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: Tokyo签到"
     },
     {
       "name": "UsefulTrash",
       "url": "https://usefultrash.net/browse.php",
-      "strategy": "browser-visit",
+      "strategy": "webbridge",
       "note": "书签同步: UsefulTrash 仅访问"
     },
     {
       "name": "xloli",
       "url": "https://mua.xloli.cc/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: xloli签到"
     },
     {
@@ -204,115 +204,115 @@
     {
       "name": "YHPP",
       "url": "https://www.yhpp.cc/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "书签同步: YHPP签到"
     },
     {
       "name": "远景论坛",
       "url": "https://bbs.pcbeta.com/forum-win11-1.html",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "书签同步: 远景论坛签到 - webbridge (browser-eval-click不稳定，改用webbridge)"
     },
     {
       "name": "42w",
       "url": "https://api.42w.shop/console/personal",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "h-e",
       "url": "https://elysiver.h-e.top/console/personal",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "hdbao",
       "url": "https://hdbao.cc/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "zxiaoruan",
       "url": "https://gyapi.zxiaoruan.cn/profile",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "pp",
       "url": "https://ioll.pp.ua/console/personal",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "littlesheep",
       "url": "https://ai.littlesheep.cc/profile",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "musopia",
       "url": "https://www.musopia.vip/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "onrender",
       "url": "https://new-api-bxhm.onrender.com/console/personal",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "ptlao",
       "url": "https://ptlao.top/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "vclib",
       "url": "https://pt.vclib.online/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "521",
       "url": "https://pt.521.best/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "anyrouter",
       "url": "https://anyrouter.top/console",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "audiences",
       "url": "https://audiences.me/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "huan666",
       "url": "https://ai.huan666.de/console/personal",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "xt-url",
       "url": "https://checkin.new-api.xt-url.com/",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "pbh-btn",
       "url": "https://bbs.pbh-btn.com/",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "invites",
       "url": "https://www.invites.fun/?sort=newest",
-      "strategy": "browser-open",
+      "strategy": "webbridge",
       "note": "auto: 书签同步新增"
     }
   ],

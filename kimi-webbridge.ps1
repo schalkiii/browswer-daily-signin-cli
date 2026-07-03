@@ -112,6 +112,12 @@ function Test-WebBridgeSignIn {
         Write-Host "  [WebBridge] $SiteName : waiting ${WaitMs}ms for page load"
         Start-Sleep -Milliseconds $WaitMs
 
+        # visit-only 模式：无 DetectEval 时仅访问，不检测签到
+        if (-not $DetectEval -or $DetectEval.Trim() -eq "") {
+            Write-Host "  [WebBridge] $SiteName : visit-only (no detect), returning VISITED"
+            return "VISITED"
+        }
+
         Write-Host "  [WebBridge] $SiteName : evaluate detect"
         $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
         if (-not $detect) {

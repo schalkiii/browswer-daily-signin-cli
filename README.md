@@ -10,12 +10,11 @@ PT 站点和论坛的每日签到是典型的「重复性手工劳动」——�
 
 ### 前提条件
 
-| 依赖           | 版本要求      | 用途                                                   |
-| -------------- | ------------- | ------------------------------------------------------ |
-| PowerShell     | 7.0+          | 脚本运行环境                                           |
-| opencli        | 最新版        | `web-read` / `browser-open` 签到（NexusPHP + JS 站点） |
-| kimi webbridge | daemon 运行中 | CF/WAF 绕过（真实浏览器操控）                          |
-| Edge / Chrome  | 任意          | 书签数据来源                                           |
+| 依赖           | 版本要求      | 用途                                 |
+| -------------- | ------------- | ------------------------------------ |
+| PowerShell     | 7.0+          | 脚本运行环境                         |
+| kimi webbridge | daemon 运行中 | 真实浏览器操控（签到 + CF/WAF 绕过） |
+| Edge / Chrome  | 任意          | 书签数据来源                         |
 
 ### 三步上手
 
@@ -51,8 +50,7 @@ notepad config.json
     "bookmarkFolder": "PT/签到" // 书签文件夹名称
   },
   "webbridge": {
-    "baseUrl": "http://127.0.0.1:10086/command", // daemon 地址
-    "enabled": true
+    "baseUrl": "http://127.0.0.1:10086/command" // daemon 地址
   },
   "feishu": {
     "webhook": "", // 飞书机器人 Webhook URL
@@ -77,14 +75,12 @@ notepad config.json
 | `browser.profilePath`    | 路径   | `Data\Default`                   | 相对于 userDataPath 的 Profile 路径       |
 | `browser.bookmarkFolder` | 字符串 | `PT/签到`                        | 书签栏中用于筛选签到站点的文件夹名        |
 | `webbridge.baseUrl`      | URL    | `http://127.0.0.1:10086/command` | kimi webbridge daemon 地址                |
-| `webbridge.enabled`      | 布尔   | `true`                           | 是否启用 webbridge（关闭则回退 opencli）  |
 | `feishu.webhook`         | URL    | —                                | 飞书机器人 Webhook 地址                   |
 | `feishu.chatId`          | 字符串 | —                                | 飞书群聊 ID（可选，用于 lark-cli 推送）   |
 | `feishu.enabled`         | 布尔   | `true`                           | 是否启用飞书推送                          |
 | `signin.waitOpenMs`      | 毫秒   | `6000`                           | 页面打开后等待时间                        |
 | `signin.waitEvalMs`      | 毫秒   | `8000`                           | JS 执行后等待时间                         |
 | `signin.timeoutSec`      | 秒     | `90`                             | 单站点超时时间                            |
-| `signin.articleDir`      | 路径   | `web-articles`                   | web-read 文章输出目录                     |
 
 ## 架构
 
@@ -97,13 +93,12 @@ signin-batch.ps1（主调度）
     │
     ├─ Sync-Bookmarks（扫描浏览器书签 → 同步增删到 sites.json）
     │
-    ├─ 签到策略分发
-    │   ├─ web-read ──────────→ opencli web read（NexusPHP）
-    │   ├─ browser-open ──────→ opencli browser + eval（JS 签到）
-    │   │   └─ note="webbridge" → signin-web.ps1 → kimi-webbridge.ps1 → 真实浏览器
-    │   ├─ browser-eval-click → 点击签到按钮 + 结果检测
-    │   ├─ browser-visit ─────→ 仅访问，不检测签到
-    │   └─ manual ────────────→ 跳过（需人工）
+    ├─ 签到策略分发（v4.10 单后端）
+    │   ├─ webbridge ─→ signin-web.ps1 → kimi-webbridge.ps1 → 真实浏览器
+    │   │                ├─ NexusPHP attendance.php（访问即签到）
+    │   │                ├─ JS 点击签到（论坛/控制台）
+    │   │                └─ visit-only（仅访问，不检测）
+    │   └─ manual ─────→ 跳过（需人工）
     │
     ├─ baseline.json（基线追踪：回归检测 / 新站点发现）
     │
@@ -112,14 +107,21 @@ signin-batch.ps1（主调度）
 
 ## 签到策略
 
-| 策略                       | 站点数 | 原理                              | 适用场景                  |
-| -------------------------- | ------ | --------------------------------- | ------------------------- |
-| `web-read`                 | 22     | 直接 HTTP GET，服务端自动记录签到 | NexusPHP attendance.php   |
-| `browser-open` (webbridge) | 15     | 操控真实浏览器，CF 零挑战         | CF/WAF 保护站点、论坛签到 |
-| `browser-open` (opencli)   | 2      | 浏览器扩展打开页面 + JS eval      | 需 JS 执行的简单签到      |
-| `browser-eval-click`       | 3      | 定位按钮 → 点击 → 检测结果        | 论坛点击签到              |
-| `browser-visit`            | 7      | 仅访问主页面                      | 纯浏览类站点              |
-| `manual`                   | 3      | 跳过                              | 验证码/人工确认           |
+v4.10 起统一为单一 `webbridge` 后端，移除 opencli 依赖。站点配置在 `signin-web.ps1` 的 `$WebSignInConfigs` hashtable 中按站点名匹配，通过 `Detect`/`Click` JS 模板差异化处理：
+
+| 策略        | 站点数 | 原理                                      | 适用场景                       |
+| ----------- | ------ | ----------------------------------------- | ------------------------------ |
+| `webbridge` | 48     | 操控真实浏览器：navigate → detect → click | NexusPHP / 论坛 / SPA 控制台等 |
+| `manual`    | 4      | 跳过                                      | 验证码/滑块/人工确认           |
+
+**webbridge 站点配置类型**（由 `signin-web.ps1` 中的 Detect/Click 决定）：
+
+| 配置类型            | Detect       | Click   | 状态转换                                    |
+| ------------------- | ------------ | ------- | ------------------------------------------- |
+| NexusPHP attendance | 通用检测模板 | `$null` | 访问即签到，首次 SIGN_OK = 真实签到成功     |
+| 论坛/JS 点击        | 站点特定 JS  | 站点 JS | 首次 SIGN_OK = ALREADY_SIGNED（今天已签到） |
+| SPA 控制台          | SPA 模板     | `$null` | 登录态保持即视为成功                        |
+| visit-only          | `$null`      | `$null` | 仅访问，返回 VISITED                        |
 
 ### 重要规则：禁止自动添加 manual
 
@@ -133,12 +135,12 @@ signin-batch.ps1（主调度）
 
 ### Kimi WebBridge 优势
 
-| 维度     |  opencli（旧）   |  kimi webbridge（新）  |
-| -------- | :--------------: | :--------------------: |
-| CF 绕过  |    经常被拦截    | **完美绕过**（零挑战） |
-| 环境检测 | 可被识别为自动化 |  真实浏览器，不可检测  |
-| 登录状态 |   独立 Profile   |     用户真实登录态     |
-| 签到流程 | eval 一次性调试  |   固化代码，稳定重放   |
+v4.10 起为唯一后端，操控用户真实浏览器（Chrome/Edge）完成签到：
+
+- **CF/WAF 完美绕过**：真实浏览器携带 CF 信任令牌，零挑战
+- **真实登录态**：复用用户浏览器 Profile，无需独立登录
+- **固化代码**：每个站点的 Detect/Click JS 已调试验证，稳定重放
+- **不可检测**：与人工浏览行为一致，不被识别为自动化
 
 ## 核心文件
 
@@ -175,7 +177,7 @@ signin-batch.ps1（主调度）
 ### 单站点调试
 
 ```powershell
-# 测试指定站点（使用 opencli）
+# 测试指定站点（使用 webbridge）
 .\signin-single.ps1 -SiteName "52pojie"
 
 # 指定配置文件

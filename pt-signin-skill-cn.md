@@ -1,11 +1,11 @@
 ---
 name: pt-signin
 description: |
-  使用 opencli web read 和 browser 命令自动化 PT（私人种子站）及论坛签到。
-  涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、滑动验证 API 绕过、
-  点击签到页面和人工站点。当用户要求 PT 站点签到、论坛签到、
+  使用 kimi webbridge（单一后端）自动化 PT（私人种子站）及论坛签到。
+  涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、点击签到页面、
+  SPA 控制台站点和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-06-22 (v4.6 — Yemapt 转为 manual: SPA站点人机验证无法自动化)
+updated: 2026-07-03 (v4.10 — opencli 全面替代为 kimi webbridge 单后端；33 个新站点配置；visit-only 模式）
 ---
 
 # PT 站点签到自动化
@@ -13,24 +13,23 @@ updated: 2026-06-22 (v4.6 — Yemapt 转为 manual: SPA站点人机验证无法�
 ## 快速开始
 
 ```powershell
-cd d:\workspace\ptsignin
+cd d:\workspace\browswer-daily-signin-cli
 
-# 全量批处理: 49 个自动化站点 + 2 个人工站点, 约 15-20 分钟
+# 全量批处理: 48 个 webbridge 站点 + 4 个人工站点, 约 15-20 分钟
 .\signin-batch.ps1
 ```
 
-## 覆盖范围
+## 覆盖范围 (v4.10 — 单 webbridge 后端)
 
-| 类别                           | 数量   | 描述                         |
-| ------------------------------ | ------ | ---------------------------- |
-| web-read (NexusPHP)            | 22     | 页面访问即签到               |
-| browser-open (webbridge)       | 6      | kimi 真实浏览器，绕过 CF/WAF |
-| browser-open (opencli)         | 2      | JS 签到、CF 挑战             |
-| browser-eval-click (点击+检测) | 3      | 点击按钮 + 重检（论坛签到）  |
-| browser-visit (仅访问)         | 7      | 纯浏览类站点，不检测签到     |
-| browser-eval (API 绕过)        | —      | 滑动验证绕过（按需）         |
-| manual（验证码/政策原因）      | 2      | 需人工交互                   |
-| **总计**                       | **42** | 全部书签站点均尝试           |
+| 类别                            | 数量   | 描述                       |
+| ------------------------------- | ------ | -------------------------- |
+| webbridge (NexusPHP attendance) | 16     | 访问即签到 (Click=$null)   |
+| webbridge (JS 点击签到)         | 17     | 点击按钮 + 重检（论坛/PT） |
+| webbridge (SPA 控制台)          | 10     | 登录态保持即视为成功       |
+| webbridge (仅访问)              | 7      | 纯浏览类站点，不检测签到   |
+| webbridge (特殊 URL)            | 1      | 13City (usercp.php)        |
+| manual（验证码/政策原因）       | 4      | 需人工交互                 |
+| **总计**                        | **52** | 全部书签站点均尝试         |
 
 **核心规则：尝试书签文件夹中的全部站点，而非仅尝试曾经成功过的。**
 以基线（`baseline.json`）为参考，判断哪些站点*理应*成功 — 基线站点失败 = 真实 bug。不在基线中的站点是探索机会。
@@ -132,17 +131,20 @@ $config = $configRaw | ConvertFrom-Json
 | `LOGGED_IN`      | 已登录但未检测到签到动作       | 标记待调查           |
 | `UNKNOWN`        | 未匹配以上任何模式             | 等 20s 后重试        |
 
-### 策略矩阵
+### 策略矩阵 (v4.10 — 单 webbridge 后端)
 
-| 策略                       | 命令                                  | 基础等待 | CF等待 | 重试             | 站点数 |
-| -------------------------- | ------------------------------------- | -------- | ------ | ---------------- | ------ |
-| `web-read`                 | `opencli web read --url`              | 3s       | —      | 无               | 22     |
-| `browser-open` (webbridge) | `Invoke-WebSignIn` via kimi webbridge | 8-15s    | —      | 无需（完美绕过） | 6      |
-| `browser-open` (opencli)   | `opencli browser open` + eval         | 8s       | 12s    | 8s（UNKNOWN/CF） | 2      |
-| `browser-eval-click`       | 打开 + eval 点击 + 检测               | 6s+5s    | —      | 8s（UNKNOWN）    | 3      |
-| `browser-visit`            | 打开 + 检测 + 关闭                    | 8s       | —      | —                | 7      |
-| `browser-eval`             | 打开 + 绕过 API + eval                | 5s+10s   | —      | Token 自动刷新   | —      |
-| `manual`                   | 不适用                                | —        | —      | —                | 2      |
+v4.10 起所有非 manual 站点统一走 `webbridge` strategy。差异化由 `signin-web.ps1` 中的 `Detect`/`Click` JS 模板决定：
+
+| 配置类型            | Detect                  | Click   | 信号流                                    | 站点数 |
+| ------------------- | ----------------------- | ------- | ----------------------------------------- | ------ |
+| NexusPHP attendance | `$NexusPHPSignInDetect` | `$null` | 访问 → SIGN_OK = 真实签到                 | 16     |
+| JS 点击签到         | 站点特定 JS             | 站点 JS | 访问 → NEED_SIGN → 点击 → SIGN_OK/ALREADY | 17     |
+| SPA 控制台          | `$SPASignInDetect`      | `$null` | 访问 → 登录态保持 = SIGN_OK               | 10     |
+| visit-only          | `$null`                 | `$null` | 访问 → VISITED（不检测）                  | 7      |
+| 特殊 URL            | 站点特定 JS             | `$null` | 13City usercp.php                         | 1      |
+| manual              | 不适用                  | 不适用  | 跳过                                      | 4      |
+
+**重试策略**：CF_BLOCKED / SLIDER_FAIL / PAGE_ERROR / NO_DETECT / TIMEOUT 最多重试 2 次，间隔 10s。
 
 ## 基线追踪 (v3.5)
 

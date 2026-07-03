@@ -12,8 +12,7 @@
 
     "_comment_webbridge": "=== kimi WebBridge：默认 127.0.0.1:10086，一般无需修改 ===",
     "webbridge": {
-        "baseUrl": "http://127.0.0.1:10086/command",
-        "enabled": true
+        "baseUrl": "http://127.0.0.1:10086/command"
     },
 
     "_comment_feishu": "=== 飞书推送：填写你的机器人 Webhook 地址 ===",
@@ -28,7 +27,6 @@
         "concurrency": 1,
         "waitOpenMs": 6000,
         "waitEvalMs": 8000,
-        "timeoutSec": 90,
-        "articleDir": "web-articles"
+        "timeoutSec": 90
     }
 }

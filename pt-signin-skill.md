@@ -1,11 +1,11 @@
 ---
 name: pt-signin
 description: |
-  Automated PT (Private Tracker) and forum site sign-in using opencli web read and browser commands.
-  Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, slider captcha API bypass,
-  click-to-sign pages, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
+  Automated PT (Private Tracker) and forum site sign-in using kimi webbridge (single backend).
+  Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, click-to-sign pages,
+  SPA console sites, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-07-02 (v4.9.1 — Click JS 选择器加固：精确匹配+叶子节点过滤；HHCLUB webbridge 路由修复；lessons #37/#38）
+updated: 2026-07-03 (v4.10 — opencli 全面替代为 kimi webbridge 单后端；33 个新站点配置；visit-only 模式）
 ---
 
 # PT Site Sign-in Automation
@@ -13,24 +13,23 @@ updated: 2026-07-02 (v4.9.1 — Click JS 选择器加固：精确匹配+叶子�
 ## Quick Start
 
 ```powershell
-cd d:\workspace\ptsignin
+cd d:\workspace\browswer-daily-signin-cli
 
-# Full batch: 49 automated + 2 manual sites (~15-20min)
+# Full batch: 48 webbridge + 4 manual sites (~15-20min)
 .\signin-batch.ps1
 ```
 
-## Coverage
+## Coverage (v4.10 — single webbridge backend)
 
-| Category                       | Count  | Description                              |
-| ------------------------------ | ------ | ---------------------------------------- |
-| web-read (NexusPHP)            | 19     | Attendance on page visit                 |
-| browser-open (webbridge)       | 9      | kimi real browser, CF/WAF bypass         |
-| browser-open (opencli)         | 1      | JS sign-in, CF challenge                 |
-| browser-eval-click (click+det) | 2      | Click button + re-detect (forum checkin) |
-| browser-visit (visit only)     | 7      | Pure visit, no sign-in detection         |
-| browser-eval (API bypass)      | —      | Slider captcha bypass (as needed)        |
-| manual (captcha / policy)      | 2      | Requires human interaction               |
-| **Total**                      | **40** | All bookmark sites attempted             |
+| Category                        | Count  | Description                               |
+| ------------------------------- | ------ | ----------------------------------------- |
+| webbridge (NexusPHP attendance) | 16     | Visit = sign-in (Click=$null)             |
+| webbridge (JS click sign-in)    | 17     | Click button + re-detect (forums/tracker) |
+| webbridge (SPA console)         | 10     | Login state = success (API consoles)      |
+| webbridge (visit-only)          | 7      | Pure visit, no sign-in detection          |
+| webbridge (special URL)         | 1      | 13City (usercp.php?action=personal)       |
+| manual (captcha / policy)       | 4      | Requires human interaction                |
+| **Total**                       | **52** | All bookmark sites attempted              |
 
 **Key Rule: Attempt ALL sites in the bookmark folder, not just previously successful ones.**
 Use the baseline (`baseline.json`) as a reference for which sites _should_ succeed — regressions are real bugs. Sites not in baseline are exploratory opportunities.
@@ -128,17 +127,20 @@ This applies to both `sites.json` and `iterations.json` reads.
 | `LOGGED_IN`      | Logged in but no sign-in action detected | Flag for investigation       |
 | `UNKNOWN`        | None of the above patterns matched       | Retry after 8s               |
 
-### Strategy Matrix
+### Strategy Matrix (v4.10 — single webbridge backend)
 
-| Strategy                   | Command                               | Base Wait | CF Wait | Retry Policy          | Count |
-| -------------------------- | ------------------------------------- | --------- | ------- | --------------------- | ----- |
-| `web-read`                 | `opencli web read --url`              | 3s        | —       | None                  | 19    |
-| `browser-open` (webbridge) | `Invoke-WebSignIn` via kimi webbridge | 8-15s     | —       | None (perfect bypass) | 9     |
-| `browser-open` (opencli)   | `opencli browser open` + eval         | 8s        | 12s     | 8s (UNKNOWN/CF)       | 1     |
-| `browser-eval-click`       | Open + eval click + detect            | 6s+5s     | —       | 8s (UNKNOWN)          | 2     |
-| `browser-visit`            | Open + detect + close                 | 8s        | —       | —                     | 7     |
-| `browser-eval`             | Open + bypass API + eval              | 5s+10s    | —       | Auto token refresh    | —     |
-| `manual`                   | N/A                                   | —         | —       | —                     | 2     |
+v4.10 起所有非 manual 站点统一走 `webbridge` strategy。差异化由 `signin-web.ps1` 中的 `Detect`/`Click` JS 模板决定：
+
+| Config Type         | Detect                  | Click   | Signal Flow                                 | Count |
+| ------------------- | ----------------------- | ------- | ------------------------------------------- | ----- |
+| NexusPHP attendance | `$NexusPHPSignInDetect` | `$null` | visit → SIGN_OK = real sign-in              | 16    |
+| JS click sign-in    | site-specific JS        | site JS | visit → NEED_SIGN → click → SIGN_OK/ALREADY | 17    |
+| SPA console         | `$SPASignInDetect`      | `$null` | visit → login state = SIGN_OK               | 10    |
+| visit-only          | `$null`                 | `$null` | visit → VISITED (no detect)                 | 7     |
+| special URL         | site-specific JS        | `$null` | 13City usercp.php                           | 1     |
+| manual              | N/A                     | N/A     | skipped                                     | 4     |
+
+**Retry Policy**: CF_BLOCKED / SLIDER_FAIL / PAGE_ERROR / NO_DETECT / TIMEOUT 最多重试 2 次，间隔 10s。
 
 ## Baseline Tracking (v3.5)
 
@@ -989,3 +991,12 @@ Every sign-in session must follow this complete workflow. No step may be skipped
     - **Impact**: Any `browser-open` site whose note lacks the literal "webbridge" silently uses the wrong backend. New auto-synced sites get note `"auto: 书签同步新增"` and never route to webbridge — 11 such sites (42w/h-e/zxiaoruan/pp/littlesheep/onrender/anyrouter/huan666/xt-url/pbh-btn/invites) all ERROR.
     - **Fix for HHCLUB**: added config in `signin-web.ps1` + changed note to include "webbridge".
     - **Lesson**: Routing decisions must not depend on a substring in a free-text note field — it's brittle and invisible. Either (a) use an explicit `backend` field (`webbridge`/`opencli`), or (b) default `browser-open` to webbridge when daemon is available. The note-gate is a hidden coupling that bites when notes are auto-generated or hand-edited.
+
+39. **Single backend simplification: opencli fully replaced by kimi webbridge (v4.10)**: Lesson #38's note-gate bug was a symptom of a deeper problem — maintaining two backends (opencli + webbridge) created dual code paths, routing complexity, and silent failures when the opencli daemon was down (17 sites NO_ARTICLE regression on 2026-07-02). The fix wasn't another patch on the routing gate; it was eliminating the dual-backend architecture entirely.
+    - **Migration**: 5-phase plan — (1) add visit-only mode to webbridge, (2) simplify switch from 5 branches to 2 (manual + default→webbridge), (3) add 33 site configs using two reusable JS templates (`$NexusPHPSignInDetect` / `$SPASignInDetect`), (4) unify all non-manual strategies to `webbridge`, (5) update docs.
+    - **Key design decisions**:
+      - **Two reusable JS templates** instead of 33 copy-pasted configs: NexusPHP attendance.php sites share `$NexusPHPSignInDetect` (Click=$null, visit=sign-in); SPA console sites share `$SPASignInDetect` (login state = success). Reduces maintenance burden from 33 configs to 2 templates.
+      - **visit-only mode** (Detect=$null): returns `VISITED` after navigate+wait, supporting "pure visit" sites (M-Team, SpeedApp) without false SIGN_OK signals.
+      - **ALREADY_SIGNED vs SIGN_OK distinction preserved**: sites with ClickEval → first SIGN_OK = ALREADY_SIGNED (already signed today); sites without ClickEval → first SIGN_OK = real success (visit triggered the sign-in).
+    - **Result**: 997→633 lines (signin-batch.ps1), 17→50 site configs (signin-web.ps1), 5→2 switch branches, 0 opencli dependencies. All 48 non-manual sites covered.
+    - **Lesson**: When a routing gate causes silent failures (lesson #38), the root fix is to eliminate the routing decision entirely, not patch the gate. Dual-backend architectures create hidden coupling — the moment one backend fails, the routing logic becomes a liability. Single-backend + template-based config is simpler, more robust, and easier to maintain. The cost of migration (5 phases, 33 new configs) was far less than the ongoing cost of maintaining dual paths.
