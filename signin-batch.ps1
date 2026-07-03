@@ -104,31 +104,32 @@ function Sync-Bookmarks {
     }
     Write-Output "[SYNC] Scanning Edge bookmarks..."
     $bookmarks = Get-Content $bookmarkFile -Raw -Encoding UTF8 | ConvertFrom-Json
-    $bookmarkUrls = [System.Collections.Generic.List[string]]::new()
+    # 提取书签 url + name（display_name 来源）
+    $bookmarkInfos = [System.Collections.Generic.List[object]]::new()
     function Walk-BookmarkNodes($node, $path, $list) {
         if ($node.type -eq 'folder') {
             $curPath = "$path/$($node.name)"
             if ($curPath -match $bookmarkFolderPattern) {
                 foreach ($child in $node.children) {
-                    if ($child.type -eq 'url') { $list.Add($child.url) }
+                    if ($child.type -eq 'url') { $list.Add(@{ url = $child.url; name = $child.name }) }
                 }
             }
             foreach ($child in $node.children) { Walk-BookmarkNodes $child $curPath $list }
         }
     }
-    Walk-BookmarkNodes $bookmarks.roots.bookmark_bar "" $bookmarkUrls
-    $bookmarkUrls = $bookmarkUrls | Select-Object -Unique
-    if ($bookmarkUrls.Count -eq 0) {
+    Walk-BookmarkNodes $bookmarks.roots.bookmark_bar "" $bookmarkInfos
+    $bookmarkInfos = $bookmarkInfos | Sort-Object url -Unique
+    if ($bookmarkInfos.Count -eq 0) {
         Write-Output "[SYNC] No PT签到 bookmarks found, keeping all existing sites"
         return $ConfigObject
     }
-    Write-Output "[SYNC] Found $($bookmarkUrls.Count) bookmark URLs"
+    Write-Output "[SYNC] Found $($bookmarkInfos.Count) bookmark URLs"
     $bookmarkDomains = @{}
-    foreach ($url in $bookmarkUrls) {
+    foreach ($info in $bookmarkInfos) {
         try {
-            $uri = [uri]$url
+            $uri = [uri]$info.url
             $domain = $uri.Host -replace '^www\.', ''
-            if (-not $bookmarkDomains.ContainsKey($domain)) { $bookmarkDomains[$domain] = $url }
+            if (-not $bookmarkDomains.ContainsKey($domain)) { $bookmarkDomains[$domain] = $info }
         } catch {}
     }
     $currentSites = @($ConfigObject.sites)
@@ -147,7 +148,9 @@ function Sync-Bookmarks {
         } catch { $newSites.Add($site) }
     }
     foreach ($domain in $bookmarkDomains.Keys) {
-        $url = $bookmarkDomains[$domain]
+        $info = $bookmarkDomains[$domain]
+        $url = $info.url
+        $bmName = $info.name
         $parts = $domain -split '\.'
         $nameGuess = if ($parts.Count -ge 3) { $parts[-2] } else { $parts[0] }
         $strategy = if ($url -match 'attendance\.php') { 'web-read' } else { 'browser-open' }
@@ -155,8 +158,12 @@ function Sync-Bookmarks {
             name = $nameGuess
             url = $url
             strategy = $strategy
-            note = 'auto: 书签同步新增'
         }
+        # 书签名与 nameGuess 不同时写入 display_name，避免冗余
+        if ($bmName -and $bmName -ne $nameGuess) {
+            $newSite | Add-Member -NotePropertyName display_name -NotePropertyValue $bmName
+        }
+        $newSite | Add-Member -NotePropertyName note -NotePropertyValue 'auto: 书签同步新增'
         $newSites.Add($newSite)
         $added.Add("$nameGuess ($url)")
     }
@@ -399,8 +406,34 @@ function Send-FeishuSummary {
     $e_cross  = "$([char]0x274C)"
     $e_date   = "$([System.Char]::ConvertFromUtf32(0x1F4C5))"
 
-    $okJoined = ($signals.ok_sites | Sort-Object) -join ", "
-    $skipJoined = if ($signals.skip_sites.Count -gt 0) { ($signals.skip_sites | Sort-Object) -join ", " } else { "(none)" }
+    # 构建 siteInfoMap: name -> @{ url; display_name }，用于展示名 + 可点击链接
+    $siteInfoMap = @{}
+    foreach ($s in $config.sites) {
+        $dn = if ($s.display_name) { $s.display_name } else { $s.name }
+        $siteInfoMap[$s.name] = @{ url = $s.url; display_name = $dn }
+    }
+    # 取展示名（display_name 缺失时回退到 name）
+    function Get-Dn([string]$siteName) {
+        $info = $siteInfoMap[$siteName]
+        if ($info -and $info.display_name) { return $info.display_name }
+        return $siteName
+    }
+    # 格式化为飞书 lark_md 可点击链接 [display_name](url)
+    function Format-SiteLink([string]$siteName) {
+        $info = $siteInfoMap[$siteName]
+        if ($info -and $info.url) {
+            $dn = if ($info.display_name) { $info.display_name } else { $siteName }
+            return "[$dn]($($info.url))"
+        }
+        return $siteName
+    }
+
+    # 成功列表仅用 display_name（不加链接，避免 30+ 站点卡片过长）
+    $okJoined = ($signals.ok_sites | Sort-Object | ForEach-Object { Get-Dn $_ }) -join ", "
+    # manual 跳过加链接（用户需点击打开手动签到）
+    $skipJoined = if ($signals.skip_sites.Count -gt 0) {
+        ($signals.skip_sites | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
+    } else { "(none)" }
 
     # ===== Classify failures by reason =====
     $capSites = @(); $deadSites = @(); $nodetectSites = @(); $otherSites = @()
@@ -422,11 +455,11 @@ function Send-FeishuSummary {
     # ===== Baseline delta =====
     $baselineMd = ""
     if ($tracking.new_sites.Count -gt 0) {
-        $newJoined = ($tracking.new_sites | Sort-Object) -join ", "
+        $newJoined = ($tracking.new_sites | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
         $baselineMd += "$e_new 新基线: **+$($tracking.new_sites.Count)** ($newJoined)`n"
     }
     if ($tracking.regressions.Count -gt 0) {
-        $regJoined = ($tracking.regressions | Sort-Object) -join ", "
+        $regJoined = ($tracking.regressions | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
         $baselineMd += "$e_alarm 基线回归: **$($tracking.regressions.Count)** 站 ($regJoined)`n"
     }
 
@@ -478,19 +511,19 @@ function Send-FeishuSummary {
         $cardElements += @{ tag = "hr" }
         $failMd = "**🔴 签到失败 ($($Summary.failed))**"
         if ($capSites.Count -gt 0) {
-            $capJoined = ($capSites | Sort-Object) -join ", "
+            $capJoined = ($capSites | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
             $failMd += "`n$e_cf CF拦截 ($($capSites.Count)): $capJoined"
         }
         if ($deadSites.Count -gt 0) {
-            $deadJoined = ($deadSites | Sort-Object) -join ", "
+            $deadJoined = ($deadSites | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
             $failMd += "`n❓ 无响应 ($($deadSites.Count)): $deadJoined"
         }
         if ($nodetectSites.Count -gt 0) {
-            $ndJoined = ($nodetectSites | Sort-Object) -join ", "
+            $ndJoined = ($nodetectSites | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
             $failMd += "`n🔍 未识别 ($($nodetectSites.Count)): $ndJoined"
         }
         if ($otherSites.Count -gt 0) {
-            $otherJoined = ($otherSites | Sort-Object) -join ", "
+            $otherJoined = ($otherSites | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
             $failMd += "`n❌ 其他 ($($otherSites.Count)): $otherJoined"
         }
         $cardElements += @{
@@ -502,7 +535,12 @@ function Send-FeishuSummary {
     # --- Needs manual review section (仅通知，不自动改策略) ---
     if ($tracking.needs_manual_review.Count -gt 0) {
         $cardElements += @{ tag = "hr" }
-        $reviewJoined = ($tracking.needs_manual_review | Sort-Object) -join ", "
+        $reviewJoined = ($tracking.needs_manual_review | Sort-Object | ForEach-Object {
+            if ($_ -match '^(.+?)\((.+)\)$') {
+                $siteName = $matches[1]; $status = $matches[2]
+                "$(Format-SiteLink $siteName)($status)"
+            } else { Get-Dn $_ }
+        }) -join ", "
         $reviewMd = "**$e_alarm 需人工审核 ($($tracking.needs_manual_review.Count))**`n$reviewJoined`n⚠️  系统不会自动改为 manual，请人工确认后手动修改"
         $cardElements += @{
             tag = "div"
@@ -522,7 +560,7 @@ function Send-FeishuSummary {
     # --- Login expired warning ---
     if ($signals.login_expired.Count -gt 0) {
         $cardElements += @{ tag = "hr" }
-        $loginExpJoined = ($signals.login_expired | Sort-Object) -join ", "
+        $loginExpJoined = ($signals.login_expired | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
         $loginMd = "**$e_alarm 会话失效 ($($signals.login_expired.Count))**`n$loginExpJoined"
         $cardElements += @{
             tag = "div"
@@ -591,10 +629,10 @@ function Send-FeishuSummary {
         if ($Summary.failed -gt 0) {
             $text += "`n`n🔴 签到失败 ($($Summary.failed))"
             $text += "`n━━━━━━━━━━━━━━━━━━"
-            if ($capSites.Count -gt 0) { $text += "`n🚫 CF拦截 ($($capSites.Count)): $(($capSites | Sort-Object) -join ', ')" }
-            if ($deadSites.Count -gt 0) { $text += "`n❓ 无响应 ($($deadSites.Count)): $(($deadSites | Sort-Object) -join ', ')" }
-            if ($nodetectSites.Count -gt 0) { $text += "`n🔍 未识别 ($($nodetectSites.Count)): $(($nodetectSites | Sort-Object) -join ', ')" }
-            if ($otherSites.Count -gt 0) { $text += "`n❌ 其他 ($($otherSites.Count)): $(($otherSites | Sort-Object) -join ', ')" }
+            if ($capSites.Count -gt 0) { $text += "`n🚫 CF拦截 ($($capSites.Count)): $(($capSites | Sort-Object | ForEach-Object { Get-Dn $_ }) -join ', ')" }
+            if ($deadSites.Count -gt 0) { $text += "`n❓ 无响应 ($($deadSites.Count)): $(($deadSites | Sort-Object | ForEach-Object { Get-Dn $_ }) -join ', ')" }
+            if ($nodetectSites.Count -gt 0) { $text += "`n🔍 未识别 ($($nodetectSites.Count)): $(($nodetectSites | Sort-Object | ForEach-Object { Get-Dn $_ }) -join ', ')" }
+            if ($otherSites.Count -gt 0) { $text += "`n❌ 其他 ($($otherSites.Count)): $(($otherSites | Sort-Object | ForEach-Object { Get-Dn $_ }) -join ', ')" }
         }
         if ($Summary.skipped -gt 0) {
             $text += "`n`n⏭ 人工签到 ($($Summary.skipped))"

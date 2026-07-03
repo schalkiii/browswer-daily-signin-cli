@@ -1,5 +1,5 @@
 {
-  "version": "v4.10.1",
+  "version": "v4.11.0",
   "total": 52,
   "baseline_file": "baseline.json",
   "sites": [
@@ -37,6 +37,7 @@
       "name": "FreeFarm",
       "url": "https://pt.0ff.cc/attendance.php",
       "strategy": "manual",
+      "display_name": "FreeFarm",
       "note": "2026-06-23: 滑块验证持续拦截，webbridge无法绕过，移入manual（禁止自动添加manual，需人工确认）"
     },
     {
@@ -67,6 +68,7 @@
       "name": "BiliDownload",
       "url": "https://bilibili.download/attendance.php",
       "strategy": "webbridge",
+      "display_name": "RailgunPT",
       "note": "书签同步: RailgunPT签到"
     },
     {
@@ -127,6 +129,7 @@
       "name": "HTCPT",
       "url": "https://www.htpt.cc/attendance.php",
       "strategy": "webbridge",
+      "display_name": "海棠PT",
       "note": "书签同步: 海棠PT签到"
     },
     {
@@ -193,6 +196,7 @@
       "name": "xloli",
       "url": "https://mua.xloli.cc/attendance.php",
       "strategy": "webbridge",
+      "display_name": "XLoli",
       "note": "书签同步: xloli签到"
     },
     {
@@ -217,66 +221,77 @@
       "name": "42w",
       "url": "https://api.42w.shop/console/personal",
       "strategy": "manual",
+      "display_name": "42w AI控制台",
       "note": "v4.10.1: URL 返回 404 (页面未找到)，签到入口失效，需人工确认正确URL后改回webbridge"
     },
     {
       "name": "h-e",
       "url": "https://elysiver.h-e.top/console/personal",
       "strategy": "webbridge",
+      "display_name": "Elysiver控制台",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "hdbao",
       "url": "https://hdbao.cc/attendance.php",
       "strategy": "webbridge",
+      "display_name": "HD宝",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "zxiaoruan",
       "url": "https://gyapi.zxiaoruan.cn/profile",
       "strategy": "manual",
+      "display_name": "小软API",
       "note": "v4.10.1: 页面重定向到 /sign-in 登录页（LinuxDO OAuth），未登录态无法签到，需人工登录后改回webbridge"
     },
     {
       "name": "pp",
       "url": "https://ioll.pp.ua/console/personal",
       "strategy": "manual",
+      "display_name": "PP控制台",
       "note": "v4.10.1: URL 返回 404 (页面未找到)，签到入口失效，需人工确认正确URL后改回webbridge"
     },
     {
       "name": "littlesheep",
       "url": "https://ai.littlesheep.cc/profile",
       "strategy": "manual",
+      "display_name": "小羊AI",
       "note": "v4.10.1: 页面重定向到 /sign-in 登录页，未登录态无法签到，需人工登录后改回webbridge"
     },
     {
       "name": "musopia",
       "url": "https://www.musopia.vip/attendance.php",
       "strategy": "webbridge",
+      "display_name": "Musopia",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "onrender",
       "url": "https://new-api-bxhm.onrender.com/console/personal",
       "strategy": "webbridge",
+      "display_name": "NewAPI(bxhm)",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "ptlao",
       "url": "https://ptlao.top/attendance.php",
       "strategy": "webbridge",
+      "display_name": "PTLao",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "vclib",
       "url": "https://pt.vclib.online/attendance.php",
       "strategy": "manual",
+      "display_name": "VCLib",
       "note": "v4.10.1: 签到页需输入图片验证码（CAPTCHA），无法自动化，改为manual"
     },
     {
       "name": "521",
       "url": "https://pt.521.best/attendance.php",
       "strategy": "manual",
+      "display_name": "521PT",
       "note": "v4.10.1: 签到页需输入图片验证码（CAPTCHA），无法自动化，改为manual"
     },
     {
@@ -289,30 +304,35 @@
       "name": "audiences",
       "url": "https://audiences.me/attendance.php",
       "strategy": "webbridge",
+      "display_name": "Audiences",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "huan666",
       "url": "https://ai.huan666.de/console/personal",
       "strategy": "webbridge",
+      "display_name": "幻666 AI",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "xt-url",
       "url": "https://checkin.new-api.xt-url.com/",
       "strategy": "manual",
+      "display_name": "NewAPI(xt-url)",
       "note": "v4.10.1: 页面要求 LinuxDO OAuth 登录后才能签到，未登录态显示登录提示，改为manual"
     },
     {
       "name": "pbh-btn",
       "url": "https://bbs.pbh-btn.com/",
       "strategy": "webbridge",
+      "display_name": "PBH-BTN论坛",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "invites",
       "url": "https://www.invites.fun/?sort=newest",
       "strategy": "webbridge",
+      "display_name": "Invites邀请",
       "note": "auto: 书签同步新增"
     }
   ],

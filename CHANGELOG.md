@@ -1,5 +1,28 @@
 # Changelog
 
+## [v4.11.0] - 2026-07-03
+
+### display_name 字段 + 飞书可点击链接
+
+#### 新增1: sites.json display_name 字段
+
+- **目的**：解决飞书推送中 cryptic 站点名（如 `42w`/`521`/`pp`/`littlesheep`/`audiences`）不可读问题
+- **设计**：`name` 字段保持不变（5 处主键依赖：WebSignInConfigs 查找、baseline.json 比对、fail_sites 去重、signin-single 查找、debug 快照文件名），`display_name` 纯展示层，缺失时回退到 `name`
+- **覆盖**：20 个 cryptic 站点添加 display_name（15 已有 + 5 新增：audiences/huan666/xt-url/pbh-btn/invites）
+
+#### 新增2: Sync-Bookmarks 提取书签 name
+
+- **改造**：`Walk-BookmarkNodes` 从只提取 url 改为提取 `@{ url; name }` 对象
+- **效果**：新增站点时自动用书签 name 作为 display_name，从源头消除 cryptic 名字
+- **兼容**：书签 name 与 nameGuess 相同时省略 display_name，避免冗余
+
+#### 新增3: 飞书卡片可点击链接
+
+- **改造**：`Send-FeishuSummary` 新增 `Get-Dn`/`Format-SiteLink` 辅助函数，10 处 joined 变量改造
+- **链接覆盖范围**：manual 跳过、失败分类（CF/无响应/未识别/其他）、会话失效、新基线、基线回归、需人工审核
+- **不加链接**：成功列表（30+ 站点，加链接会致卡片过长）
+- **lark-cli text 兜底**：自动受益于 display_name（通过 Get-Dn），但不支持 markdown 链接，保持纯文本
+
 ## [v4.10.1] - 2026-07-03
 
 ### 全量签到调试修复（v4.10 首次全量签到反馈）

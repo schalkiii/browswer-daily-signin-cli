@@ -5,7 +5,7 @@ description: |
   涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、点击签到页面、
   SPA 控制台站点和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-07-03 (v4.10.1+ — EVAL_FAIL tab 丢失恢复、HHCLUB 方括号按钮、re-check 超时增大、7 站点改 manual)
+updated: 2026-07-03 (v4.11.0 — display_name 字段 + 飞书可点击链接 + Sync-Bookmarks 提取书签名)
 ---
 
 # PT 站点签到自动化
@@ -30,6 +30,16 @@ cd d:\workspace\browswer-daily-signin-cli
 | webbridge (特殊 URL)            | 1      | 13City (attendance.php)    |
 | manual（验证码/政策原因）       | 4      | 需人工交互                 |
 | **总计**                        | **52** | 全部书签站点均尝试         |
+
+### sites.json 字段定义
+
+| 字段           | 必填 | 说明                                                                   |
+| -------------- | ---- | ---------------------------------------------------------------------- |
+| `name`         | 是   | 站点主键（5 处依赖：WebSignInConfigs/baseline/fail_sites/single/快照） |
+| `url`          | 是   | 签到页面 URL                                                           |
+| `strategy`     | 是   | `webbridge` 或 `manual`                                                |
+| `display_name` | 否   | 展示名（飞书推送/日志），缺失时回退到 `name`。Sync-Bookmarks 自动提取  |
+| `note`         | 否   | 同步状态/变更说明                                                      |
 
 **核心规则：尝试书签文件夹中的全部站点，而非仅尝试曾经成功过的。**
 以基线（`baseline.json`）为参考，判断哪些站点*理应*成功 — 基线站点失败 = 真实 bug。不在基线中的站点是探索机会。
@@ -930,3 +940,8 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
     - **修复**: 所有脚本验证和签到执行改用 pwsh（`pwsh -NoProfile -File signin-batch.ps1`）
     - **附加**: PowerShell 5.x 解析 here-string `'@` 结束符要求 CRLF；LF 结尾会导致 here-string 无法正确终止。git core.autocrlf=true 在 checkout 时会转 CRLF，但 Edit/Write 工具用 LF 写入工作区文件，可能导致 here-string 解析失败
     - **经验**: 含中文的 PowerShell 脚本必须用 pwsh 7.x 运行；here-string 必须保持 CRLF 行结束符
+
+24. **展示名与主键名分离（v4.11.0）**: 站点配置中 `name` 字段作为 5 处主键依赖（WebSignInConfigs 查找、baseline.json 比对、fail_sites 去重、signin-single 查找、debug 快照文件名），不可随意修改。新增 `display_name` 字段作为纯展示层，缺失时回退到 `name`。
+    - **背景**：Sync-Bookmarks 从 URL 域名倒数第二段生成 name（如 `42w`/`pp`/`audiences`），cryptic 不可读
+    - **设计**：`display_name` 不参与任何匹配逻辑，仅用于飞书卡片推送和日志展示
+    - **经验**：当主键字段被多处依赖时，新增展示字段比修改主键更安全；字段回退逻辑（`if ($dn) { $dn } else { $name }`）保证向后兼容
