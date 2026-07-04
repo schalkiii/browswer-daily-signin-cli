@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, click-to-sign pages,
   SPA console sites, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-07-03 (v4.10 — opencli 全面替代为 kimi webbridge 单后端；33 个新站点配置；visit-only 模式）
+updated: 2026-07-04 (v4.12.0 — display_name field + Feishu clickable links + captcha-extension polling + CF/2FA detection)
 ---
 
 # PT Site Sign-in Automation
@@ -15,24 +15,34 @@ updated: 2026-07-03 (v4.10 — opencli 全面替代为 kimi webbridge 单后端�
 ```powershell
 cd d:\workspace\browswer-daily-signin-cli
 
-# Full batch: 48 webbridge + 4 manual sites (~15-20min)
+# Full batch: 42 webbridge + 7 manual sites (~15-20min)
 .\signin-batch.ps1
 ```
 
-## Coverage (v4.10 — single webbridge backend)
+## Coverage (v4.12.0 — single webbridge backend)
 
-| Category                        | Count  | Description                               |
-| ------------------------------- | ------ | ----------------------------------------- |
-| webbridge (NexusPHP attendance) | 16     | Visit = sign-in (Click=$null)             |
-| webbridge (JS click sign-in)    | 17     | Click button + re-detect (forums/tracker) |
-| webbridge (SPA console)         | 10     | Login state = success (API consoles)      |
-| webbridge (visit-only)          | 7      | Pure visit, no sign-in detection          |
-| webbridge (special URL)         | 1      | 13City (usercp.php?action=personal)       |
-| manual (captcha / policy)       | 4      | Requires human interaction                |
-| **Total**                       | **52** | All bookmark sites attempted              |
+| Category                        | Count  | Description                                                                    |
+| ------------------------------- | ------ | ------------------------------------------------------------------------------ |
+| webbridge (NexusPHP attendance) | 15     | Visit = sign-in (Click=$null)                                                  |
+| webbridge (JS click sign-in)    | 17     | Click button + re-detect (forums/tracker)                                      |
+| webbridge (SPA console)         | 9      | Login state = success (API consoles)                                           |
+| webbridge (visit-only)          | 7      | Pure visit, no sign-in detection                                               |
+| webbridge (NexusPHP + captcha)  | 2      | Click JS polls imagestring for browser extension to fill (v4.12.0+: vclib/521) |
+| manual (captcha / policy)       | 7      | Requires human interaction                                                     |
+| **Total**                       | **49** | All bookmark sites attempted                                                   |
 
 **Key Rule: Attempt ALL sites in the bookmark folder, not just previously successful ones.**
 Use the baseline (`baseline.json`) as a reference for which sites _should_ succeed — regressions are real bugs. Sites not in baseline are exploratory opportunities.
+
+### sites.json Field Definitions
+
+| Field          | Required | Description                                                                             |
+| -------------- | -------- | --------------------------------------------------------------------------------------- |
+| `name`         | Yes      | Site primary key (5 deps: WebSignInConfigs/baseline/fail_sites/single/snapshot)         |
+| `url`          | Yes      | Sign-in page URL                                                                        |
+| `strategy`     | Yes      | `webbridge` or `manual`                                                                 |
+| `display_name` | No       | Display name (Feishu push/logs), falls back to `name`. Auto-extracted by Sync-Bookmarks |
+| `note`         | No       | Sync status / change notes                                                              |
 
 ## Core Architecture (v3.3)
 
@@ -51,8 +61,9 @@ Before every batch run, the working directory must contain **only these files**:
 | `config.json`           | **Local config** (private webhook, gitignored)                   | Local      |
 | `sites.json`            | Site configuration                                               | Yes        |
 | `baseline.json`         | Known-success sites                                              | Yes        |
-| `iterations.json`       | Self-iteration log                                               | Yes        |
-| `signin-log.json`       | Per-run result log                                               | Yes        |
+| `iterations.json`       | Self-iteration log (runtime, gitignored)                         | Runtime    |
+| `signin-log.json`       | Per-run result log (runtime, gitignored)                         | Runtime    |
+| `sync-log.json`         | Bookmark sync log (runtime, gitignored)                          | Runtime    |
 | `.gitignore`            | Git ignore rules                                                 | Yes        |
 | `pt-signin-skill.md`    | Skill doc (English)                                              | Yes        |
 | `pt-signin-skill-cn.md` | Skill doc (Chinese)                                              | Yes        |
@@ -732,11 +743,11 @@ Every sign-in session must follow this complete workflow. No step may be skipped
 3. Review `baseline.json` — know which sites are expected to succeed
 4. Verify working directory has only the 10 core files listed in Directory Hygiene
 5. Ensure `sites.json` BOM is stripped before parsing
-6. **CRITICAL**: Do NOT filter sites by baseline. Attempt ALL 51 sites.
+6. **CRITICAL**: Do NOT filter sites by baseline. Attempt ALL 49 sites.
 
 ### Phase 2: Execution
 
-7. Run `.\signin-batch.ps1` — processes all 51 sites sequentially
+7. Run `.\signin-batch.ps1` — processes all 49 sites sequentially
 8. Script auto-cleans `web-articles/` at start, generates fresh articles during run
 9. Self-iteration fires on failures: token refresh, web-read fallback, pattern discovery
 10. Each site result is tracked against baseline for regression/new-success detection
@@ -796,7 +807,7 @@ Every sign-in session must follow this complete workflow. No step may be skipped
 8. **Policy-aware strategy selection**: Some sites (52pojie) explicitly prohibit automation. Respect these policies: mark as `manual` with a clear `reason` field explaining why automation is not attempted. This prevents wasted debugging effort and potential account issues.
 9. **Exit code semantics matter**: Manual skips are not failures — the exit code and report PASS/FAIL should only reflect automated site results. Mixing manual and automated counts produces misleading reports that suggest failures where none exist. Use `$autoTotal = $total - $manual` for accurate ratios.
 10. **Running post-run workflow is mandatory**: every successful run must end with: report generation → Feishu push → directory cleanup → skill doc update → Chinese sync. Skipping any step leaves the system in an incomplete state for the next run.
-11. **Baseline is a reference, never a filter**: Never skip sites because they are not in the baseline. Attempt ALL 51 sites every run. The baseline exists to detect regressions, not to reduce the test set.
+11. **Baseline is a reference, never a filter**: Never skip sites because they are not in the baseline. Attempt ALL 49 sites every run. The baseline exists to detect regressions, not to reduce the test set.
 12. **Incremental baseline growth is the goal**: Each new site that succeeds for the first time is a victory. The baseline should grow monotonically — celebrate each addition and record it in `baseline.json`.
 13. **Regression is the highest-priority bug**: If a site in the baseline fails, it means something broke (CF upgrade, token expiry, login session lost). These must be diagnosed and fixed before the next run. Report `[REGR]` prominently in Feishu.
 14. **Exploratory failures are normal**: New sites not yet in the baseline will likely fail on first attempt. These are discovery opportunities, not bugs. Report them as `FAIL (N new)` to distinguish from regressions.
@@ -1000,3 +1011,20 @@ Every sign-in session must follow this complete workflow. No step may be skipped
       - **ALREADY_SIGNED vs SIGN_OK distinction preserved**: sites with ClickEval → first SIGN_OK = ALREADY_SIGNED (already signed today); sites without ClickEval → first SIGN_OK = real success (visit triggered the sign-in).
     - **Result**: 997→633 lines (signin-batch.ps1), 17→50 site configs (signin-web.ps1), 5→2 switch branches, 0 opencli dependencies. All 48 non-manual sites covered.
     - **Lesson**: When a routing gate causes silent failures (lesson #38), the root fix is to eliminate the routing decision entirely, not patch the gate. Dual-backend architectures create hidden coupling — the moment one backend fails, the routing logic becomes a liability. Single-backend + template-based config is simpler, more robust, and easier to maintain. The cost of migration (5 phases, 33 new configs) was far less than the ongoing cost of maintaining dual paths.
+
+40. **Display name vs primary key separation (v4.11.0)**: The `name` field in site config is a primary key with 5 dependencies (WebSignInConfigs lookup, baseline.json comparison, fail_sites dedup, signin-single lookup, debug snapshot filename) — it cannot be renamed casually. Added `display_name` as a pure presentation layer, falling back to `name` when absent.
+    - **Background**: Sync-Bookmarks generates `name` from URL domain's penultimate segment (e.g. `42w`/`pp`/`audiences`), which is cryptic and unreadable in Feishu push messages.
+    - **Design**: `display_name` participates in no matching logic; it's only used for Feishu card push and log display. Sync-Bookmarks auto-extracts bookmark name as `display_name` when adding new sites.
+    - **Lesson**: When a primary key field has many dependencies, adding a new display field is safer than renaming the primary key. Fallback logic (`if ($dn) { $dn } else { $name }`) ensures backward compatibility.
+
+41. **Captcha-extension polling scheme (v4.12.0)**: When the user's browser has a captcha auto-fill extension, use `setInterval` async polling in Click JS to wait for the extension to fill the captcha before submitting.
+    - **Background**: vclib/521 (NexusPHP sites) require image captcha (`<input name="imagestring">` + `<img src="image.php?action=regimage">`). v4.10.1 marked them as manual. User reported browser extension can auto-fill captchas.
+    - **Scheme**: Because webbridge evaluate is synchronous and doesn't support Promise/awaitPromise, Click JS uses `setInterval` to check `input.value` every 1 second. evaluate returns `CLICK_SCHEDULED` immediately; setInterval runs async in the browser during PostClickMs.
+    - **Tuning**: v4.12.1 expanded polling window from 12s to 28s, PostClickMs from 15s to 30s (extension may need longer to recognize NexusPHP image captchas).
+    - **Limitation**: 521 testing showed the extension did not fill imagestring within 28s. The extension may not be enabled on pt.521.best domain, or may not support NexusPHP image captcha format. Requires user confirmation of extension config.
+    - **Lesson**: Async polling bypasses evaluate's synchronous limitation, but requires the extension to actually work on the target domain. Design should assume extensions may have domain whitelists/format restrictions, and provide fast-fail + manual fallback.
+
+42. **CF managed challenge and remote-login 2FA detection (v4.12.0)**: Detect JS should identify "non-sign-in-page" abnormal states to prevent Click JS from misoperating on error pages.
+    - **CF managed challenge**: title="请稍候…" + bodyText contains "正在进行安全验证". Detect `.cf-turnstile` / `iframe[src*="challenges.cloudflare.com"]` / `[name="cf-turnstile-response"]` elements. Returns `CF_CHALLENGE` signal, classified into capSites.
+    - **Remote-login 2FA**: URL redirects to `take2fa.php`, bodyText contains "异地登录" (remote login) / "两步验证" (2FA). Returns `LOGIN_REQUIRED` signal, triggers Feishu alert for manual handling.
+    - **Lesson**: Detect JS should identify not only "sign-in status" but also "page abnormal states" (CF block / 2FA / login expired / server error). Otherwise Click JS misfires on navigation elements on abnormal pages, producing hard-to-debug side effects.

@@ -61,8 +61,9 @@ cd d:\workspace\browswer-daily-signin-cli
 | `config.json`           | **本地配置**（含私密 webhook，在 .gitignore 中排除） | 本地   |
 | `sites.json`            | 站点配置                                             | 是     |
 | `baseline.json`         | 已知成功站点                                         | 是     |
-| `iterations.json`       | 自迭代日志                                           | 是     |
-| `signin-log.json`       | 每次运行结果日志                                     | 是     |
+| `iterations.json`       | 自迭代日志（运行时，.gitignore 排除）                | 运行时 |
+| `signin-log.json`       | 每次运行结果日志（运行时，.gitignore 排除）          | 运行时 |
+| `sync-log.json`         | 书签同步日志（运行时，.gitignore 排除）              | 运行时 |
 | `.gitignore`            | Git 忽略规则                                         | 是     |
 | `pt-signin-skill.md`    | 技能文档（英文）                                     | 是     |
 | `pt-signin-skill-cn.md` | 技能文档（中文）                                     | 是     |

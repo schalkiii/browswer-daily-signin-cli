@@ -156,9 +156,14 @@ v4.10 起为唯一后端，操控用户真实浏览器（Chrome/Edge）完成签
 | `config.json`         | **本地配置文件**（已在 .gitignore 中排除，不上传仓库）     |
 | `sites.json`          | 站点列表（自动由书签同步维护）                             |
 | `baseline.json`       | 基线追踪（记录曾成功签到的站点）                           |
-| `iterations.json`     | 自迭代修复日志                                             |
-| `signin-log.json`     | 每次运行的结构化日志                                       |
-| `sync-log.json`       | 书签同步日志（保留最近 50 条，排查新书签未同步问题）       |
+| `CHANGELOG.md`        | 版本变更日志                                               |
+| `README.md`           | 项目说明（本文件）                                         |
+| `pt-signin-skill.md`  | 技能文档（英文）                                           |
+| `pt-signin-skill-cn.md` | 技能文档（中文）                                         |
+| `.gitignore`          | Git 忽略规则                                               |
+| `iterations.json`     | 自迭代修复日志（运行时，.gitignore 排除）                  |
+| `signin-log.json`     | 每次运行的结构化日志（运行时，.gitignore 排除）            |
+| `sync-log.json`       | 书签同步日志（运行时，.gitignore 排除）                    |
 
 ## 使用指南
 

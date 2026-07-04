@@ -1,5 +1,36 @@
 # Changelog
 
+## [v4.12.1] - 2026-07-04
+
+### 项目目录整理 + 英文版 skill 同步
+
+#### 改动1: iterations.json 从 git 追踪中移除
+
+- **背景**：iterations.json 是 self-iterating 模式的运行时日志（40 条历史记录），但被错误地提交到 git 仓库
+- **改动**：`git rm --cached iterations.json` + 加入 .gitignore，与 signin-log.json/sync-log.json 同等处理
+- **效果**：本地文件保留，但 git 不再追踪其变化
+
+#### 改动2: 英文版 pt-signin-skill.md 同步到 v4.12.0
+
+- **背景**：英文版停留在 v4.10，落后中文版两个版本（v4.11.0/v4.12.0）
+- **同步内容**：
+  - frontmatter updated 时间更新到 v4.12.0
+  - Coverage 表格站点数更新（48+4=52 → 42+7=49，新增 NexusPHP + captcha 类别）
+  - Directory & File Hygiene 表格：iterations.json/signin-log.json 标注为 Runtime，新增 sync-log.json
+  - Phase 1/2 站点数 51 → 49
+  - 新增 sites.json Field Definitions 部分（含 display_name 字段）
+  - 新增 lesson 40 (display_name 字段) / 41 (验证码扩展方案) / 42 (CF/2FA 检测)
+
+#### 改动3: README.md 核心文件表格完善
+
+- 新增 CHANGELOG.md / README.md / pt-signin-skill.md / pt-signin-skill-cn.md / .gitignore 条目
+- iterations.json / signin-log.json / sync-log.json 标注"运行时，.gitignore 排除"
+
+#### 改动4: pt-signin-skill-cn.md 目录说明完善
+
+- iterations.json / signin-log.json 标注从"是"改为"运行时"
+- 新增 sync-log.json 条目
+
 ## [v4.12.0] - 2026-07-04
 
 ### 验证码站点改回 webbridge + CF/2FA 检测增强
