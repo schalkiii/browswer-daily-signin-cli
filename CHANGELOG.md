@@ -1,5 +1,38 @@
 # Changelog
 
+## [v4.12.3] - 2026-07-05
+
+### extension 冷启动等待 + HDKYL chrome-error 检测 + UNKNOWN 重试改进
+
+基于 07-05 全量签到（00:50 启动，30 成功/12 失败）的调试发现：脚本在 v4.12.2 commit 前 8 小时启动，加载的是 v4.12.1 旧版代码，所以 v4.12.2 的 Clear-WebBridgeTabs 和 UNKNOWN 重试都没生效。本次修复 v4.12.2 未覆盖的问题。
+
+#### 改动1: extension 冷启动等待（kimi-webbridge.ps1）
+
+- **根因**：daemon 启动后 extension 需要几秒才连接，首个站点（52pojie）navigate 时 extension 未就绪，返回 "no extension connected" 导致 NAV_FAIL
+- **修复**：navigate 失败时调用 `list_tabs` 检测 extension 是否就绪，未就绪则等待 5 秒重试，最多 3 次（共 15 秒）
+- **影响站点**：52pojie（首个站点 NAV_FAIL → 等待 extension 后正常）
+
+#### 改动2: HDKYL Detect 添加 chrome-error 检测（signin-web.ps1）
+
+- **根因**：HDKYL 服务器间歇性关闭连接（ERR_CONNECTION_CLOSED），页面跳转到 `chrome-error://chromewebdata/`，Detect 缺少此检测返回 UNKNOWN
+- **修复**：Detect 添加 `location.protocol==='chrome-error:'` + `t.indexOf('无法访问此页面')>-1` + `t.indexOf('ERR_CONNECTION')>-1` 检测，返回 SERVER_ERROR
+- **影响站点**：HDKYL（UNKNOWN → SERVER_ERROR，正确报告问题）
+
+#### 改动3: UNKNOWN 重试改进（kimi-webbridge.ps1）
+
+- **根因**：v4.12.2 的 UNKNOWN 重试等待 3 秒重试 1 次，对间歇性 SPA 加载慢（如 Rousi）不够
+- **调试证据**：Rousi 09:14:59 失败（bodyText 空，`<div id="root"></div>` 未渲染），09:18:48 成功（SIGN_OK）→ 间歇性 SPA 加载慢
+- **修复**：UNKNOWN 时等待 5 秒重试 2 次（共 10 秒），给 SPA 更多渲染时间
+- **影响站点**：Rousi（间歇性 UNKNOWN → 等待后应能成功）
+
+#### 07-05 调试快照分析
+
+| 站点  | 时间     | 结果    | 页面状态                                               |
+| ----- | -------- | ------- | ------------------------------------------------------ |
+| Rousi | 09:14:59 | UNKNOWN | bodyText 空，`<div id="root"></div>` 未渲染            |
+| Rousi | 09:18:48 | SIGN_OK | bodyText 完整，含"已签到"+"连续 4 天"                  |
+| HDKYL | 09:16:54 | UNKNOWN | `chrome-error://chromewebdata/`，ERR_CONNECTION_CLOSED |
+
 ## [v4.12.2] - 2026-07-05
 
 ### 标签泄漏修复 + UNKNOWN 重试 + HDKYL Detect 优化

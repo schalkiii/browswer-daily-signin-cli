@@ -5,7 +5,7 @@ description: |
   涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、点击签到页面、
   SPA 控制台站点和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-07-05 (v4.12.2 — 标签泄漏修复 + UNKNOWN 重试 + HDKYL Detect 优化)
+updated: 2026-07-05 (v4.12.3 — extension 冷启动等待 + HDKYL chrome-error 检测 + UNKNOWN 重试改进)
 ---
 
 # PT 站点签到自动化
@@ -965,8 +965,21 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
     - **影响**：52pojie/HDClone/HHCLUB 三个站点 NAV_FAIL → 应恢复正常
     - **经验**：tab 管理操作（close_tab/navigate）失败时不能静默吞掉，应该用 `list_tabs` 验证状态并循环清理。单次 close_tab 只关闭当前活跃 tab，如果有多个残留 tab 需要循环关闭
 
-28. **SPA 页面 UNKNOWN 重试（v4.12.2）**: SPA 站点（如 Rousi）内容动态渲染，首次 Detect 运行时页面还没加载完，返回 UNKNOWN。
+28. **SPA 页面 UNKNOWN 重试（v4.12.2 → v4.12.3 改进）**: SPA 站点（如 Rousi）内容动态渲染，首次 Detect 运行时页面还没加载完，返回 UNKNOWN。
     - **根因**：SPA 框架（Vue/React）的内容是客户端渲染的，navigate 完成后页面 DOM 可能还是空的。WaitMs 12000ms 不够等待 SPA 完全渲染
-    - **修复**：Detect 返回 UNKNOWN 时，等待 3 秒后重新检测一次。如果状态变化则用新信号
-    - **影响**：Rousi（UNKNOWN → SIGN_OK，测试通过）
-    - **经验**：SPA 站点的 Detect 需要考虑渲染延迟。UNKNOWN 重试比增加 WaitMs 更高效——只对 UNKNOWN 的站点多等 3 秒，不影响已成功的站点
+    - **v4.12.2 修复**：Detect 返回 UNKNOWN 时，等待 3 秒后重新检测一次
+    - **v4.12.3 改进**：等待 3 秒重试 1 次不够（Rousi 09:14:59 失败，bodyText 空，`<div id="root"></div>` 未渲染；09:18:48 成功），改为等待 5 秒重试 2 次（共 10 秒）
+    - **影响**：Rousi（间歇性 UNKNOWN → 等待后应能成功）
+    - **经验**：SPA 站点的 Detect 需要考虑渲染延迟。UNKNOWN 重试比增加 WaitMs 更高效——只对 UNKNOWN 的站点多等，不影响已成功的站点。间歇性问题需要多次重试
+
+29. **extension 冷启动等待（v4.12.3）**: daemon 启动后 extension 需要几秒才连接，首个站点 navigate 时 extension 未就绪，返回 "no extension connected" 导致 NAV_FAIL。
+    - **根因**：`Ensure-WebBridgeDaemon` 只检测 daemon 端口监听，不检测 extension 是否已连接。daemon 启动成功 ≠ extension 已就绪
+    - **调试证据**：07-05 全量签到 52pojie（首个站点）连续 3 次 navigate 都报 "no extension connected"，但 HDKYL（第 2 个站点）重试时 extension 已连接
+    - **修复**：navigate 失败时调用 `list_tabs` 检测 extension 是否就绪，未就绪则等待 5 秒重试，最多 3 次（共 15 秒）
+    - **经验**：daemon 和 extension 是两个独立组件，daemon 启动后需要额外等待 extension 连接。首个站点的 NAV_FAIL 应该触发 extension 就绪检测，而非直接判失败
+
+30. **chrome-error 页面检测（v4.12.3）**: 服务器间歇性关闭连接（ERR_CONNECTION_CLOSED），页面跳转到 `chrome-error://chromewebdata/`，Detect 缺少此检测返回 UNKNOWN。
+    - **根因**：HDKYL 服务器间歇性关闭连接，浏览器显示 "嗯… 无法访问此页面" + "ERR_CONNECTION_CLOSED"，但 HDKYL 的 Detect 只检测签到关键词，不识别 chrome-error 页面
+    - **调试证据**：HDKYL 09:16:54 快照显示 `location.protocol === 'chrome-error:'`，bodyText 含 "无法访问此页面" 和 "ERR_CONNECTION_CLOSED"
+    - **修复**：Detect 添加 `location.protocol==='chrome-error:'` + `t.indexOf('无法访问此页面')>-1` + `t.indexOf('ERR_CONNECTION')>-1` 检测，返回 SERVER_ERROR
+    - **经验**：Detect 必须覆盖 chrome-error 页面（与 $NexusPHPSignInDetect 一致），否则服务器问题时返回 UNKNOWN 而非 SERVER_ERROR，误导调试。每个站点的独立 Detect 都应包含 chrome-error 检测

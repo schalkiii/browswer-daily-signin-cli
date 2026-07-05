@@ -141,8 +141,26 @@ function Test-WebBridgeSignIn {
     try {
         Write-Host "  [WebBridge] $SiteName : navigate -> $Url"
         $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+        # v4.12.3: extension 冷启动等待 — daemon 启动后 extension 需要几秒才连接
+        # 首个站点可能 navigate 失败，等待 extension 就绪后重试
         if (-not $nav -or -not $nav.success) {
-            return "NAV_FAIL"
+            $listCheck = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $session -TimeoutSec 5
+            if (-not $listCheck) {
+                Write-Host "  [WebBridge] $SiteName : extension 未就绪，等待重试..." -ForegroundColor Yellow
+                for ($extRetry = 0; $extRetry -lt 3; $extRetry++) {
+                    Start-Sleep -Seconds 5
+                    $listCheck = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $session -TimeoutSec 5
+                    if ($listCheck) {
+                        Write-Host "  [WebBridge] $SiteName : extension 已就绪（重试 $($extRetry+1)/3）" -ForegroundColor Green
+                        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+                        break
+                    }
+                    Write-Host "  [WebBridge] $SiteName : extension 重试 $($extRetry+1)/3 仍未就绪" -ForegroundColor Yellow
+                }
+            }
+            if (-not $nav -or -not $nav.success) {
+                return "NAV_FAIL"
+            }
         }
 
         Write-Host "  [WebBridge] $SiteName : waiting ${WaitMs}ms for page load"
@@ -190,17 +208,20 @@ function Test-WebBridgeSignIn {
             return $signal
         }
 
-        # v4.12.2: UNKNOWN 时等待 3 秒重试一次（处理 SPA 页面加载慢，如 Rousi）
+        # v4.12.3: UNKNOWN 时等待 5 秒重试 2 次（处理 SPA 页面加载慢，如 Rousi）
         # SPA 站点内容动态渲染，首次 Detect 可能页面还没加载完，等待后重新检测
         if ($signal -eq "UNKNOWN") {
-            Write-Host "  [WebBridge] $SiteName : UNKNOWN, waiting 3s for SPA to render..."
-            Start-Sleep -Seconds 3
-            $retryDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-            if ($retryDetect) {
-                $retrySig = if ($retryDetect -is [string]) { $retryDetect } elseif ($retryDetect.value) { "$($retryDetect.value)" } else { "$retryDetect" }
-                if ($retrySig -ne "UNKNOWN") {
-                    Write-Host "  [WebBridge] $SiteName : retry signal=$retrySig"
-                    $signal = $retrySig
+            for ($unkRetry = 0; $unkRetry -lt 2; $unkRetry++) {
+                Write-Host "  [WebBridge] $SiteName : UNKNOWN, waiting 5s for SPA to render (retry $($unkRetry+1)/2)..."
+                Start-Sleep -Seconds 5
+                $retryDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+                if ($retryDetect) {
+                    $retrySig = if ($retryDetect -is [string]) { $retryDetect } elseif ($retryDetect.value) { "$($retryDetect.value)" } else { "$retryDetect" }
+                    if ($retrySig -ne "UNKNOWN") {
+                        Write-Host "  [WebBridge] $SiteName : retry signal=$retrySig"
+                        $signal = $retrySig
+                        break
+                    }
                 }
             }
         }

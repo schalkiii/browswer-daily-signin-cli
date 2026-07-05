@@ -189,6 +189,8 @@ $WebSignInConfigs = @{
         Detect = @'
 (function(){
   var t = document.body.innerText||'';
+  // v4.12.3: 检测 chrome-error 页面（服务器连接关闭 ERR_CONNECTION_CLOSED 等）
+  if(location.protocol==='chrome-error:'||t.indexOf('无法访问此页面')>-1||t.indexOf('ERR_CONNECTION')>-1) return 'SERVER_ERROR';
   // v4.12.2: 添加"签到已得"关键词（HDKYL 已签到时显示"[签到已得110, 补签卡: 0]"）
   if(t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1||t.indexOf('签到已得')>-1) return 'SIGN_OK';
   if(t.indexOf('签到得')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
