@@ -5,7 +5,7 @@ description: |
   涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、点击签到页面、
   SPA 控制台站点和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-07-04 (v4.12.0 — 验证码站点改回 webbridge + CF/2FA 检测增强)
+updated: 2026-07-05 (v4.12.2 — 标签泄漏修复 + UNKNOWN 重试 + HDKYL Detect 优化)
 ---
 
 # PT 站点签到自动化
@@ -958,3 +958,15 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
     - **CF managed challenge**：title="请稍候…" + bodyText 含"正在进行安全验证"，检测 `.cf-turnstile` / `iframe[src*="challenges.cloudflare.com"]` / `[name="cf-turnstile-response"]` 元素。返回 `CF_CHALLENGE` 信号归入 capSites
     - **异地登录 2FA**：URL 跳转到 `take2fa.php`，bodyText 含"异地登录"/"两步验证"。返回 `LOGIN_REQUIRED` 触发飞书提醒
     - **经验**：Detect 不仅识别"签到状态"，还要识别"页面异常状态"（CF 拦截/2FA/登录失效/服务器错误）。否则 Click JS 在异常页面上误点导航元素，产生难以 debug 的副作用
+
+27. **标签泄漏：close_tab 失败不能静默吞掉（v4.12.2）**: `Test-WebBridgeSignIn` 用单次 `close_tab` 清理 tab，但 extension 断开时 `close_tab` 失败被 `try/catch` 静默吞掉，旧 tab 残留。重试时 `navigate newTab=$true` 创建新 tab，导致同一 URL 累积 2-3 个标签。
+    - **根因**：extension 断开时 daemon 返回 `{"ok":false,"error":{"code":"tool_error","message":"no extension connected"}}`，但代码用 `try { close_tab } catch {}` 吞掉了错误
+    - **修复**：新增 `Clear-WebBridgeTabs` 函数，用 `list_tabs` 循环检查 + `close_tab` 逐个关闭，最多清理 10 个残留 tab。`Test-WebBridgeSignIn` 中 3 处单次 `close_tab`（开始/evaluate 重试/finally）全部替换
+    - **影响**：52pojie/HDClone/HHCLUB 三个站点 NAV_FAIL → 应恢复正常
+    - **经验**：tab 管理操作（close_tab/navigate）失败时不能静默吞掉，应该用 `list_tabs` 验证状态并循环清理。单次 close_tab 只关闭当前活跃 tab，如果有多个残留 tab 需要循环关闭
+
+28. **SPA 页面 UNKNOWN 重试（v4.12.2）**: SPA 站点（如 Rousi）内容动态渲染，首次 Detect 运行时页面还没加载完，返回 UNKNOWN。
+    - **根因**：SPA 框架（Vue/React）的内容是客户端渲染的，navigate 完成后页面 DOM 可能还是空的。WaitMs 12000ms 不够等待 SPA 完全渲染
+    - **修复**：Detect 返回 UNKNOWN 时，等待 3 秒后重新检测一次。如果状态变化则用新信号
+    - **影响**：Rousi（UNKNOWN → SIGN_OK，测试通过）
+    - **经验**：SPA 站点的 Detect 需要考虑渲染延迟。UNKNOWN 重试比增加 WaitMs 更高效——只对 UNKNOWN 的站点多等 3 秒，不影响已成功的站点

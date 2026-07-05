@@ -1,5 +1,41 @@
 # Changelog
 
+## [v4.12.2] - 2026-07-05
+
+### 标签泄漏修复 + UNKNOWN 重试 + HDKYL Detect 优化
+
+基于 07-05 全量签到结果（30 成功/12 失败）的针对性优化。3 个 NAV_FAIL 站点（52pojie/HDClone/HHCLUB）的根因是标签泄漏，2 个 UNKNOWN 站点（HDKYL/Rousi）的根因是 Detect 逻辑缺陷。
+
+#### 改动1: 标签泄漏修复（kimi-webbridge.ps1）
+
+- **根因**：`Test-WebBridgeSignIn` 用单次 `close_tab` 清理 tab，但 extension 断开时 `close_tab` 失败被 `try/catch` 静默吞掉，旧 tab 残留。重试时 `navigate newTab=$true` 创建新 tab，导致同一 URL 累积多个标签
+- **修复**：新增 `Clear-WebBridgeTabs` 函数，用 `list_tabs` 循环检查 + `close_tab` 逐个关闭，最多清理 10 个残留 tab
+- **替换**：`Test-WebBridgeSignIn` 中 3 处单次 `close_tab`（开始/evaluate 重试/finally）全部替换为 `Clear-WebBridgeTabs`
+- **影响站点**：52pojie/HDClone/HHCLUB（NAV_FAIL → 应恢复正常）
+
+#### 改动2: UNKNOWN 重试逻辑（kimi-webbridge.ps1）
+
+- **根因**：SPA 站点（如 Rousi）内容动态渲染，首次 Detect 运行时页面还没加载完，返回 UNKNOWN
+- **修复**：Detect 返回 UNKNOWN 时，等待 3 秒后重新检测一次。如果状态变化则用新信号
+- **影响站点**：Rousi（UNKNOWN → SIGN_OK，测试通过）
+
+#### 改动3: HDKYL Detect 优化（signin-web.ps1）
+
+- **根因**：HDKYL 已签到时显示"[签到已得110, 补签卡: 0]"，原 Detect 缺少"签到已得"关键词匹配
+- **修复**：Detect 添加 `t.indexOf('签到已得')>-1` 匹配
+- **影响站点**：HDKYL（UNKNOWN → SIGN_OK，被 CF 临时拦截待验证）
+
+#### 07-05 全量签到失败站点分析
+
+| 站点                        | Signal       | 根因             | 处理                    |
+| --------------------------- | ------------ | ---------------- | ----------------------- |
+| 52pojie/HDClone/HHCLUB      | NAV_FAIL     | 标签泄漏         | 已修复（v4.12.2 改动1） |
+| HDKYL                       | UNKNOWN      | Detect 缺关键词  | 已修复（v4.12.2 改动3） |
+| Rousi                       | UNKNOWN      | SPA 加载慢       | 已修复（v4.12.2 改动2） |
+| DepthStudio/xloli/audiences | CF_CHALLENGE | CF 拦截          | 无法自动修复，等待恢复  |
+| Moment/ptlao                | SERVER_ERROR | 服务器错误       | 无法自动修复，等待恢复  |
+| vclib/521                   | NEED_SIGN    | 验证码扩展未填入 | 需用户确认扩展配置      |
+
 ## [v4.12.1] - 2026-07-04
 
 ### 项目目录整理 + 英文版 skill 同步

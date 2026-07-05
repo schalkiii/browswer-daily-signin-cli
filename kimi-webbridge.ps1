@@ -83,6 +83,38 @@ function Invoke-WebBridgeCommand {
     }
 }
 
+# 循环关闭 session 下所有 tab，避免标签累积泄漏
+# 返回关闭的 tab 数量；extension 未连接时返回 -1
+function Clear-WebBridgeTabs {
+    param(
+        [string]$Session = "daily-signin",
+        [int]$MaxClose = 10
+    )
+    $closedCount = 0
+    for ($i = 0; $i -lt $MaxClose; $i++) {
+        try {
+            $listResp = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
+            if (-not $listResp -or -not $listResp.tabs -or $listResp.tabs.Count -eq 0) {
+                break
+            }
+            $tabCount = $listResp.tabs.Count
+            if ($i -eq 0 -and $tabCount -gt 1) {
+                Write-Host "  [WebBridge] 检测到 $tabCount 个残留 tab，开始清理..." -ForegroundColor Yellow
+            }
+            $closeResp = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{} -Session $Session -TimeoutSec 5
+            if (-not $closeResp) {
+                # close_tab 失败（可能是 extension 未连接），停止循环
+                if ($closedCount -eq 0) { return -1 }
+                break
+            }
+            $closedCount++
+        } catch {
+            break
+        }
+    }
+    return $closedCount
+}
+
 function Test-WebBridgeSignIn {
     param(
         [string]$SiteName,
@@ -99,8 +131,12 @@ function Test-WebBridgeSignIn {
     )
     $session = "daily-signin"
 
-    # 清理上一站点或上一次重试残留的 tab，避免标签累积
-    try { $null = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{} -Session $session -TimeoutSec 5 } catch {}
+    # v4.12.2: 循环关闭 session 下所有残留 tab，避免标签累积泄漏
+    # 旧版单次 close_tab 在 extension 断开时失败，导致旧 tab 残留，重试时新 tab 累积
+    $cleared = Clear-WebBridgeTabs -Session $session
+    if ($cleared -gt 0) {
+        Write-Host "  [WebBridge] $SiteName : 清理 $cleared 个残留 tab" -ForegroundColor DarkGray
+    }
 
     try {
         Write-Host "  [WebBridge] $SiteName : navigate -> $Url"
@@ -122,9 +158,9 @@ function Test-WebBridgeSignIn {
         $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
         if (-not $detect) {
             # evaluate 失败常见于 tab 丢失（webbridge daemon bug: navigate 返回 success 但 tab 在等待期间消失）
-            # 修复：重新 navigate + evaluate 一次
+            # 修复：清理所有残留 tab 后重新 navigate + evaluate 一次
             Write-Host "  [WebBridge] $SiteName : evaluate failed (tab may be lost), retrying navigate..."
-            try { $null = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{} -Session $session -TimeoutSec 5 } catch {}
+            $null = Clear-WebBridgeTabs -Session $session
             $navRetry = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
             if ($navRetry -and $navRetry.success) {
                 Start-Sleep -Milliseconds $WaitMs
@@ -152,6 +188,21 @@ function Test-WebBridgeSignIn {
         if ($signal -match "LOGIN_REQUIRED|SLIDER|CAPTCHA") {
             Save-DebugSnapshot $SiteName $session $signal $DebugDir $SaveDebugSnapshot
             return $signal
+        }
+
+        # v4.12.2: UNKNOWN 时等待 3 秒重试一次（处理 SPA 页面加载慢，如 Rousi）
+        # SPA 站点内容动态渲染，首次 Detect 可能页面还没加载完，等待后重新检测
+        if ($signal -eq "UNKNOWN") {
+            Write-Host "  [WebBridge] $SiteName : UNKNOWN, waiting 3s for SPA to render..."
+            Start-Sleep -Seconds 3
+            $retryDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+            if ($retryDetect) {
+                $retrySig = if ($retryDetect -is [string]) { $retryDetect } elseif ($retryDetect.value) { "$($retryDetect.value)" } else { "$retryDetect" }
+                if ($retrySig -ne "UNKNOWN") {
+                    Write-Host "  [WebBridge] $SiteName : retry signal=$retrySig"
+                    $signal = $retrySig
+                }
+            }
         }
 
         if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
@@ -213,8 +264,8 @@ function Test-WebBridgeSignIn {
         return $signal
     }
     finally {
-        # 函数结束关闭本站点 tab，确保不残留给下一个站点
-        try { $null = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{} -Session $session -TimeoutSec 5 } catch {}
+        # 函数结束清理本站点所有 tab，确保不残留给下一个站点
+        $null = Clear-WebBridgeTabs -Session $session
     }
 }
 
