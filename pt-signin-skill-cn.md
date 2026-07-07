@@ -15,21 +15,23 @@ updated: 2026-07-07 (v4.12.6 — CDP Shadow DOM 穿透 + NexusPHPSignInDetect cf
 ```powershell
 cd d:\workspace\browswer-daily-signin-cli
 
-# 全量批处理: 41 个 webbridge 站点 + 11 个人工站点, 约 15-25 分钟
+# 全量批处理: 43 个 webbridge 站点 + 6 个人工站点, 约 15-25 分钟
 .\signin-batch.ps1
 ```
 
-## 覆盖范围 (v4.10.1+ — 单 webbridge 后端)
+## 覆盖范围 (v4.12.6 — 单 webbridge 后端)
 
-| 类别                            | 数量   | 描述                       |
-| ------------------------------- | ------ | -------------------------- |
-| webbridge (NexusPHP attendance) | 15     | 访问即签到 (Click=$null)   |
-| webbridge (JS 点击签到)         | 17     | 点击按钮 + 重检（论坛/PT） |
-| webbridge (SPA 控制台)          | 9      | 登录态保持即视为成功       |
-| webbridge (仅访问)              | 7      | 纯浏览类站点，不检测签到   |
-| webbridge (特殊 URL)            | 1      | 13City (attendance.php)    |
-| manual（验证码/政策原因）       | 4      | 需人工交互                 |
-| **总计**                        | **52** | 全部书签站点均尝试         |
+| 类别                                | 数量   | 描述                                             |
+| ----------------------------------- | ------ | ------------------------------------------------ |
+| webbridge (NexusPHP attendance)     | 12     | 访问即签到 (Click=$null)                         |
+| webbridge (NexusPHP + CF Turnstile) | 3      | CF 通过后提交 attendance 表单（v4.12.5+）        |
+| webbridge (NexusPHP + 验证码)       | 2      | Click JS 轮询 imagestring（v4.12.0+，vclib/521） |
+| webbridge (论坛/JS 点击签到)        | 14     | 点击按钮 + 重检（论坛/PT）                       |
+| webbridge (SPA 控制台)              | 4      | 登录态保持即视为成功                             |
+| webbridge (SPA + ALTCHA)            | 1      | 两阶段 Click：ALTCHA + 签到（v4.12.6+，Yemapt）  |
+| webbridge (仅访问)                  | 7      | 纯浏览类站点，不检测签到                         |
+| manual（验证码/政策原因）           | 6      | 需人工交互                                       |
+| **总计**                            | **49** | 全部书签站点均尝试                               |
 
 ### sites.json 字段定义
 
@@ -64,11 +66,13 @@ cd d:\workspace\browswer-daily-signin-cli
 | `iterations.json`       | 自迭代日志（运行时，.gitignore 排除）                | 运行时 |
 | `signin-log.json`       | 每次运行结果日志（运行时，.gitignore 排除）          | 运行时 |
 | `sync-log.json`         | 书签同步日志（运行时，.gitignore 排除）              | 运行时 |
+| `CHANGELOG.md`          | 版本变更日志                                         | 是     |
+| `README.md`             | 项目说明                                             | 是     |
 | `.gitignore`            | Git 忽略规则                                         | 是     |
 | `pt-signin-skill.md`    | 技能文档（英文）                                     | 是     |
 | `pt-signin-skill-cn.md` | 技能文档（中文）                                     | 是     |
 
-所有调试/临时脚本（`debug-browser*.ps1`、`fix-encoding.ps1`、`test-browser.ps1`、`check-syntax.ps1`）必须在稳定化后删除。批处理脚本会在每次运行开始时自动清理 `web-articles/`。
+所有调试/临时脚本（`debug-*.ps1`、`_tmp_*.ps1`、`fix-encoding.ps1`、`test-browser.ps1`、`check-syntax.ps1`）必须在稳定化后删除。批处理脚本会在每次运行开始时自动清理 `web-articles/`。`debug-snapshots/` 和 `debug-shots/` 为运行时快照目录（.gitignore 排除），应定期清理旧快照。
 
 ### JSON BOM 容错
 
@@ -193,7 +197,7 @@ v4.10 起所有非 manual 站点统一走 `webbridge` strategy。差异化由 `s
 ```
 [PASS] PT Sign-in Report
 Time: 2026-05-24 10:15:00
-Total: 51 sites | Baseline: 24
+Total: 49 sites | Baseline: 49
 Auto: 30/49 OK | 19 FAIL (19 new) | Manual: 2 SKIP | 15.3min
 [NEW] +6 site(s) added to baseline: HDKYL, PigGo, Srvfi, ...
 [REGR] 1 baseline site(s) failed: UBits
@@ -831,11 +835,11 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
 3. 查看 `baseline.json` — 了解哪些站点预期会成功
 4. 验证工作目录仅有目录清理规范中列出的 10 个核心文件
 5. 确保 `sites.json` 在解析前已剥离 BOM
-6. **关键**：不要按基线筛选站点。尝试全部 51 个站点。
+6. **关键**：不要按基线筛选站点。尝试全部 49 个站点。
 
 ### 阶段 2: 执行
 
-7. 运行 `.\signin-batch.ps1` — 按顺序处理全部 51 个站点
+7. 运行 `.\signin-batch.ps1` — 按顺序处理全部 49 个站点
 8. 脚本在启动时自动清理 `web-articles/`，运行中生成新的文章目录
 9. 自迭代在失败时触发：Token 刷新、web-read 回退、模式发现
 10. 每个站点结果与基线对照，检测回归/新成功
@@ -893,7 +897,7 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
 8. **策略选择需考虑政策因素**: 部分站点（52pojie）明确禁止自动化。尊重这些政策：标记为 `manual` 并附带清晰的 `reason` 字段说明为何不尝试自动化。避免浪费调试精力并防止账户风险。
 9. **退出码语义很重要**: 人工跳过不算失败 — 退出码和报告的 PASS/FAIL 应仅反映自动化站点结果。将人工和自动化计数混在一起会产生误导性报告，暗示本来不存在的失败。使用 `$autoTotal = $total - $manual` 计算准确比例。
 10. **运行后工作流是强制性的**: 每次成功运行必须以以下步骤结束：报告生成 → 飞书推送 → 目录清理 → 技能文档更新 → 中文版同步。跳过任何一步都会使系统处于不完整状态，影响下一次运行。
-11. **基线是参考，不是过滤器**: 不要因为站点不在基线中就跳过它。每次运行尝试全部 51 个站点。基线的作用是检测回归，而不是削减测试集。
+11. **基线是参考，不是过滤器**: 不要因为站点不在基线中就跳过它。每次运行尝试全部 49 个站点。基线的作用是检测回归，而不是削减测试集。
 12. **基线增量增长是目标**: 每个首次成功的站点都是胜利。基线应单调增长 — 庆祝每次新增并记录到 `baseline.json`。
 13. **回归是最高优先级的 bug**: 基线中的站点如果失败，意味着某些东西坏了（CF 升级、Token 过期、登录失效）。必须在下次运行前诊断并修复。在飞书中显著报告 `[REGR]`。
 14. **探索性失败是正常的**: 尚未加入基线的新站点首次尝试很可能会失败。这些是发现机会，不是 bug。报告为 `FAIL (N new)` 以区别于回归。

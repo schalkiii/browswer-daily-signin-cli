@@ -15,21 +15,23 @@ updated: 2026-07-07 (v4.12.6 — CDP Shadow DOM piercing + NexusPHPSignInDetect 
 ```powershell
 cd d:\workspace\browswer-daily-signin-cli
 
-# Full batch: 42 webbridge + 7 manual sites (~15-20min)
+# Full batch: 43 webbridge + 6 manual sites (~15-25min)
 .\signin-batch.ps1
 ```
 
-## Coverage (v4.12.0 — single webbridge backend)
+## Coverage (v4.12.6 — single webbridge backend)
 
-| Category                        | Count  | Description                                                                    |
-| ------------------------------- | ------ | ------------------------------------------------------------------------------ |
-| webbridge (NexusPHP attendance) | 15     | Visit = sign-in (Click=$null)                                                  |
-| webbridge (JS click sign-in)    | 17     | Click button + re-detect (forums/tracker)                                      |
-| webbridge (SPA console)         | 9      | Login state = success (API consoles)                                           |
-| webbridge (visit-only)          | 7      | Pure visit, no sign-in detection                                               |
-| webbridge (NexusPHP + captcha)  | 2      | Click JS polls imagestring for browser extension to fill (v4.12.0+: vclib/521) |
-| manual (captcha / policy)       | 7      | Requires human interaction                                                     |
-| **Total**                       | **49** | All bookmark sites attempted                                                   |
+| Category                            | Count  | Description                                                                    |
+| ----------------------------------- | ------ | ------------------------------------------------------------------------------ |
+| webbridge (NexusPHP attendance)     | 12     | Visit = sign-in (Click=$null)                                                  |
+| webbridge (NexusPHP + CF Turnstile) | 3      | Submit attendance form after CF passes (v4.12.5+: DepthStudio/xloli/audiences) |
+| webbridge (NexusPHP + captcha)      | 2      | Click JS polls imagestring for browser extension to fill (v4.12.0+: vclib/521) |
+| webbridge (JS click sign-in)        | 14     | Click button + re-detect (forums/tracker)                                      |
+| webbridge (SPA console)             | 4      | Login state = success (API consoles)                                           |
+| webbridge (SPA + ALTCHA)            | 1      | Two-phase Click: ALTCHA + sign-in (v4.12.6+: Yemapt)                           |
+| webbridge (visit-only)              | 7      | Pure visit, no sign-in detection                                               |
+| manual (captcha / policy)           | 6      | Requires human interaction                                                     |
+| **Total**                           | **49** | All bookmark sites attempted                                                   |
 
 **Key Rule: Attempt ALL sites in the bookmark folder, not just previously successful ones.**
 Use the baseline (`baseline.json`) as a reference for which sites _should_ succeed — regressions are real bugs. Sites not in baseline are exploratory opportunities.
@@ -64,11 +66,13 @@ Before every batch run, the working directory must contain **only these files**:
 | `iterations.json`       | Self-iteration log (runtime, gitignored)                         | Runtime    |
 | `signin-log.json`       | Per-run result log (runtime, gitignored)                         | Runtime    |
 | `sync-log.json`         | Bookmark sync log (runtime, gitignored)                          | Runtime    |
+| `CHANGELOG.md`          | Version changelog                                                | Yes        |
+| `README.md`             | Project README                                                   | Yes        |
 | `.gitignore`            | Git ignore rules                                                 | Yes        |
 | `pt-signin-skill.md`    | Skill doc (English)                                              | Yes        |
 | `pt-signin-skill-cn.md` | Skill doc (Chinese)                                              | Yes        |
 
-All debug/temp scripts (`debug-browser*.ps1`, `fix-encoding.ps1`, `test-browser.ps1`, `check-syntax.ps1`) must be deleted after stabilization. The batch script auto-clears `web-articles/` at the start of each run.
+All debug/temp scripts (`debug-*.ps1`, `_tmp_*.ps1`, `fix-encoding.ps1`, `test-browser.ps1`, `check-syntax.ps1`) must be deleted after stabilization. The batch script auto-clears `web-articles/` at the start of each run. `debug-snapshots/` and `debug-shots/` are runtime snapshot dirs (gitignored); old snapshots should be cleaned periodically.
 
 ### JSON BOM Resilience
 
@@ -189,7 +193,7 @@ The baseline (`baseline.json`) records every site that has **ever succeeded** in
 ```
 [PASS] PT Sign-in Report
 Time: 2026-05-24 10:15:00
-Total: 51 sites | Baseline: 24
+Total: 49 sites | Baseline: 49
 Auto: 30/49 OK | 19 FAIL (19 new) | Manual: 2 SKIP | 15.3min
 [NEW] +6 site(s) added to baseline: HDKYL, PigGo, Srvfi, ...
 [REGR] 1 baseline site(s) failed: UBits

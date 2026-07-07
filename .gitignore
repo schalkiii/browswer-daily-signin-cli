@@ -17,6 +17,7 @@ iterations.json
 
 # Trae 工作目录
 .trae/
+.uploads/
 
 # 操作系统
 Thumbs.db
