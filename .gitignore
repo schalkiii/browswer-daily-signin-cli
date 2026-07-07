@@ -4,6 +4,7 @@ config.json
 # 运行时中间产物
 web-articles/
 debug-snapshots/
+debug-shots/
 *.log
 
 # 运行时日志（签到结果、书签同步日志、自迭代历史，每次运行动态生成）

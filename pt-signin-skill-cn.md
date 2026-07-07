@@ -5,7 +5,7 @@ description: |
   涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、点击签到页面、
   SPA 控制台站点和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-07-05 (v4.12.3 — extension 冷启动等待 + HDKYL chrome-error 检测 + UNKNOWN 重试改进)
+updated: 2026-07-07 (v4.12.6 — CDP Shadow DOM 穿透 + NexusPHPSignInDetect cfTokenPassed 修复 + Yemapt ALTCHA 适配)
 ---
 
 # PT 站点签到自动化
@@ -983,3 +983,48 @@ browser-open 站点返回 UNKNOWN 或 NO_DETECT 时：
     - **调试证据**：HDKYL 09:16:54 快照显示 `location.protocol === 'chrome-error:'`，bodyText 含 "无法访问此页面" 和 "ERR_CONNECTION_CLOSED"
     - **修复**：Detect 添加 `location.protocol==='chrome-error:'` + `t.indexOf('无法访问此页面')>-1` + `t.indexOf('ERR_CONNECTION')>-1` 检测，返回 SERVER_ERROR
     - **经验**：Detect 必须覆盖 chrome-error 页面（与 $NexusPHPSignInDetect 一致），否则服务器问题时返回 UNKNOWN 而非 SERVER_ERROR，误导调试。每个站点的独立 Detect 都应包含 chrome-error 检测
+
+31. **CF Turnstile closed Shadow DOM 需 CDP 穿透（v4.12.6）**: CF Turnstile 使用 `attachShadow({mode:'closed'})` 封装 iframe，JS `evaluate` 永远看不到内部 checkbox，必须用 CDP（Chrome DevTools Protocol）穿透。
+    - **根因**：closed shadow DOM 是浏览器安全边界，`document.querySelector` 返回 null，`element.shadowRoot` 也是 null。旧版 `Invoke-CfVerifyClick` 通过 DOM 查找 widget 必然返回 `cdp:no-widget`
+    - **修复**：`Invoke-CfVerifyClick` 完全重写为 CDP 方案
+      1. `DOM.describeNode(pierce=true)` 穿透 closed shadow DOM 定位 CF iframe 节点
+      2. `Input.dispatchMouseEvent` 模拟三步点击：`mouseMoved` → `mousePressed` → `mouseReleased`
+      3. 点击坐标取 iframe 左侧约 24px 处（checkbox 实际位置，非中心点）
+    - **辅助**：navigate 后调用 `Page.bringToFront` 让标签页获得焦点（CF Turnstile 需要页面有焦点才渲染 iframe）
+    - **经验**：浏览器扩展的 `evaluate` 受 same-origin policy 和 shadow DOM 边界限制。closed shadow DOM 必须用 CDP 的 `pierce=true` 穿透，这是唯一能在用户态绕过 shadow DOM 边界的方法
+
+32. **NexusPHPSignInDetect cfTokenPassed 修复（v4.12.6）**: CF 通过后 `.cf-turnstile` div 仍在 DOM 中，`attendance-captcha-table` label 含"安全验证"文本，旧逻辑误判为 CF_CHALLENGE → 无限重试。
+    - **根因**：CF token 通过后不会移除 widget，而是保留 div + 清空 token。旧 Detect 检查到 `.cf-turnstile` 存在就返回 CF_CHALLENGE，没区分"widget 存在但 token 已通过"的状态
+    - **修复**：检查 `input[name="cf-turnstile-response"]` token 是否填入
+      - token 未填入 + CF widget 存在 → 返回 `CF_CHALLENGE`（真实未通过）
+      - token 已填入 → 设 `cfTokenPassed=true`，跳过下方 CF 文本检测
+    - **CF 重试循环修复**：`Test-CfTurnstilePassed` 返回 `no-cf` 也触发重新检测（widget 被移除、token 被清空的状态），旧逻辑只在 `passed:` 时重新检测会漏判
+    - **经验**：CF Turnstile 通过后的页面状态有三种：widget+token（passed:）、widget 被移除（no-cf）、widget+token 清空（pending）。Detect 必须区分这三种状态，不能只看 widget 是否存在
+
+33. **Yemapt ALTCHA proof-of-work 适配（v4.12.6）**: Yemapt 使用 ALTCHA 验证机制（基于 proof-of-work），点击"立即签到"前需先处理 ALTCHA checkbox，否则 NEED_SIGN。
+    - **根因**：ALTCHA 是基于 PoW 的验证机制，用户点击 checkbox 后 widget 异步计算 PoW（约 5-10 秒），计算完成才算验证通过。旧 Click JS 直接点击签到按钮，ALTCHA 未验证 → 服务端拒绝
+    - **识别**：ALTCHA widget 的 class 是 `altcha-checkbox-wrap` / `altcha-widget`，checkbox 是 `input[type="checkbox"]` 或 `[role="checkbox"]`
+    - **修复**：Click JS 重写为两阶段流程
+      1. 检查 ALTCHA checkbox 是否存在且未验证 → 点击 checkbox
+      2. `setInterval` 每 1 秒轮询 PoW 计算完成（检查 `altchaCheckbox.checked` 或 `.altcha-verified` class，最多 12 秒）→ 自动点击签到按钮
+    - **调优**：`PostClickMs` 从 8000 增加到 15000（ALTCHA 轮询 + 签到按钮等待）
+    - **经验**：异步验证机制（ALTCHA/reCAPTCHA v3）需要在 Click JS 中用 setInterval 轮询验证状态，不能假设点击后立即通过。`PostClickMs` 必须大于验证最长耗时 + 签到按钮点击后等待
+
+34. **NexusPHPCfSignInClick 通用 Click 模板（v4.12.5）**: NexusPHP + CF Turnstile 站点在 CF 通过后需要提交 attendance 表单，新增通用 Click JS 模板减少重复。
+    - **背景**：DepthStudio/xloli/audiences 三个站点都是 NexusPHP attendance.php + CF Turnstile，CF 通过后 token 自动填入 `cf-turnstile-response` hidden input，但需要点击 submit 按钮提交表单
+    - **模板流程**：检查 token 已填入 → 找 `form[action*="attendance"]` → 找 `input[type=submit][value*="签到"]` → `submit.click()`
+    - **失败信号**：`CF_NOT_PASSED`（token 未填入）/ `NO_FORM`（找不到表单）/ `NO_SUBMIT`（找不到提交按钮）
+    - **经验**：NexusPHP attendance.php 站点的表单结构高度一致，可以抽取通用 Click 模板。CF 通过后的签到流程 = 提交 attendance 表单，与无 CF 站点的"点击按钮"逻辑相同，只是多了一步 token 检查
+
+35. **CF Turnstile 检测 CDP 自动化行为（v4.12.6 已知限制）**: CDP `Input.dispatchMouseEvent` 模拟的鼠标点击会被 CF Turnstile 检测，token 不填入。
+    - **症状**：DepthStudio/xloli CDP 点击成功（`cdp:clicked:(730,457)`），但 CF state 一直 `pending:cf-text`（之前测试是 `passed:...`）
+    - **根因**：CF Turnstile 检测鼠标事件的 `isTrusted` 标志、事件序列完整性、鼠标轨迹随机性等特征。CDP `Input.dispatchMouseEvent` 生成的事件 `isTrusted=false`，被 CF 识别为自动化
+    - **未修复**：需要用户确认是否改回 manual。可能的替代方案：(a) 用 `Input.synthesizePinchGesture` / `Input.emulateTouchFromMouseEvent`；(b) 用 `Input.insertText` + 焦点切换；(c) 直接调用 CF 的 callback 函数（需 reverse engineering）
+    - **经验**：CDP 不是万能的，CF Turnstile 是当前最难绕过的反自动化机制之一。真实浏览器点击（用户手动）和 CDP 点击有本质区别，`isTrusted` 标志无法伪造。当自动化检测过强时，应果断转为 manual 避免浪费调试时间
+
+36. **webbridge daemon 30s 页面加载超时（v4.12.6 已知限制）**: webbridge daemon 内部有 30s 页面加载超时，不受 `NavTimeoutSec` 控制，导致多个站点 NAV_FAIL。
+    - **症状**：Moment/audiences/invites 三个站点 navigate 报 `extension_error: navigate: page load timeout (30s)`，重试 2 次仍失败
+    - **根因**：webbridge daemon 的 navigate 命令内部硬编码 30s 超时，`NavTimeoutSec` 参数只控制 PowerShell `Invoke-RestMethod` 的超时，不影响 daemon 内部
+    - **影响站点**：服务器响应慢（Moment/ptlao）或 CF 拦截加载慢（audiences）的站点
+    - **未修复**：需要修改 webbridge daemon 源码（kimi-webbridge.exe），或等待上游更新。当前缓解：站点级 `WaitMs` 配置 + 重试逻辑
+    - **经验**：第三方工具的内部限制（如硬编码超时）是自动化的常见瓶颈。调试时应区分"脚本逻辑问题"和"工具限制问题"——前者可修复，后者只能绕过或等待上游更新

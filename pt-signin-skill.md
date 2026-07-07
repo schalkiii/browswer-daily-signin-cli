@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, click-to-sign pages,
   SPA console sites, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-07-04 (v4.12.0 — display_name field + Feishu clickable links + captcha-extension polling + CF/2FA detection)
+updated: 2026-07-07 (v4.12.6 — CDP Shadow DOM piercing + NexusPHPSignInDetect cfTokenPassed fix + Yemapt ALTCHA adaptation)
 ---
 
 # PT Site Sign-in Automation
@@ -1028,3 +1028,48 @@ Every sign-in session must follow this complete workflow. No step may be skipped
     - **CF managed challenge**: title="请稍候…" + bodyText contains "正在进行安全验证". Detect `.cf-turnstile` / `iframe[src*="challenges.cloudflare.com"]` / `[name="cf-turnstile-response"]` elements. Returns `CF_CHALLENGE` signal, classified into capSites.
     - **Remote-login 2FA**: URL redirects to `take2fa.php`, bodyText contains "异地登录" (remote login) / "两步验证" (2FA). Returns `LOGIN_REQUIRED` signal, triggers Feishu alert for manual handling.
     - **Lesson**: Detect JS should identify not only "sign-in status" but also "page abnormal states" (CF block / 2FA / login expired / server error). Otherwise Click JS misfires on navigation elements on abnormal pages, producing hard-to-debug side effects.
+
+43. **CF Turnstile closed Shadow DOM requires CDP piercing (v4.12.6)**: CF Turnstile uses `attachShadow({mode:'closed'})` to encapsulate the iframe; JS `evaluate` can never see the internal checkbox. Must use CDP (Chrome DevTools Protocol) to pierce through.
+    - **Root cause**: closed shadow DOM is a browser security boundary — `document.querySelector` returns null, `element.shadowRoot` is also null. The old `Invoke-CfVerifyClick` always returned `cdp:no-widget` because it tried DOM lookup.
+    - **Fix**: `Invoke-CfVerifyClick` fully rewritten as CDP scheme:
+      1. `DOM.describeNode(pierce=true)` pierces closed shadow DOM to locate CF iframe node
+      2. `Input.dispatchMouseEvent` simulates 3-step click: `mouseMoved` → `mousePressed` → `mouseReleased`
+      3. Click coordinates take iframe left side ~24px (checkbox actual position, not center)
+    - **Auxiliary**: After navigate, call `Page.bringToFront` to focus the tab (CF Turnstile requires page focus to render iframe)
+    - **Lesson**: Browser extension `evaluate` is constrained by same-origin policy and shadow DOM boundaries. Closed shadow DOM must use CDP's `pierce=true` — this is the only user-mode way to bypass the shadow DOM boundary.
+
+44. **NexusPHPSignInDetect cfTokenPassed fix (v4.12.6)**: After CF passes, `.cf-turnstile` div remains in DOM and `attendance-captcha-table` label contains "安全验证" text — old logic misidentified as CF_CHALLENGE → infinite retry.
+    - **Root cause**: CF token passage does not remove the widget; it keeps the div and clears the token. Old Detect returned CF_CHALLENGE on `.cf-turnstile` presence, without distinguishing "widget exists but token already passed" state.
+    - **Fix**: Check `input[name="cf-turnstile-response"]` token fill state:
+      - Token empty + CF widget present → return `CF_CHALLENGE` (truly not passed)
+      - Token filled → set `cfTokenPassed=true`, skip CF text detection below
+    - **CF retry loop fix**: `Test-CfTurnstilePassed` returning `no-cf` also triggers re-detection (widget removed, token cleared state); old logic only re-detected on `passed:`, missing this case.
+    - **Lesson**: CF Turnstile post-pass page state has three variants: widget+token (passed:), widget removed (no-cf), widget+token cleared (pending). Detect must distinguish all three, not just check widget presence.
+
+45. **Yemapt ALTCHA proof-of-work adaptation (v4.12.6)**: Yemapt uses ALTCHA verification (proof-of-work based); must handle ALTCHA checkbox before clicking "立即签到" sign-in button, otherwise NEED_SIGN.
+    - **Root cause**: ALTCHA is a PoW-based verification; after the user clicks the checkbox, the widget asynchronously computes PoW (~5-10 seconds). Only after computation completes is verification considered passed. Old Click JS directly clicked the sign-in button → ALTCHA unverified → server rejected.
+    - **Identification**: ALTCHA widget class is `altcha-checkbox-wrap` / `altcha-widget`; checkbox is `input[type="checkbox"]` or `[role="checkbox"]`.
+    - **Fix**: Click JS rewritten as two-phase flow:
+      1. Check ALTCHA checkbox exists and unverified → click checkbox
+      2. `setInterval` polls PoW completion every 1 second (check `altchaCheckbox.checked` or `.altcha-verified` class, max 12 seconds) → auto-click sign-in button
+    - **Tuning**: `PostClickMs` increased from 8000 to 15000 (ALTCHA polling + sign-in button wait).
+    - **Lesson**: Async verification mechanisms (ALTCHA/reCAPTCHA v3) need setInterval polling in Click JS for verification state, not assuming immediate pass after click. `PostClickMs` must exceed max verification time + sign-in button click wait.
+
+46. **NexusPHPCfSignInClick universal Click template (v4.12.5)**: NexusPHP + CF Turnstile sites need to submit attendance form after CF passes; new universal Click JS template reduces duplication.
+    - **Background**: DepthStudio/xloli/audiences are all NexusPHP attendance.php + CF Turnstile. After CF passes, token auto-fills `cf-turnstile-response` hidden input, but submit button must be clicked to submit the form.
+    - **Template flow**: Check token filled → find `form[action*="attendance"]` → find `input[type=submit][value*="签到"]` → `submit.click()`.
+    - **Failure signals**: `CF_NOT_PASSED` (token not filled) / `NO_FORM` (form not found) / `NO_SUBMIT` (submit button not found).
+    - **Lesson**: NexusPHP attendance.php sites have highly consistent form structures, so a universal Click template can be extracted. The post-CF sign-in flow = submit attendance form, identical to "click button" logic for non-CF sites, just with an extra token check.
+
+47. **CF Turnstile detects CDP automation (v4.12.6 known limitation)**: CDP `Input.dispatchMouseEvent` simulated clicks are detected by CF Turnstile; token is not filled.
+    - **Symptom**: DepthStudio/xloli CDP click succeeds (`cdp:clicked:(730,457)`), but CF state stays `pending:cf-text` (earlier tests showed `passed:...`).
+    - **Root cause**: CF Turnstile detects mouse event `isTrusted` flag, event sequence completeness, mouse trajectory randomness, etc. CDP `Input.dispatchMouseEvent` generates events with `isTrusted=false`, identified as automation by CF.
+    - **Not fixed**: Need user confirmation whether to revert to manual. Possible alternatives: (a) `Input.synthesizePinchGesture` / `Input.emulateTouchFromMouseEvent`; (b) `Input.insertText` + focus switch; (c) directly invoke CF callback functions (requires reverse engineering).
+    - **Lesson**: CDP is not omnipotent; CF Turnstile is one of the hardest anti-automation mechanisms to bypass today. Real browser clicks (manual) and CDP clicks are fundamentally different — `isTrusted` flag cannot be forged. When automation detection is too strong, decisively switch to manual to avoid wasting debug time.
+
+48. **webbridge daemon 30s page load timeout (v4.12.6 known limitation)**: webbridge daemon has an internal 30s page load timeout, not controlled by `NavTimeoutSec`, causing NAV_FAIL on multiple sites.
+    - **Symptom**: Moment/audiences/invites navigate reports `extension_error: navigate: page load timeout (30s)`; retry 2 times still fails.
+    - **Root cause**: webbridge daemon's navigate command internally hardcodes 30s timeout; `NavTimeoutSec` parameter only controls PowerShell `Invoke-RestMethod` timeout, not daemon internals.
+    - **Affected sites**: Sites with slow server response (Moment/ptlao) or CF-slowed loading (audiences).
+    - **Not fixed**: Requires modifying webbridge daemon source (kimi-webbridge.exe), or waiting for upstream update. Current mitigation: per-site `WaitMs` config + retry logic.
+    - **Lesson**: Third-party tool internal limits (like hardcoded timeouts) are common automation bottlenecks. When debugging, distinguish "script logic issues" (fixable) from "tool limitation issues" (only workaround or wait for upstream) — the former can be fixed, the latter cannot.

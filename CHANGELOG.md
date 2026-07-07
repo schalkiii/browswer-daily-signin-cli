@@ -1,5 +1,59 @@
 # Changelog
 
+## [v4.12.6] - 2026-07-07
+
+### CDP Shadow DOM 穿透 + NexusPHPSignInDetect 修复 + ALTCHA 适配
+
+基于 07-07 全量签到（34 成功/8 失败/6 跳过，NEW: vclib+521，baseline 47→49）的针对性优化。v4.12.4/v4.12.5 的 CF 站点配置在此版本集成 CDP 点击方案后落地。
+
+#### 改动1: CF Turnstile CDP 点击方案（kimi-webbridge.ps1）
+
+- **根因**：CF Turnstile 使用 `attachShadow({mode:'closed'})` 封装 iframe，JS `evaluate` 永远看不到内部 checkbox；旧版 `Invoke-CfVerifyClick` 通过 DOM 查找 widget 必然返回 `cdp:no-widget`
+- **修复**：`Invoke-CfVerifyClick` 完全重写为 CDP（Chrome DevTools Protocol）方案
+  - `DOM.describeNode(pierce=true)` 穿透 closed shadow DOM 定位 CF iframe 节点
+  - `Input.dispatchMouseEvent` 模拟三步点击：`mouseMoved` → `mousePressed` → `mouseReleased`
+  - 点击坐标取 iframe 左侧约 24px 处（checkbox 实际位置，非中心点）
+- **新增**：`Invoke-CdpClickIframe` 辅助函数封装 CDP 点击逻辑
+- **辅助**：navigate 后调用 `Page.bringToFront` 让标签页获得焦点（CF Turnstile 需要页面有焦点才渲染 iframe）
+- **CF 重试循环修复**：`no-cf` 状态也触发重新检测（CF 验证通过后 widget 被移除、token 被清空，旧逻辑只在 `passed:` 时重新检测会漏判）
+
+#### 改动2: NexusPHPSignInDetect cfTokenPassed 修复（signin-web.ps1）
+
+- **根因**：CF 通过后 `.cf-turnstile` div 仍在 DOM 中，`attendance-captcha-table` label 含"安全验证"文本，旧逻辑误判为 CF_CHALLENGE → 无限重试
+- **修复**：检查 `input[name="cf-turnstile-response"]` token 是否填入
+  - token 未填入 + CF widget 存在 → 返回 `CF_CHALLENGE`（真实未通过）
+  - token 已填入 → 跳过下方 CF 文本检测（避免"安全验证" label 误判）
+- **影响站点**：PigGo（CF_BLOCKED 误判 → 改用 `$NexusPHPSignInDetect`）
+
+#### 改动3: Yemapt ALTCHA 适配（signin-web.ps1）
+
+- **根因**：Yemapt 使用 ALTCHA proof-of-work 验证（`altcha-checkbox-wrap` class），点击"立即签到"前需先处理 ALTCHA checkbox，否则 NEED_SIGN
+- **修复**：Click JS 重写为两阶段流程
+  1. 检查 ALTCHA checkbox 是否存在且未验证 → 点击 checkbox
+  2. `setInterval` 每 1 秒轮询 ALTCHA PoW 计算完成（最多 12 秒）→ 自动点击签到按钮
+- **调优**：`PostClickMs` 从 8000 增加到 15000（ALTCHA 轮询 + 签到按钮等待）
+
+#### 改动4: NexusPHPCfSignInClick 通用 Click JS（signin-web.ps1，v4.12.5 引入）
+
+- 新增 `$NexusPHPCfSignInClick` 通用 Click JS 模板，用于 NexusPHP + CF Turnstile 站点
+- 流程：检查 token 已填入 → 找到 attendance 表单 → 点击 submit 按钮
+- 适用站点：DepthStudio/xloli/audiences（CF 通过后提交签到表单）
+
+#### 改动5: CF 站点等待时间配置（signin-web.ps1，v4.12.5 引入）
+
+- DepthStudio/xloli/audiences: `CfRetryCount=4`, `CfRetryWaitMs=15000`, `WaitMs=18000`
+- Yemapt: SPA + CF 检测 + 叶子节点 Click 策略；`sites.json` strategy 从 `manual` 改为 `webbridge`（v4.12.4）
+
+#### 07-07 全量签到结果
+
+| 类别 | 数量 | 站点 |
+| ---- | ---- | ---- |
+| NEW  | 2    | vclib, 521（验证码扩展方案生效） |
+| OK   | 34   | 52pojie, HDKYL, OurBits, V2EX, 13City, AsianDVDClub, BiliDownload, BTSchool, DigitalCore, GGPT, HDClone, HDDolby, HDHome, HDVideo, HHCLUB, HTCPT, Kufirc, M-Team, NewInsane, Rousi, SBPT, SpeedApp, Tokyo, UsefulTrash, YHPP, 远景论坛, h-e, hdbao, musopia, onrender, vclib, 521, huan666, pbh-btn |
+| FAIL | 8    | PigGo(CF_BLOCKED, 已适配), DepthStudio(CF_BLOCKED, CDP被检测), Moment(NAV_FAIL), xloli(CF_BLOCKED, CDP被检测), Yemapt(NEED_SIGN, 已适配), ptlao(SERVER_ERROR), audiences(NAV_FAIL), invites(NAV_FAIL) |
+
+**已知限制**：CF Turnstile 检测 CDP 自动化行为，DepthStudio/xloli CDP 点击成功（`cdp:clicked`）但 token 一直 `pending:cf-text` 未填入。需用户确认是否改回 manual。
+
 ## [v4.12.3] - 2026-07-05
 
 ### extension 冷启动等待 + HDKYL chrome-error 检测 + UNKNOWN 重试改进

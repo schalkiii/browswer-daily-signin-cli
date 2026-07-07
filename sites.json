@@ -202,8 +202,9 @@
     {
       "name": "Yemapt",
       "url": "https://www.yemapt.org/#/consumer/checkIn",
-      "strategy": "manual",
-      "note": "2026-07-01: webbridge导航超时+tab丢失，SPA人机验证无法自动化，改回manual"
+      "strategy": "webbridge",
+      "display_name": "YemaPT",
+      "note": "2026-07-06: v4.12.4 改回 webbridge（v4.12.3 已修复 extension 冷启动+tab 清理，配合 CF 重试改进重试）"
     },
     {
       "name": "YHPP",

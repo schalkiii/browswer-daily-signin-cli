@@ -11,8 +11,26 @@ $NexusPHPSignInDetect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1||t.indexOf('Just a moment')>-1) return 'CF_CHALLENGE';
+  // v4.12.6: CF Turnstile 检测 — token 已填入时跳过 CF 文本检测
+  // CF 通过后 .cf-turnstile div 仍在 DOM 中，attendance-captcha-table label 含"安全验证"文本
+  // 旧逻辑误判：token 已填入但页面含"安全验证"文本 → 仍返回 CF_CHALLENGE → 无限重试
+  var cfWidget = document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage');
+  var cfTokenPassed = false;
+  if(cfWidget){
+    var tokenInput = document.querySelector('input[name="cf-turnstile-response"]');
+    if(!tokenInput || !tokenInput.value || tokenInput.value.length < 10){
+      // CF widget 存在且 token 未填入 = CF 未通过
+      return 'CF_CHALLENGE';
+    }
+    // CF 已通过（token 已填入），跳过下方 CF 文本检测
+    cfTokenPassed = true;
+  }
+  // 仅在 CF token 未通过时检查 CF 文本（避免"安全验证"label 误判）
+  if(!cfTokenPassed){
+    if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1) return 'CF_CHALLENGE';
+    // "安全验证"仅在无 CF widget 时才算 CF_CHALLENGE（有 widget 时是 label 文本）
+    if(t.indexOf('安全验证')>-1 && !cfWidget) return 'CF_CHALLENGE';
+  }
   // 简体 + 繁体匹配（SBPT 等繁体站点使用 "簽到成功"）
   if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
   if(t.indexOf('簽到已得')>-1||t.indexOf('今日已簽到')>-1||t.indexOf('已簽到')>-1||t.indexOf('簽到成功')>-1) return 'SIGN_OK';
@@ -23,6 +41,30 @@ $NexusPHPSignInDetect = @'
   if(location.protocol==='chrome-error:'||t.indexOf('HTTP ERROR')>-1||t.indexOf('当前无法使用此页面')>-1) return 'SERVER_ERROR';
   if(t.length<20) return 'BODY_NULL';
   return 'UNKNOWN';
+})()
+'@
+
+# v4.12.5: NexusPHP attendance.php + CF Turnstile 站点的通用 Click JS
+# CF 通过后，token 自动填入 cf-turnstile-response hidden input，需要提交 attendance 表单
+# 流程：检查 token → 找到表单 → 点击 submit 按钮
+$NexusPHPCfSignInClick = @'
+(function(){
+  // 1. 检查 CF Turnstile token 是否已填入
+  var tokenInput = document.querySelector('input[name="cf-turnstile-response"]');
+  if(tokenInput && (!tokenInput.value || tokenInput.value.length < 10)){
+    return 'CF_NOT_PASSED';
+  }
+  // 2. 找到 attendance 表单
+  var form = document.querySelector('form[action*="attendance"]') || document.querySelector('form');
+  if(!form) return 'NO_FORM';
+  // 3. 找到 submit 按钮
+  var submit = form.querySelector('input[type=submit][value*="签到"]') ||
+               form.querySelector('input[type=submit][value*="簽到"]') ||
+               form.querySelector('input[type=submit]');
+  if(!submit) return 'NO_SUBMIT';
+  // 4. 点击 submit
+  submit.click();
+  return 'CLICKED';
 })()
 '@
 
@@ -246,19 +288,8 @@ $WebSignInConfigs = @{
         Url = "https://piggo.me/attendance.php?id=18989"
         WaitMs = 12000
         PostClickMs = 5000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1||t.indexOf('雷池')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
-  return 'UNKNOWN';
-})()
-'@
+        # v4.12.6: 复用 NexusPHPSignInDetect（含 cfTokenPassed 修复，避免"安全验证"文本误判）
+        Detect = $NexusPHPSignInDetect
         Click = @'
 (function(){
   // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
@@ -687,10 +718,13 @@ $WebSignInConfigs = @{
     }
     "DepthStudio" = @{
         Url = "https://dstudio.me/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
+        # v4.12.5: CF 站点需要更长等待 + 多次 CF 重试 + CF 通过后提交表单
+        WaitMs = 18000
+        PostClickMs = 8000
+        CfRetryCount = 4
+        CfRetryWaitMs = 15000
         Detect = $NexusPHPSignInDetect
-        Click = $null
+        Click = $NexusPHPCfSignInClick
     }
     "HDClone" = @{
         Url = "https://pt.hdclone.top/attendance.php"
@@ -736,10 +770,13 @@ $WebSignInConfigs = @{
     }
     "xloli" = @{
         Url = "https://mua.xloli.cc/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
+        # v4.12.5: CF 站点需要更长等待 + 多次 CF 重试 + CF 通过后提交表单
+        WaitMs = 18000
+        PostClickMs = 8000
+        CfRetryCount = 4
+        CfRetryWaitMs = 15000
         Detect = $NexusPHPSignInDetect
-        Click = $null
+        Click = $NexusPHPCfSignInClick
     }
     "YHPP" = @{
         Url = "https://www.yhpp.cc/attendance.php"
@@ -833,10 +870,98 @@ $WebSignInConfigs = @{
     }
     "audiences" = @{
         Url = "https://audiences.me/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
+        # v4.12.5: CF 站点需要更长等待 + 多次 CF 重试 + CF 通过后提交表单
+        WaitMs = 18000
+        PostClickMs = 8000
+        CfRetryCount = 4
+        CfRetryWaitMs = 15000
         Detect = $NexusPHPSignInDetect
-        Click = $null
+        Click = $NexusPHPCfSignInClick
+    }
+
+    # v4.12.4: Yemapt 改回 webbridge（SPA + ALTCHA + 点击签到）
+    # 07-01 曾因导航超时+tab 丢失回退 manual，v4.12.3 修复 extension 冷启动 + Clear-WebBridgeTabs 后重试
+    # v4.12.6: 添加 ALTCHA checkbox 异步处理（PoW 计算最多 12 秒）
+    "Yemapt" = @{
+        Url = "https://www.yemapt.org/#/consumer/checkIn"
+        WaitMs = 18000
+        PostClickMs = 15000
+        CfRetryCount = 4
+        CfRetryWaitMs = 15000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  // CF Turnstile 检测（CF iframe 优先匹配，避免与 SPA 内容混淆）
+  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],iframe[src*="turnstile"],#challenge-stage')) return 'CF_CHALLENGE';
+  var t = document.body.innerText||'';
+  if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
+  // SPA 登录态检测
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('Login')>-1||t.indexOf('登录')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
+  // 签到状态检测
+  if(t.indexOf('已签到')>-1||t.indexOf('今日已签')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
+  if(t.indexOf('签到')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  // SPA 未渲染完成
+  if(t.length<50) return 'BODY_NULL';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  // v4.12.6: Yemapt 使用 ALTCHA proof-of-work 验证 + SPA 签到按钮
+  // 流程：点击 ALTCHA checkbox → 异步等待 PoW 计算 → 自动点击"立即签到"
+  function clickSignInBtn(){
+    var sels = ['button','[role="button"]','a[class*="checkin"]','a[class*="sign"]','[class*="checkin-btn"]','[class*="sign-btn"]'];
+    for(var s=0;s<sels.length;s++){
+      var els = document.querySelectorAll(sels[s]);
+      for(var i=0;i<els.length;i++){
+        var el = els[i];
+        var v = (el.textContent||'').trim();
+        if(v==='签到'||v==='打卡'||v==='立即签到'||v==='今日签到'||v==='每日签到'){
+          el.click();
+          window.__yemaptClicked = 'CLICKED:'+v;
+          return;
+        }
+      }
+    }
+    var btns = document.querySelectorAll('button');
+    for(var k=0;k<btns.length;k++){
+      var v3 = (btns[k].textContent||'').trim();
+      if(v3.indexOf('签到')>-1 && v3.length < 30){
+        btns[k].click();
+        window.__yemaptClicked = 'CLICKED_BTN:'+v3;
+        return;
+      }
+    }
+    window.__yemaptClicked = 'NO_BTN';
+  }
+  // 1. 检查 ALTCHA 是否存在且未验证
+  var altchaWrap = document.querySelector('.altcha-checkbox-wrap,altcha-widget,[class*="altcha"]');
+  if(altchaWrap){
+    var altchaCheckbox = altchaWrap.querySelector('input[type="checkbox"],[role="checkbox"],.altcha-checkbox');
+    if(altchaCheckbox && !altchaCheckbox.checked){
+      altchaCheckbox.click();
+      // 异步轮询：等待 ALTCHA PoW 计算完成（最多 12 秒），完成后自动点击签到按钮
+      window.__yemaptClicked = null;
+      var altchaStart = Date.now();
+      var altchaPoll = setInterval(function(){
+        var elapsed = Date.now() - altchaStart;
+        // ALTCHA 验证完成：checkbox 已 checked 或 widget 状态变为 verified
+        var verified = (altchaCheckbox.checked) ||
+                       (document.querySelector('.altcha-verified,[class*="verified"]')) ||
+                       (window.__altchaState === 'verified');
+        if(verified || elapsed > 12000){
+          clearInterval(altchaPoll);
+          clickSignInBtn();
+        }
+      }, 1000);
+      return 'ALTCHA_CLICKED:waiting';
+    }
+  }
+  // 2. 无 ALTCHA 或已验证：直接点击签到按钮
+  clickSignInBtn();
+  return window.__yemaptClicked || 'NO_BTN';
+})()
+'@
     }
 
     # 13City: v4.10.1 修正 URL（原 usercp.php 是聚合签到页，改为单站点 attendance.php）

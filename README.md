@@ -123,6 +123,8 @@ v4.10 起统一为单一 `webbridge` 后端，移除 opencli 依赖。站点配�
 | SPA 控制台          | SPA 模板     | `$null` | 登录态保持即视为成功                                                                    |
 | visit-only          | `$null`      | `$null` | 仅访问，返回 VISITED                                                                    |
 | NexusPHP + 验证码   | 通用检测模板 | 轮询 JS | Click JS 用 setInterval 轮询 imagestring，待浏览器扩展填入后提交（v4.12.0+，vclib/521） |
+| NexusPHP + CF Turnstile | 通用检测模板（含 cfTokenPassed 修复） | `$NexusPHPCfSignInClick` | CF 通过后 token 自动填入 hidden input，Click JS 提交 attendance 表单（v4.12.5+，DepthStudio/xloli/audiences） |
+| SPA + ALTCHA        | SPA + CF 检测 | 两阶段 Click JS | 先点击 ALTCHA checkbox → 异步轮询 PoW 完成 → 点击签到按钮（v4.12.6+，Yemapt） |
 
 ### 重要规则：禁止自动添加 manual
 

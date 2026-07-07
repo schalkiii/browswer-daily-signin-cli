@@ -163,6 +163,11 @@ function Test-WebBridgeSignIn {
             }
         }
 
+        # v4.12.6: navigate 后让标签页获得焦点（CF Turnstile 需要页面有焦点才渲染 iframe）
+        try {
+            $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Page.bringToFront"; params=@{}} -Session $session -TimeoutSec 5
+        } catch {}
+
         Write-Host "  [WebBridge] $SiteName : waiting ${WaitMs}ms for page load"
         Start-Sleep -Milliseconds $WaitMs
 
@@ -228,33 +233,40 @@ function Test-WebBridgeSignIn {
 
         if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
             for ($retry = 0; $retry -lt $CfRetryCount; $retry++) {
+                # v4.12.5: Invoke-CfVerifyClick 内部会 scrollIntoView + 点击 iframe/widget
                 $cfClickResult = Invoke-CfVerifyClick $session $SiteName
-                if ($cfClickResult) { Write-Host "  [WebBridge] $SiteName : CF verify button clicked: $cfClickResult" }
+                if ($cfClickResult) { Write-Host "  [WebBridge] $SiteName : CF verify: $cfClickResult" }
 
-                $waitSec = [math]::Round($CfRetryWaitMs / 1000 * ($retry + 1), 0)
-                Write-Host "  [WebBridge] $SiteName : CF/BODY retry $($retry+1)/$CfRetryCount, wait ${waitSec}s..."
+                # v4.12.5: 点击后等待 CF Turnstile 处理（iframe 内部验证 + token 填充）
+                $waitSec = [math]::Round($CfRetryWaitMs / 1000, 0)
+                Write-Host "  [WebBridge] $SiteName : CF retry $($retry+1)/$CfRetryCount, wait ${waitSec}s..."
                 Start-Sleep -Seconds $waitSec
-                if (($retry + 1) % 2 -eq 1) {
-                    Write-Host "  [WebBridge] $SiteName : reloading page for CF re-check..."
-                    $null = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = "location.reload()" } -Session $session -TimeoutSec 15
-                    Start-Sleep -Seconds 5
+
+                # v4.12.5: 先检查 CF Turnstile 是否已通过（token 已填入 hidden input）
+                # v4.12.6: no-cf 也视为 CF 已通过（CF 验证通过后 widget 会被移除，token 可能被清空）
+                $cfPassed = Test-CfTurnstilePassed $session $SiteName
+                Write-Host "  [WebBridge] $SiteName : CF state=$cfPassed"
+                if ($cfPassed -match "^passed:|^no-cf$") {
+                    # CF 已通过或已消失，重新检测页面状态
+                    $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+                    $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
+                    Write-Host "  [WebBridge] $SiteName : post-CF signal=$reSig"
+                    if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
+                        $cfPassSignal = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
+                        Save-DebugSnapshot $SiteName $session "sign_ok_after_cf" $DebugDir $SaveDebugSnapshot
+                        return $cfPassSignal
+                    }
+                    if ($reSig -match "NEED_SIGN|UNKNOWN") {
+                        $signal = $reSig
+                        break  # 跳出 CF 重试循环，进入下方 ClickEval 流程
+                    }
+                    if ($reSig -match "LOGIN_REQUIRED") {
+                        Save-DebugSnapshot $SiteName $session "login_required" $DebugDir $SaveDebugSnapshot
+                        return "LOGIN_REQUIRED"
+                    }
+                    # v4.12.6: no-cf 但 reSig 仍是 CF_CHALLENGE — widget 可能已消失但页面未更新，继续重试
                 }
-                $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-                $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
-                Write-Host "  [WebBridge] $SiteName : retry signal=$reSig"
-                if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
-                    $cfPassSignal = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
-                    Save-DebugSnapshot $SiteName $session "sign_ok_after_cf" $DebugDir $SaveDebugSnapshot
-                    return $cfPassSignal
-                }
-                if ($reSig -match "NEED_SIGN|UNKNOWN") {
-                    $signal = $reSig
-                    break
-                }
-                if ($reSig -match "LOGIN_REQUIRED") {
-                    Save-DebugSnapshot $SiteName $session "login_required" $DebugDir $SaveDebugSnapshot
-                    return "LOGIN_REQUIRED"
-                }
+                # CF 仍在验证中（pending:*），继续下一次重试
             }
             if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
                 Save-DebugSnapshot $SiteName $session "cf_blocked_final" $DebugDir $SaveDebugSnapshot
@@ -292,66 +304,154 @@ function Test-WebBridgeSignIn {
 
 # 尝试点击 CF 验证按钮（"请验证您是真人" / "Verify you are human" / turnstile checkbox）
 # 返回点击结果描述，未找到返回 $null
+# v4.12.6: CF Turnstile iframe 在 closed Shadow DOM 中，JS document.querySelectorAll('iframe') 看不到
+# 必须用 CDP DOM.describeNode(pierce=true) 穿透 Shadow DOM，再用 Input.dispatchMouseEvent 点击 iframe checkbox
+# 关键：点击位置是 iframe 左侧 (minX+24, centerY)，不是中心 — checkbox 在左侧
 function Invoke-CfVerifyClick {
     param(
         [string]$Session,
         [string]$SiteName
     )
-    $cfClickJS = @'
+
+    # 先滚动 widget 到视口（触发懒加载渲染 iframe）
+    $scrollJS = @'
 (function(){
-  // 1. 点击 turnstile widget 中的 checkbox / 验证框
-  var selectors = [
-    'input[type="checkbox"]',
-    '.cf-turnstile',
-    '#challenge-stage',
-    '.g-recaptcha',
-    '[class*="turnstile"]',
-    '[class*="captcha"]',
-    '[id*="challenge"]',
-    'iframe[src*="challenges.cloudflare.com"]',
-    'iframe[src*="turnstile"]'
-  ];
-  var clicked = [];
-  for(var i=0;i<selectors.length;i++){
-    var els = document.querySelectorAll(selectors[i]);
-    for(var j=0;j<els.length;j++){
-      var el = els[j];
-      try {
-        // 尝试点击
-        el.click();
-        clicked.push(selectors[i]);
-      } catch(e) {}
-      // 如果是 iframe，尝试触发其内容
-      if(el.tagName === 'IFRAME'){
-        try { el.contentDocument.body.click(); } catch(e) {}
-      }
-    }
+  var widget = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]');
+  if(widget){
+    try { widget.scrollIntoView({block:'center'}); } catch(e){ try{ widget.scrollIntoView(); }catch(e2){} }
+    return 'scrolled';
   }
-  // 2. 查找页面上包含验证文字的可点击元素
-  var texts = ['请验证您是真人','验证您是真人','我不是机器人','我是人类','Verify you are human','I am human','I\'m not a robot','Not a robot'];
-  var allClickable = document.querySelectorAll('a,button,span,div,label');
-  for(var k=0;k<allClickable.length;k++){
-    var txt = (allClickable[k].textContent||'').trim();
-    for(var m=0;m<texts.length;m++){
-      if(txt.indexOf(texts[m])>-1 && txt.length < 50){
-        try {
-          allClickable[k].click();
-          clicked.push('text:"'+texts[m]+'"');
-        } catch(e) {}
-        break;
-      }
-    }
-  }
-  if(clicked.length > 0) return 'clicked:' + clicked.join(';');
-  return null;
+  return 'no_widget';
 })()
 '@
     try {
-        $result = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $cfClickJS } -Session $Session -TimeoutSec 10
-        if ($result -and $result.value) { return "$($result.value)" }
-        if ($result -is [string] -and $result) { return $result }
+        $null = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $scrollJS } -Session $Session -TimeoutSec 10
     } catch {}
-    return $null
+
+    # v4.12.6: CDP 穿透 closed Shadow DOM 点击 CF Turnstile iframe
+    try {
+        # Step 1: 获取文档根节点
+        $docResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.getDocument"; params=@{depth=1; pierce=$true}} -Session $Session -TimeoutSec 10
+        if (-not $docResult -or -not $docResult.root) { return "cdp:no-doc" }
+        $rootNodeId = $docResult.root.nodeId
+
+        # Step 2: 找到 .cf-turnstile widget
+        $qsResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.querySelector"; params=@{nodeId=$rootNodeId; selector=".cf-turnstile"}} -Session $Session -TimeoutSec 10
+        if (-not $qsResult -or $qsResult.nodeId -eq 0) {
+            # 备用：全页 CF 挑战（非 widget 模式），尝试直接找 iframe
+            $qsIframe = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.querySelector"; params=@{nodeId=$rootNodeId; selector="iframe[src*='challenges.cloudflare.com']"}} -Session $Session -TimeoutSec 10
+            if ($qsIframe -and $qsIframe.nodeId -ne 0) {
+                $iframeNodeId = $qsIframe.nodeId
+                $boxResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.getBoxModel"; params=@{nodeId=$iframeNodeId}} -Session $Session -TimeoutSec 10
+                if ($boxResult -and $boxResult.model) {
+                    return Invoke-CdpClickIframe -BoxResult $boxResult -Session $Session
+                }
+            }
+            return "cdp:no-widget"
+        }
+        $widgetNodeId = $qsResult.nodeId
+
+        # Step 3: requestChildNodes 加载 Shadow DOM 子节点
+        $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.requestChildNodes"; params=@{nodeId=$widgetNodeId; depth=10; pierce=$true}} -Session $Session -TimeoutSec 10
+        Start-Sleep -Milliseconds 500
+
+        # Step 4: describeNode 获取 Shadow DOM 中的 iframe
+        $descResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.describeNode"; params=@{nodeId=$widgetNodeId; depth=10; pierce=$true}} -Session $Session -TimeoutSec 10
+        if (-not $descResult -or -not $descResult.node) { return "cdp:desc-fail" }
+
+        # 解析 Shadow DOM: widget > div (有 shadowRoots) > shadowRoot > iframe
+        $widgetChildren = $descResult.node.children
+        if (-not $widgetChildren -or $widgetChildren.Count -eq 0) { return "cdp:no-children" }
+
+        $iframeNodeId = 0
+        foreach ($child in $widgetChildren) {
+            if ($child.shadowRoots -and $child.shadowRoots.Count -gt 0) {
+                foreach ($sr in $child.shadowRoots) {
+                    if ($sr.children -and $sr.children.Count -gt 0) {
+                        foreach ($srChild in $sr.children) {
+                            if ($srChild.nodeName -eq "IFRAME") {
+                                $iframeNodeId = $srChild.nodeId
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+            if ($iframeNodeId -ne 0) { break }
+        }
+
+        if ($iframeNodeId -eq 0) { return "cdp:no-iframe-in-shadow" }
+
+        # Step 5: 获取 iframe box model
+        $boxResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.getBoxModel"; params=@{nodeId=$iframeNodeId}} -Session $Session -TimeoutSec 10
+        if (-not $boxResult -or -not $boxResult.model) { return "cdp:no-box-model" }
+
+        # Step 6: 用 CDP Input.dispatchMouseEvent 点击 iframe checkbox（左侧）
+        return Invoke-CdpClickIframe -BoxResult $boxResult -Session $Session
+    } catch {
+        return "cdp:exception:$($_.Exception.Message)"
+    }
+}
+
+# v4.12.6: 用 CDP Input.dispatchMouseEvent 点击 CF Turnstile iframe 的 checkbox
+# checkbox 在 iframe 左侧 (minX+24, centerY)，不是中心
+function Invoke-CdpClickIframe {
+    param(
+        $BoxResult,
+        [string]$Session
+    )
+    $content = $BoxResult.model.content
+    if (-not $content -or $content.Count -lt 4) { return "cdp:invalid-content" }
+
+    $minX = [math]::Min($content[0], [math]::Min($content[2], [math]::Min($content[4], $content[6])))
+    $maxX = [math]::Max($content[0], [math]::Max($content[2], [math]::Max($content[4], $content[6])))
+    $minY = [math]::Min($content[1], [math]::Min($content[3], [math]::Min($content[5], $content[7])))
+    $maxY = [math]::Max($content[1], [math]::Max($content[3], [math]::Max($content[5], $content[7])))
+
+    # CF Turnstile checkbox 在 iframe 左侧约 24px 处
+    $clickX = [math]::Round($minX + 24, 0)
+    $clickY = [math]::Round(($minY + $maxY) / 2, 0)
+
+    # 鼠标移动 → 按下 → 释放
+    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Input.dispatchMouseEvent"; params=@{type="mouseMoved"; x=$clickX; y=$clickY}} -Session $Session -TimeoutSec 10
+    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Input.dispatchMouseEvent"; params=@{type="mousePressed"; x=$clickX; y=$clickY; button="left"; clickCount=1}} -Session $Session -TimeoutSec 10
+    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Input.dispatchMouseEvent"; params=@{type="mouseReleased"; x=$clickX; y=$clickY; button="left"; clickCount=1}} -Session $Session -TimeoutSec 10
+
+    return "cdp:clicked:($clickX,$clickY)"
+}
+
+# v4.12.5: 检查 CF Turnstile 是否已通过（cf-turnstile-response 有值）
+# 返回 true 表示 CF 已通过，false 表示未通过
+function Test-CfTurnstilePassed {
+    param(
+        [string]$Session,
+        [string]$SiteName
+    )
+    $checkJS = @'
+(function(){
+  // 1. 检查 cf-turnstile-response hidden input 是否有值
+  var inputs = document.querySelectorAll('input[name="cf-turnstile-response"],input[name="g-recaptcha-response"]');
+  for(var i=0;i<inputs.length;i++){
+    if(inputs[i].value && inputs[i].value.length > 10){
+      return 'passed:'+inputs[i].value.substring(0, 30);
+    }
+  }
+  // 2. 检查页面是否还有 CF 挑战（全页 CF）
+  if(document.querySelector('iframe[src*="challenges.cloudflare.com"]')){
+    return 'pending:cf-iframe-present';
+  }
+  // 3. body 文本含 CF 关键字
+  var t = document.body ? document.body.innerText : '';
+  if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1) return 'pending:cf-text';
+  return 'no-cf';
+})()
+'@
+    try {
+        $result = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $checkJS } -Session $Session -TimeoutSec 10
+        if ($result -is [string]) { return $result }
+        if ($result.value) { return $result.value }
+    } catch {}
+    return "check-failed"
 }
 
 # 保存页面调试快照为 JSON

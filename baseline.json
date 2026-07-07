@@ -48,7 +48,9 @@
     "h-e",
     "onrender",
     "huan666",
-    "anyrouter"
+    "anyrouter",
+    "vclib",
+    "521"
   ],
   "manual_sites": [
     "北洋园PT",
@@ -64,7 +66,7 @@
     "42w",
     "pp"
   ],
-  "auto_total": 47,
+  "auto_total": 49,
   "manual_total": 12,
-  "last_updated": "2026-07-03 10:44:18"
+  "last_updated": "2026-07-07 03:03:27"
 }
