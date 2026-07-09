@@ -11,6 +11,14 @@ $NexusPHPSignInDetect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
+  // v4.12.9: 已签到状态优先于 CF 检测 —— 部分站点（xloli）attendance 页始终残留 .cf-turnstile
+  // 空 token widget，若先判 CF 会把"今日签到，得到魔力加成"误判成 CF_CHALLENGE 导致无限重试。
+  // 故先确认已签到，再处理 CF widget。
+  // 简体 + 繁体匹配（SBPT 等繁体站点使用 "簽到成功"）
+  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
+  if(t.indexOf('簽到已得')>-1||t.indexOf('今日已簽到')>-1||t.indexOf('已簽到')>-1||t.indexOf('簽到成功')>-1) return 'SIGN_OK';
+  // v4.12.9: 站点特有"今日签到，得到魔力加成"等已签短语
+  if(t.indexOf('今日签到')>-1||t.indexOf('得到魔力加成')>-1) return 'SIGN_OK';
   // v4.12.6: CF Turnstile 检测 — token 已填入时跳过 CF 文本检测
   // CF 通过后 .cf-turnstile div 仍在 DOM 中，attendance-captcha-table label 含"安全验证"文本
   // 旧逻辑误判：token 已填入但页面含"安全验证"文本 → 仍返回 CF_CHALLENGE → 无限重试
@@ -31,9 +39,6 @@ $NexusPHPSignInDetect = @'
     // "安全验证"仅在无 CF widget 时才算 CF_CHALLENGE（有 widget 时是 label 文本）
     if(t.indexOf('安全验证')>-1 && !cfWidget) return 'CF_CHALLENGE';
   }
-  // 简体 + 繁体匹配（SBPT 等繁体站点使用 "簽到成功"）
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('簽到已得')>-1||t.indexOf('今日已簽到')>-1||t.indexOf('已簽到')>-1||t.indexOf('簽到成功')>-1) return 'SIGN_OK';
   if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
   if(t.indexOf('簽到得魔力')>-1||t.indexOf('簽到得鯨幣')>-1||t.indexOf('簽到得鲸币')>-1||t.indexOf('簽到領取')>-1) return 'NEED_SIGN';
   if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('必须登录')>-1) return 'LOGIN_REQUIRED';
@@ -154,18 +159,28 @@ $WebSignInConfigs = @{
         Url = "https://pt.0ff.cc/attendance.php"
         WaitMs = 15000
         PostClickMs = 5000
+        # v4.12.11: FreeFarm 适配修复
+        # 根因：旧 Detect 将 SLIDER 检测放在已签到关键词之前，且使用过度宽泛的
+        #   div[class*="challenge"] 选择器（会命中布局 div）→ 即使已签到也误报 SLIDER，
+        #   导致站点长期被误判为"滑块拦截"而移入 manual。
+        # 诊断（2026-07-10）证实：已登录页显示"签到成功/这是您的第806次签到"，
+        #   无任何 .cf-turnstile / challenge iframe / div[class*="challenge"]。
+        # 修复：已签到关键词优先；滑块仅精确匹配真实验证 UI（CF Turnstile iframe / 滑动滑块文本），
+        #   移除 div[class*="challenge"] 等误判源。SLIDER 交由 kimi-webbridge 的
+        #   Invoke-SlideBypass（set_access_token token 提取）尝试绕过。
         Detect = @'
 (function(){
   var t = document.body.innerText||'';
   var title = document.title||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],iframe[src*="turnstile"],#challenge-stage,#cf-challenge,div[class*="challenge"]')) return 'SLIDER';
+  // 1. 已签到优先（避免残留 challenge 元素误判 SLIDER）
+  if(t.indexOf('签到成功')>-1||t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('这是您的第')>-1||t.indexOf('连续签到')>-1) return 'SIGN_OK';
+  // 2. 真实滑块/人机验证（精确匹配，不滥用 div[class*="challenge"]）
+  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],iframe[src*="turnstile"]')) return 'SLIDER';
+  if(t.indexOf('滑动滑块')>-1||t.indexOf('验证您是真人')>-1||t.indexOf('确认您是真人')>-1||title.indexOf('滑动认证')>-1) return 'SLIDER';
   if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1||t.indexOf('DDoS')>-1||t.indexOf('turnstile')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('验证您是真人')>-1||t.indexOf('确认您是真人')>-1||t.indexOf('滑动滑块')>-1) return 'SLIDER';
-  if(title.indexOf('滑动认证')>-1||title.indexOf('安全验证')>-1) return 'SLIDER';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1) return 'SIGN_OK';
-  var idx = t.indexOf('签到得魔力');
-  if(idx>-1) return 'NEED_SIGN';
-  if(t.indexOf('请先登录')>-1||t.indexOf('未登录')>-1||t.indexOf('客户端')>-1&&t.indexOf('登录')>-1) return 'LOGIN_REQUIRED';
+  // 3. 尚未签到 → 需点击
+  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  if(t.indexOf('请先登录')>-1||t.indexOf('未登录')>-1) return 'LOGIN_REQUIRED';
   var match = t.match(/签到.{0,20}/);
   return 'UNKNOWN:'+(match?match[0]:'no_match')+'; title='+title.substring(0,50);
 })()
@@ -286,7 +301,9 @@ $WebSignInConfigs = @{
     }
     "PigGo" = @{
         Url = "https://piggo.me/attendance.php?id=18989"
-        WaitMs = 12000
+        # v4.12.11: 雷池(Safeline) WAF JS 挑战页 body 初始为空，挑战通过后才注入真实内容。
+        #   加大 WaitMs（12s→30s）给 WAF 挑战更充裕的求解时间，避免 body 仍空被判 UNKNOWN。
+        WaitMs = 30000
         PostClickMs = 5000
         # v4.12.6: 复用 NexusPHPSignInDetect（含 cfTokenPassed 修复，避免"安全验证"文本误判）
         Detect = $NexusPHPSignInDetect
@@ -718,11 +735,14 @@ $WebSignInConfigs = @{
     }
     "DepthStudio" = @{
         Url = "https://dstudio.me/attendance.php"
-        # v4.12.5: CF 站点需要更长等待 + 多次 CF 重试 + CF 通过后提交表单
-        WaitMs = 18000
+        # v4.12.5: CF Turnstile 站点（attendance 页含 .cf-turnstile 内联控件），需要 CF 验证通过后提交表单。
+        # 验证：CF 托管挑战偶发（CF 反爬强度波动），宽松日可过，严格日 no-rect 失败属站点侧行为。
+        # v4.12.11: 加大 CF 耐心（WaitMs 18s→24s，重试 4→6 次、单次 15s→20s）以应对严格日更长的
+        #   全页 CF 插页；宽松日 CF 快速通过会在首次重试即跳出，不增加耗时。
+        WaitMs = 24000
         PostClickMs = 8000
-        CfRetryCount = 4
-        CfRetryWaitMs = 15000
+        CfRetryCount = 6
+        CfRetryWaitMs = 20000
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPCfSignInClick
     }
@@ -771,6 +791,18 @@ $WebSignInConfigs = @{
     "xloli" = @{
         Url = "https://mua.xloli.cc/attendance.php"
         # v4.12.5: CF 站点需要更长等待 + 多次 CF 重试 + CF 通过后提交表单
+        WaitMs = 18000
+        PostClickMs = 8000
+        CfRetryCount = 4
+        CfRetryWaitMs = 15000
+        Detect = $NexusPHPSignInDetect
+        Click = $NexusPHPCfSignInClick
+    }
+    "UBits" = @{
+        Url = "https://ubits.club/attendance.php"
+        # v4.12.10: 从 manual 策略移出，改为自动签到（用户确认可签）。
+        # ubits.club 为 NexusPHP attendance 站，含 CF Turnstile，走标准 CF 验证流程
+        # （依赖 v4.12.8 视口修复使坐标点击命中；CF 宽松日可过）。
         WaitMs = 18000
         PostClickMs = 8000
         CfRetryCount = 4
@@ -871,10 +903,11 @@ $WebSignInConfigs = @{
     "audiences" = @{
         Url = "https://audiences.me/attendance.php"
         # v4.12.5: CF 站点需要更长等待 + 多次 CF 重试 + CF 通过后提交表单
-        WaitMs = 18000
+        # v4.12.11: 加大 CF 耐心（WaitMs 18s→24s，重试 4→6 次、单次 15s→20s），同 DepthStudio
+        WaitMs = 24000
         PostClickMs = 8000
-        CfRetryCount = 4
-        CfRetryWaitMs = 15000
+        CfRetryCount = 6
+        CfRetryWaitMs = 20000
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPCfSignInClick
     }
@@ -891,75 +924,94 @@ $WebSignInConfigs = @{
         Detect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
-  // CF Turnstile 检测（CF iframe 优先匹配，避免与 SPA 内容混淆）
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],iframe[src*="turnstile"],#challenge-stage')) return 'CF_CHALLENGE';
   var t = document.body.innerText||'';
+  // CF Turnstile 检测（CF iframe 优先匹配）
+  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],iframe[src*="turnstile"],#challenge-stage')) return 'CF_CHALLENGE';
   if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  // SPA 登录态检测
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('Login')>-1||t.indexOf('登录')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-  // 签到状态检测
+  // 登录态
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||(t.indexOf('登录')>-1&&t.indexOf('注册')>-1)) return 'LOGIN_REQUIRED';
+  // 已签到明确标志
   if(t.indexOf('已签到')>-1||t.indexOf('今日已签')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  // SPA 未渲染完成
+  // 尚未签到 / 待验证 → 需要点击
+  if(t.indexOf('尚未签到')>-1||t.indexOf('请先进行验证')>-1) return 'NEED_SIGN';
+  // 页面已无"尚未签到"且含签到相关词 → 视为已签（避免复检误判 NEED_SIGN）
+  if(t.indexOf('签到')>-1||t.indexOf('打卡')>-1) return 'SIGN_OK';
   if(t.length<50) return 'BODY_NULL';
   return 'UNKNOWN';
 })()
 '@
         Click = @'
 (function(){
-  // v4.12.6: Yemapt 使用 ALTCHA proof-of-work 验证 + SPA 签到按钮
-  // 流程：点击 ALTCHA checkbox → 异步等待 PoW 计算 → 自动点击"立即签到"
-  function clickSignInBtn(){
-    var sels = ['button','[role="button"]','a[class*="checkin"]','a[class*="sign"]','[class*="checkin-btn"]','[class*="sign-btn"]'];
-    for(var s=0;s<sels.length;s++){
-      var els = document.querySelectorAll(sels[s]);
-      for(var i=0;i<els.length;i++){
-        var el = els[i];
-        var v = (el.textContent||'').trim();
-        if(v==='签到'||v==='打卡'||v==='立即签到'||v==='今日签到'||v==='每日签到'){
-          el.click();
-          window.__yemaptClicked = 'CLICKED:'+v;
-          return;
+  // v4.12.7: Yemapt 使用 ALTCHA（<altcha-widget> web component，proof-of-work）
+  // 诊断证实：真实复选框在 closed Shadow DOM 内，JS .click() 与宿主点击都无法触发验证；
+  // 改为返回 widget 视口坐标，交由 PowerShell 用 CDP 受信任鼠标点击（真实坐标可命中 shadow 内复选框），
+  // 再用异步轮询检测验证完成（aria-checked / JWT 隐藏字段）后点击「立即签到」
+  function collect(){
+    var docs = [document];
+    var frames = document.querySelectorAll('iframe');
+    for(var f=0; f<frames.length; f++){
+      try { var fd = frames[f].contentDocument; if(fd) docs.push(fd); } catch(e){}
+    }
+    var signBtn=null, widget=null, field=null;
+    for(var d=0; d<docs.length; d++){
+      var doc = docs[d];
+      if(!widget){
+        var w = doc.querySelector('altcha-widget, .altcha-checkbox-wrap, [class*="altcha"]');
+        if(w) widget = w;
+      }
+      // ALTCHA 验证完成后会把 JWT（eyJ 开头）写入隐藏字段，name 多为 altcha
+      var af = doc.querySelector('input[name="altcha"], input[name*="altcha"], input[value^="eyJ"]');
+      if(af && af.value && af.value.length > 10) field = af;
+      if(!signBtn){
+        var btns = doc.querySelectorAll('button, [role="button"], a');
+        for(var i=0;i<btns.length;i++){
+          var v = (btns[i].textContent||'').trim();
+          if(v==='立即签到'||v==='签到'||v==='今日签到'||v==='每日签到'||(v.indexOf('签到')>-1 && v.length<24)){ signBtn = btns[i]; break; }
         }
       }
     }
-    var btns = document.querySelectorAll('button');
-    for(var k=0;k<btns.length;k++){
-      var v3 = (btns[k].textContent||'').trim();
-      if(v3.indexOf('签到')>-1 && v3.length < 30){
-        btns[k].click();
-        window.__yemaptClicked = 'CLICKED_BTN:'+v3;
-        return;
+    // 验证完成判定：隐藏字段已填，或 widget 标记 aria-checked=true / verified class
+    var verified = !!field;
+    if(widget){
+      try {
+        if(widget.getAttribute && widget.getAttribute('aria-checked')==='true') verified = true;
+        if(widget.className && ((''+widget.className).indexOf('verified')>-1)) verified = true;
+      } catch(e){}
+    }
+    return {signBtn:signBtn, widget:widget, field:field, verified:verified};
+  }
+  function fireClick(el){
+    try { el.click(); } catch(e){}
+    try { el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); } catch(e2){}
+  }
+  var found = collect();
+  // 已验证 → 直接点签到
+  if(found.verified){
+    if(found.signBtn){ found.signBtn.click(); return 'ALTCHA_DONE_CLICKED'; }
+    return 'ALTCHA_DONE_NO_BTN';
+  }
+  // ALTCHA 复选框在 closed Shadow DOM 内，JS .click() 无法触发；返回 widget 视口坐标，
+  // 交由 PowerShell 用 CDP 受信任鼠标点击（真实坐标点击可命中 shadow 内复选框）
+  // v4.12.8: 诊断确认 ALTCHA 复选框位于 widget 左上区域（约左 24px、顶部 30% 处），
+  //          而非几何中心；返回完整 rect 供 PowerShell 多候选点重试。
+  if(found.widget){
+    var r = found.widget.getBoundingClientRect();
+    var cx = Math.round(r.x + Math.min(26, r.width * 0.05));
+    var cy = Math.round(r.y + r.height * 0.30);
+    var start = Date.now();
+    var poll = setInterval(function(){
+      var f2 = collect();
+      if(f2.verified || (Date.now()-start) > 18000){
+        clearInterval(poll);
+        if(f2.signBtn){ f2.signBtn.click(); window.__yemapt = 'CLICKED'; }
+        else { window.__yemapt = 'NO_BTN'; }
       }
-    }
-    window.__yemaptClicked = 'NO_BTN';
+    }, 1000);
+    return 'ALTCHA_RECT:' + cx + ',' + cy + ',' + Math.round(r.width) + ',' + Math.round(r.height);
   }
-  // 1. 检查 ALTCHA 是否存在且未验证
-  var altchaWrap = document.querySelector('.altcha-checkbox-wrap,altcha-widget,[class*="altcha"]');
-  if(altchaWrap){
-    var altchaCheckbox = altchaWrap.querySelector('input[type="checkbox"],[role="checkbox"],.altcha-checkbox');
-    if(altchaCheckbox && !altchaCheckbox.checked){
-      altchaCheckbox.click();
-      // 异步轮询：等待 ALTCHA PoW 计算完成（最多 12 秒），完成后自动点击签到按钮
-      window.__yemaptClicked = null;
-      var altchaStart = Date.now();
-      var altchaPoll = setInterval(function(){
-        var elapsed = Date.now() - altchaStart;
-        // ALTCHA 验证完成：checkbox 已 checked 或 widget 状态变为 verified
-        var verified = (altchaCheckbox.checked) ||
-                       (document.querySelector('.altcha-verified,[class*="verified"]')) ||
-                       (window.__altchaState === 'verified');
-        if(verified || elapsed > 12000){
-          clearInterval(altchaPoll);
-          clickSignInBtn();
-        }
-      }, 1000);
-      return 'ALTCHA_CLICKED:waiting';
-    }
-  }
-  // 2. 无 ALTCHA 或已验证：直接点击签到按钮
-  clickSignInBtn();
-  return window.__yemaptClicked || 'NO_BTN';
+  // 无 ALTCHA → 直接点签到
+  if(found.signBtn){ found.signBtn.click(); return 'CLICKED'; }
+  return 'NO_BTN';
 })()
 '@
     }
@@ -1024,8 +1076,8 @@ $WebSignInConfigs = @{
     # 根据 signin-log.json 结果再迭代调整。
 
     "42w" = @{
-        Url = "https://api.42w.shop/console/personal"
-        WaitMs = 10000
+        Url = "https://api.42w.shop/"
+        WaitMs = 12000
         PostClickMs = 5000
         Detect = $SPASignInDetect
         Click = $null
@@ -1099,7 +1151,8 @@ function Invoke-WebSignIn {
     param(
         [string]$SiteName,
         [bool]$SaveDebugSnapshot = $false,
-        [string]$DebugDir = ""
+        [string]$DebugDir = "",
+        [bool]$NoFocus = $false
     )
     $cfg = $WebSignInConfigs[$SiteName]
     if (-not $cfg) {
@@ -1116,6 +1169,7 @@ function Invoke-WebSignIn {
         PostClickWaitMs = $cfg.PostClickMs
         SaveDebugSnapshot = $SaveDebugSnapshot
         DebugDir = $DebugDir
+        NoFocus = $NoFocus
     }
     if ($cfg.NavTimeoutSec) { $params.NavTimeoutSec = $cfg.NavTimeoutSec }
     if ($cfg.CfRetryCount) { $params.CfRetryCount = $cfg.CfRetryCount }

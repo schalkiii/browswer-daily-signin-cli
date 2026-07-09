@@ -1,5 +1,44 @@
 # Changelog
 
+## [v4.12.11] - 2026-07-10
+
+### FreeFarm 滑块误报修复 + PigGo 雷池 WAF 修复 + DepthStudio/audiences CF 耐心 + 基线回归修复
+
+基于 07-10 全量签到（42 成功 / 7 失败，共 49 站）的针对性适配。本轮把成功数从上一轮 33/49 提升到 42/49。
+
+#### 改动1: FreeFarm SLIDER 误报根因修复（signin-web.ps1 + kimi-webbridge.ps1）
+
+- **根因**：FreeFarm 旧 Detect 用 `div[class*="challenge"]` 误匹配布局 div，且 SLIDER 检测排在已签到关键词之前，导致已登录页（显示"签到成功/第 N 次签到"、无 challenge iframe）被长期误判为 SLIDER 滑块 → 移入 manual 长期未自动签。
+- **修复 signin-web.ps1**：FreeFarm Detect 改为**已签到关键词优先 + 精确滑块检测**（仅当"滑动滑块 / 验证您是真人 / 确认您是真人 / 滑动认证"或 challenge iframe 存在时才判 SLIDER）。
+- **新增 Invoke-SlideBypass（kimi-webbridge.ps1）**：在 `<script src*=slide>` 中正则提取 `set_access_token` token 路径 → `fetch` 该路径（credentials include）→ reload 绕过滑块。命中后重测，出现 SIGN_OK/ALREADY_SIGNED 即返回（最多 2 次尝试）。
+- **配置**：`sites.json` FreeFarm 策略 manual→webbridge；`baseline.json` 移回 auto。
+- **结果**：FreeFarm ALREADY_SIGNED ✓（之前因误报 SLIDER 长期未自动签）。
+
+#### 改动2: PigGo 雷池(Safeline) WAF 挑战修复（signin-web.ps1）
+
+- **根因**：PigGo 部署雷池 WAF，签到页初始 body 为空（仅 WAF JS challenge 加载），旧 `WaitMs=12000` 不足 → UNKNOWN。
+- **修复**：PigGo `WaitMs` 12000→30000，让 WAF 挑战求解后注入真实内容。
+- **结果**：PigGo ALREADY_SIGNED ✓（修复基线回归）。
+
+#### 改动3: DepthStudio / audiences CF 耐心加大（signin-web.ps1）
+
+- **背景**：两站为真实 CF 站点（表单含 `.cf-turnstile` data-sitekey）。CDP 点击在 CF 严格日全页挑战期找不到 widget → 返回 no-rect，无法绕过（skill lesson 35）。
+- **修复**：`WaitMs` 18000→24000，`CfRetryCount` 4→6，`CfRetryWaitMs` 15000→20000。应对 CF 宽松日自动过；严格日仍拦截（站点侧波动，非代码缺陷）。
+
+#### 改动4: 基线回归修复（baseline.json + sites.json）
+
+- FreeFarm（滑块误判修复）、UBits、Yemapt（ALTCHA）、42w（URL 恢复）经 webbridge 验证可自动签到，从 `baseline.json` 的 manual_sites 移回 sites（auto）。
+- baseline 版本 v4.10.1→v4.12.11；auto_total 49→57，manual_total 12→8。
+
+#### 07-10 全量签到结果
+
+| 类别 | 数量 | 说明 |
+| ---- | ---- | ---- |
+| OK   | 42   | 24 SIGN_OK + 11 ALREADY_SIGNED + 7 VISITED |
+| FAIL | 7    | DepthStudio/audiences(CF_CHALLENGE)、TJUPT(图片验证码)、zxiaoruan(OAuth BODY_NULL)、ptlao(HTTP 500)、vclib/521(imagestring 扩展 OCR) |
+
+**已知限制**：余下 7 站失败均为站点 / 扩展侧（CF 严格日波动、图片验证码、OAuth 登录、源站故障、浏览器扩展 OCR），代码层无法修复。
+
 ## [v4.12.6] - 2026-07-07
 
 ### CDP Shadow DOM 穿透 + NexusPHPSignInDetect 修复 + ALTCHA 适配

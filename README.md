@@ -111,20 +111,22 @@ v4.10 起统一为单一 `webbridge` 后端，移除 opencli 依赖。站点配�
 
 | 策略        | 站点数 | 原理                                      | 适用场景                       |
 | ----------- | ------ | ----------------------------------------- | ------------------------------ |
-| `webbridge` | 43     | 操控真实浏览器：navigate → detect → click | NexusPHP / 论坛 / SPA 控制台等 |
-| `manual`    | 6      | 跳过                                      | 验证码/滑块/未登录/人工确认    |
+| `webbridge` | 44     | 操控真实浏览器：navigate → detect → click | NexusPHP / 论坛 / SPA 控制台 / 滑块绕过 等 |
+| `web-read`  | 1      | 操控真实浏览器读取页面（签到态读取）      | UBits 等读取为主站点           |
+| `manual`    | 4      | 跳过                                      | 验证码/未登录/人工确认         |
 
 **webbridge 站点配置类型**（由 `signin-web.ps1` 中的 Detect/Click 决定）：
 
-| 配置类型                | Detect                                | Click                    | 状态转换                                                                                                      |
-| ----------------------- | ------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| NexusPHP attendance     | 通用检测模板                          | `$null`                  | 访问即签到，首次 SIGN_OK = 真实签到成功                                                                       |
-| 论坛/JS 点击            | 站点特定 JS                           | 站点 JS                  | 首次 SIGN_OK = ALREADY_SIGNED（今天已签到）                                                                   |
-| SPA 控制台              | SPA 模板                              | `$null`                  | 登录态保持即视为成功                                                                                          |
-| visit-only              | `$null`                               | `$null`                  | 仅访问，返回 VISITED                                                                                          |
-| NexusPHP + 验证码       | 通用检测模板                          | 轮询 JS                  | Click JS 用 setInterval 轮询 imagestring，待浏览器扩展填入后提交（v4.12.0+，vclib/521）                       |
+| 配置类型            | Detect       | Click   | 状态转换                                                                                |
+| ------------------- | ------------ | ------- | --------------------------------------------------------------------------------------- |
+| NexusPHP attendance | 通用检测模板 | `$null` | 访问即签到，首次 SIGN_OK = 真实签到成功                                                 |
+| 论坛/JS 点击        | 站点特定 JS  | 站点 JS | 首次 SIGN_OK = ALREADY_SIGNED（今天已签到）                                             |
+| SPA 控制台          | SPA 模板     | `$null` | 登录态保持即视为成功                                                                    |
+| visit-only          | `$null`      | `$null` | 仅访问，返回 VISITED                                                                    |
+| NexusPHP + 验证码   | 通用检测模板 | 轮询 JS | Click JS 用 setInterval 轮询 imagestring，待浏览器扩展填入后提交（v4.12.0+，vclib/521） |
 | NexusPHP + CF Turnstile | 通用检测模板（含 cfTokenPassed 修复） | `$NexusPHPCfSignInClick` | CF 通过后 token 自动填入 hidden input，Click JS 提交 attendance 表单（v4.12.5+，DepthStudio/xloli/audiences） |
-| SPA + ALTCHA            | SPA + CF 检测                         | 两阶段 Click JS          | 先点击 ALTCHA checkbox → 异步轮询 PoW 完成 → 点击签到按钮（v4.12.6+，Yemapt）                                 |
+| SPA + ALTCHA        | SPA + CF 检测 | 两阶段 Click JS | 先点击 ALTCHA checkbox → 异步轮询 PoW 完成 → 点击签到按钮（v4.12.6+，Yemapt） |
+| SPA + SLIDER（滑块绕过） | 精确滑块检测 + set_access_token 提取 | `Invoke-SlideBypass` | 检测到滑块挑战时提取 `set_access_token` token 路径并 fetch + reload 绕过（v4.12.11，FreeFarm） |
 
 ### 重要规则：禁止自动添加 manual
 
@@ -147,25 +149,27 @@ v4.10 起为唯一后端，操控用户真实浏览器（Chrome/Edge）完成签
 
 ## 核心文件
 
-| 文件                    | 说明                                                       |
-| ----------------------- | ---------------------------------------------------------- |
-| `signin-batch.ps1`      | **主入口** — 书签同步 → 签到 → 飞书推送                    |
-| `signin-single.ps1`     | 单站点调试工具                                             |
-| `signin-web.ps1`        | webbridge 各站点签到逻辑固化（URL + detect JS + click JS） |
-| `kimi-webbridge.ps1`    | webbridge HTTP API 封装                                    |
-| `scan-bookmarks.ps1`    | 独立书签扫描器（调试用）                                   |
-| `config.example.json`   | **配置模板**（复制为 `config.json` 后填写真实值）          |
-| `config.json`           | **本地配置文件**（已在 .gitignore 中排除，不上传仓库）     |
-| `sites.json`            | 站点列表（自动由书签同步维护）                             |
-| `baseline.json`         | 基线追踪（记录曾成功签到的站点）                           |
-| `CHANGELOG.md`          | 版本变更日志                                               |
-| `README.md`             | 项目说明（本文件）                                         |
-| `pt-signin-skill.md`    | 技能文档（英文）                                           |
-| `pt-signin-skill-cn.md` | 技能文档（中文）                                           |
-| `.gitignore`            | Git 忽略规则                                               |
-| `iterations.json`       | 自迭代修复日志（运行时，.gitignore 排除）                  |
-| `signin-log.json`       | 每次运行的结构化日志（运行时，.gitignore 排除）            |
-| `sync-log.json`         | 书签同步日志（运行时，.gitignore 排除）                    |
+| 文件                  | 说明                                                       |
+| --------------------- | ---------------------------------------------------------- |
+| `signin-batch.ps1`    | **主入口** — 书签同步 → 签到 → 飞书推送                    |
+| `signin-single.ps1`   | 单站点调试工具                                             |
+| `signin-web.ps1`      | webbridge 各站点签到逻辑固化（URL + detect JS + click JS） |
+| `kimi-webbridge.ps1`  | webbridge HTTP API 封装                                    |
+| `scan-bookmarks.ps1`  | 独立书签扫描器（调试用）                                   |
+| `config.example.json` | **配置模板**（复制为 `config.json` 后填写真实值）          |
+| `config.json`         | **本地配置文件**（已在 .gitignore 中排除，不上传仓库）     |
+| `sites.json`          | 站点列表（自动由书签同步维护）                             |
+| `baseline.json`       | 基线追踪（记录曾成功签到的站点）                           |
+| `CHANGELOG.md`        | 版本变更日志                                               |
+| `README.md`           | 项目说明（本文件）                                         |
+| `pt-signin-skill.md`  | 技能文档（英文）                                           |
+| `pt-signin-skill-cn.md` | 技能文档（中文）                                         |
+| `.gitignore`          | Git 忽略规则                                               |
+| `iterations.json`     | 自迭代修复日志（运行时，.gitignore 排除）                  |
+| `signin-log.json`     | 每次运行的结构化日志（运行时，.gitignore 排除）            |
+| `sync-log.json`       | 书签同步日志（运行时，.gitignore 排除）                    |
+| `gen-report.py`       | 签到结果 HTML 报告生成器（读 rerun-cumulative.json） |
+| `rerun-remaining.ps1` | 续跑型失败站点取证脚本（逐站增量落盘 rerun-cumulative.json） |
 
 ## 使用指南
 
@@ -317,3 +321,4 @@ A: 修改 `config.json` 中的 `browser.userDataPath`，指向新浏览器的 Us
 
 **Q: 签到结果不准确？**
 A: 检查 `signin-log.json` 查看站点级信号。用 `.\signin-single.ps1 -SiteName "站点名"` 单步调试。
+

@@ -29,3 +29,13 @@ Desktop.ini
 .idea/
 *.suo
 *.user
+
+# 项目内部 AI 工作记忆（不公开）
+.workbuddy/
+
+# 运行时签到结果 / 生成报告（每次运行动态生成，由 gen-report.py 读取 rerun-cumulative.json 生成）
+rerun-cumulative.json
+signin-report-*.html
+
+# 临时诊断脚本
+diag-*.ps1

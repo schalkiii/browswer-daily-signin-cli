@@ -85,10 +85,13 @@ function Invoke-WebBridgeCommand {
 
 # 循环关闭 session 下所有 tab，避免标签累积泄漏
 # 返回关闭的 tab 数量；extension 未连接时返回 -1
+# v4.12.10: 必须按 list_tabs 返回的显式 tabId 逐个关闭。
+# 根因：签到 tab 在折叠后台窗口中 active=False，close_tab 不带 tabId 时只关 active tab，
+#       导致 active=False 的签到 tab 永远关不掉、跨站点累积残留。改为遍历 list_tabs 逐个按 id 关。
 function Clear-WebBridgeTabs {
     param(
         [string]$Session = "daily-signin",
-        [int]$MaxClose = 10
+        [int]$MaxClose = 30
     )
     $closedCount = 0
     for ($i = 0; $i -lt $MaxClose; $i++) {
@@ -101,7 +104,15 @@ function Clear-WebBridgeTabs {
             if ($i -eq 0 -and $tabCount -gt 1) {
                 Write-Host "  [WebBridge] 检测到 $tabCount 个残留 tab，开始清理..." -ForegroundColor Yellow
             }
-            $closeResp = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{} -Session $Session -TimeoutSec 5
+            # 取第一个 tab 的 id（关闭后列表会缩短，下轮再取新的第一个）
+            $tab = $listResp.tabs[0]
+            $tabId = if ($tab.tabId) { $tab.tabId } elseif ($tab.id) { $tab.id } else { $null }
+            if (-not $tabId) {
+                # 拿不到 id 时退化为无参 close（保底），但这是残留根因，应尽量避免
+                $closeResp = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{} -Session $Session -TimeoutSec 5
+            } else {
+                $closeResp = Invoke-WebBridgeCommand -Action "close_tab" -CmdArgs @{ tabId = $tabId } -Session $Session -TimeoutSec 5
+            }
             if (-not $closeResp) {
                 # close_tab 失败（可能是 extension 未连接），停止循环
                 if ($closedCount -eq 0) { return -1 }
@@ -127,7 +138,8 @@ function Test-WebBridgeSignIn {
         [int]$CfRetryCount = 3,
         [int]$CfRetryWaitMs = 10000,
         [bool]$SaveDebugSnapshot = $false,
-        [string]$DebugDir = ""
+        [string]$DebugDir = "",
+        [bool]$NoFocus = $false
     )
     $session = "daily-signin"
 
@@ -158,15 +170,32 @@ function Test-WebBridgeSignIn {
                     Write-Host "  [WebBridge] $SiteName : extension 重试 $($extRetry+1)/3 仍未就绪" -ForegroundColor Yellow
                 }
             }
-            if (-not $nav -or -not $nav.success) {
-                return "NAV_FAIL"
-            }
+                if (-not $nav -or -not $nav.success) {
+                    # v4.12.7: daemon 内部 30s 硬编码导航超时（lesson 36）多为服务端慢/瞬时；
+                    # 重试导航 2 次以对抗偶发超时，仍失败才判 NAV_FAIL
+                    $navRetries = 0
+                    while ((-not $nav -or -not $nav.success) -and $navRetries -lt 2) {
+                        Write-Host "  [WebBridge] $SiteName : NAV_FAIL, re-navigate retry $($navRetries+1)/2..."
+                        Start-Sleep -Seconds 3
+                        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+                        $navRetries++
+                    }
+                    if (-not $nav -or -not $nav.success) {
+                        return "NAV_FAIL"
+                    }
+                }
         }
 
         # v4.12.6: navigate 后让标签页获得焦点（CF Turnstile 需要页面有焦点才渲染 iframe）
-        try {
-            $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Page.bringToFront"; params=@{}} -Session $session -TimeoutSec 5
-        } catch {}
+        # -NoFocus 模式（后台运行）下跳过，避免浏览器窗口抢焦点弹出，破坏用户当前工作
+        if (-not $NoFocus) {
+            try {
+                $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Page.bringToFront"; params=@{}} -Session $session -TimeoutSec 5
+            } catch {}
+        }
+
+        # v4.12.8: 强制真实布局视口，修复坐标点击（CF/ALTCHA）在折叠窗口 0x0 视口下失效的问题
+        $null = Enable-LayoutViewport -Session $session
 
         Write-Host "  [WebBridge] $SiteName : waiting ${WaitMs}ms for page load"
         Start-Sleep -Milliseconds $WaitMs
@@ -213,6 +242,22 @@ function Test-WebBridgeSignIn {
             return $signal
         }
 
+        # v4.12.7: SERVER_ERROR（HTTP 500/502 等）多为瞬时服务端错误，重新导航 1 次再判定，避免偶发失败
+        if ($signal -match "SERVER_ERROR") {
+            Write-Host "  [WebBridge] $SiteName : SERVER_ERROR, re-navigating once to confirm..."
+            $null = Clear-WebBridgeTabs -Session $session
+            $navSe = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+            if ($navSe -and $navSe.success) {
+                Start-Sleep -Milliseconds $WaitMs
+                $seDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+                $seSig = if ($seDetect -is [string]) { $seDetect } elseif ($seDetect.value) { "$($seDetect.value)" } else { "$seDetect" }
+                if ($seSig -and $seSig -notmatch "SERVER_ERROR") {
+                    Write-Host "  [WebBridge] $SiteName : after re-nav, signal=$seSig"
+                    $signal = $seSig
+                }
+            }
+        }
+
         # v4.12.3: UNKNOWN 时等待 5 秒重试 2 次（处理 SPA 页面加载慢，如 Rousi）
         # SPA 站点内容动态渲染，首次 Detect 可能页面还没加载完，等待后重新检测
         if ($signal -eq "UNKNOWN") {
@@ -234,7 +279,7 @@ function Test-WebBridgeSignIn {
         if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
             for ($retry = 0; $retry -lt $CfRetryCount; $retry++) {
                 # v4.12.5: Invoke-CfVerifyClick 内部会 scrollIntoView + 点击 iframe/widget
-                $cfClickResult = Invoke-CfVerifyClick $session $SiteName
+                $cfClickResult = Invoke-CfVerifyClick $session $SiteName $retry
                 if ($cfClickResult) { Write-Host "  [WebBridge] $SiteName : CF verify: $cfClickResult" }
 
                 # v4.12.5: 点击后等待 CF Turnstile 处理（iframe 内部验证 + token 填充）
@@ -274,10 +319,61 @@ function Test-WebBridgeSignIn {
             }
         }
 
+        # v4.12.11: SLIDER 处理 — FreeFarm 等站点的滑动验证，尝试 set_access_token token 绕过
+        if ($signal -match "SLIDER") {
+            for ($sr = 0; $sr -lt 2; $sr++) {
+                Write-Host "  [WebBridge] $SiteName : SLIDER detected, attempting bypass ($($sr+1)/2)..."
+                $bypassed = Invoke-SlideBypass $session $SiteName
+                if ($bypassed) {
+                    Start-Sleep -Seconds 4
+                    $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+                    $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
+                    Write-Host "  [WebBridge] $SiteName : post-bypass signal=$reSig"
+                    if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
+                        $sig2 = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
+                        Save-DebugSnapshot $SiteName $session "sign_ok_after_slider" $DebugDir $SaveDebugSnapshot
+                        return $sig2
+                    }
+                    if ($reSig -match "NEED_SIGN|UNKNOWN") { $signal = $reSig; break }
+                }
+            }
+            if ($signal -match "SLIDER") {
+                Save-DebugSnapshot $SiteName $session "slider_blocked_final" $DebugDir $SaveDebugSnapshot
+                return $signal
+            }
+        }
+
         if ($ClickEval) {
             Write-Host "  [WebBridge] $SiteName : evaluate click"
             $clicked = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $ClickEval } -Session $session -TimeoutSec 15
             Write-Host "  [WebBridge] $SiteName : click result=$clicked"
+            # v4.12.7: Yemapt ALTCHA 返回 widget 视口坐标，用 CDP 受信任点击触发验证
+            # （closed shadow checkbox 无法用 JS .click() 触发，真实坐标点击可命中 shadow 内复选框）
+            $clickedSig = if ($clicked -is [string]) { $clicked } elseif ($clicked.value) { "$($clicked.value)" } else { "$clicked" }
+            if ($clickedSig -match '^ALTCHA_RECT:') {
+                # v4.12.8: Click 返回 "ALTCHA_RECT:cx,cy,w,h"，在真实布局视口下尝试多个候选点命中 shadow 内复选框
+                $vals = ($clickedSig -replace '^ALTCHA_RECT:','') -split ','
+                if ($vals.Count -ge 4) {
+                    $rx = [int]$vals[0]; $ry = [int]$vals[1]; $rw = [int]$vals[2]; $rh = [int]$vals[3]
+                    # 候选点：主点(左+约30%) → 中心 → 左+20% → 左+约50% → 中心+70%
+                    $cands = @(
+                        @{x=$rx; y=$ry},
+                        @{x=$rx; y=[int]($ry + $rh*0.5)},
+                        @{x=[int]($rx - [int]($rw*0.03)); y=[int]($ry + $rh*0.2)},
+                        @{x=[int]($rx + [int]($rw*0.5)); y=[int]($ry + $rh*0.3)},
+                        @{x=$rx; y=[int]($ry + $rh*0.7)}
+                    )
+                    $altchaDone = $false
+                    foreach ($c in $cands) {
+                        if ($c.x -lt 1 -or $c.y -lt 1) { continue }
+                        $null = Invoke-CdpClickAt -X $c.x -Y $c.y -Session $session
+                        Write-Host "  [WebBridge] $SiteName : CDP click ALTCHA candidate ($($c.x),$($c.y))"
+                        Start-Sleep -Seconds 2
+                        if (Test-AltchaVerified -Session $session) { $altchaDone = $true; Write-Host "  [WebBridge] $SiteName : ALTCHA verified at ($($c.x),$($c.y))"; break }
+                    }
+                    if (-not $altchaDone) { Write-Host "  [WebBridge] $SiteName : ALTCHA 未能验证（多候选点均失效）" -ForegroundColor Yellow }
+                }
+            }
 
             Write-Host "  [WebBridge] $SiteName : waiting ${PostClickWaitMs}ms post-click"
             Start-Sleep -Milliseconds $PostClickWaitMs
@@ -285,6 +381,18 @@ function Test-WebBridgeSignIn {
             Write-Host "  [WebBridge] $SiteName : evaluate re-check"
             $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 30
             $recheckSig = if ($recheck -is [string]) { $recheck } elseif ($recheck.value) { "$($recheck.value)" } else { "$recheck" }
+            # 点击后页面导航导致 tab 重建（如表单提交），复检引用失效 → 重新导航+重检测确认实际状态
+            # 修复 xloli 等站点：点击返回 CLICKED 但复检报 "tab was closed"，信号变空（实则可能已签）
+            if (-not $recheck -or [string]::IsNullOrEmpty($recheckSig)) {
+                Write-Host "  [WebBridge] $SiteName : re-check tab lost (navigated), re-navigating to confirm..."
+                $null = Clear-WebBridgeTabs -Session $session
+                $navRe = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+                if ($navRe -and $navRe.success) {
+                    Start-Sleep -Milliseconds $WaitMs
+                    $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+                    $recheckSig = if ($recheck -is [string]) { $recheck } elseif ($recheck.value) { "$($recheck.value)" } else { "$recheck" }
+                }
+            }
             # 点击后检测到已签到 → 本次签到成功（非 ALREADY_SIGNED）
             if ($recheckSig -match "SIGN_OK|ALREADY_SIGNED") {
                 Save-DebugSnapshot $SiteName $session "sign_ok_after_click" $DebugDir $SaveDebugSnapshot
@@ -297,6 +405,8 @@ function Test-WebBridgeSignIn {
         return $signal
     }
     finally {
+        # v4.12.8: 还原设备视口覆盖，避免影响后续站点/真实浏览器
+        try { $null = Disable-LayoutViewport -Session $session } catch {}
         # 函数结束清理本站点所有 tab，确保不残留给下一个站点
         $null = Clear-WebBridgeTabs -Session $session
     }
@@ -310,7 +420,8 @@ function Test-WebBridgeSignIn {
 function Invoke-CfVerifyClick {
     param(
         [string]$Session,
-        [string]$SiteName
+        [string]$SiteName,
+        [int]$Attempt = 0
     )
 
     # 先滚动 widget 到视口（触发懒加载渲染 iframe）
@@ -328,96 +439,98 @@ function Invoke-CfVerifyClick {
         $null = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $scrollJS } -Session $Session -TimeoutSec 10
     } catch {}
 
-    # v4.12.6: CDP 穿透 closed Shadow DOM 点击 CF Turnstile iframe
-    try {
-        # Step 1: 获取文档根节点
-        $docResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.getDocument"; params=@{depth=1; pierce=$true}} -Session $Session -TimeoutSec 10
-        if (-not $docResult -or -not $docResult.root) { return "cdp:no-doc" }
-        $rootNodeId = $docResult.root.nodeId
-
-        # Step 2: 找到 .cf-turnstile widget
-        $qsResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.querySelector"; params=@{nodeId=$rootNodeId; selector=".cf-turnstile"}} -Session $Session -TimeoutSec 10
-        if (-not $qsResult -or $qsResult.nodeId -eq 0) {
-            # 备用：全页 CF 挑战（非 widget 模式），尝试直接找 iframe
-            $qsIframe = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.querySelector"; params=@{nodeId=$rootNodeId; selector="iframe[src*='challenges.cloudflare.com']"}} -Session $Session -TimeoutSec 10
-            if ($qsIframe -and $qsIframe.nodeId -ne 0) {
-                $iframeNodeId = $qsIframe.nodeId
-                $boxResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.getBoxModel"; params=@{nodeId=$iframeNodeId}} -Session $Session -TimeoutSec 10
-                if ($boxResult -and $boxResult.model) {
-                    return Invoke-CdpClickIframe -BoxResult $boxResult -Session $Session
-                }
-            }
-            return "cdp:no-widget"
-        }
-        $widgetNodeId = $qsResult.nodeId
-
-        # Step 3: requestChildNodes 加载 Shadow DOM 子节点
-        $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.requestChildNodes"; params=@{nodeId=$widgetNodeId; depth=10; pierce=$true}} -Session $Session -TimeoutSec 10
-        Start-Sleep -Milliseconds 500
-
-        # Step 4: describeNode 获取 Shadow DOM 中的 iframe
-        $descResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.describeNode"; params=@{nodeId=$widgetNodeId; depth=10; pierce=$true}} -Session $Session -TimeoutSec 10
-        if (-not $descResult -or -not $descResult.node) { return "cdp:desc-fail" }
-
-        # 解析 Shadow DOM: widget > div (有 shadowRoots) > shadowRoot > iframe
-        $widgetChildren = $descResult.node.children
-        if (-not $widgetChildren -or $widgetChildren.Count -eq 0) { return "cdp:no-children" }
-
-        $iframeNodeId = 0
-        foreach ($child in $widgetChildren) {
-            if ($child.shadowRoots -and $child.shadowRoots.Count -gt 0) {
-                foreach ($sr in $child.shadowRoots) {
-                    if ($sr.children -and $sr.children.Count -gt 0) {
-                        foreach ($srChild in $sr.children) {
-                            if ($srChild.nodeName -eq "IFRAME") {
-                                $iframeNodeId = $srChild.nodeId
-                                break
-                            }
-                        }
-                    }
-                }
-            }
-            if ($iframeNodeId -ne 0) { break }
-        }
-
-        if ($iframeNodeId -eq 0) { return "cdp:no-iframe-in-shadow" }
-
-        # Step 5: 获取 iframe box model
-        $boxResult = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="DOM.getBoxModel"; params=@{nodeId=$iframeNodeId}} -Session $Session -TimeoutSec 10
-        if (-not $boxResult -or -not $boxResult.model) { return "cdp:no-box-model" }
-
-        # Step 6: 用 CDP Input.dispatchMouseEvent 点击 iframe checkbox（左侧）
-        return Invoke-CdpClickIframe -BoxResult $boxResult -Session $Session
-    } catch {
-        return "cdp:exception:$($_.Exception.Message)"
-    }
+    # v4.12.7: 用 JS getBoundingClientRect 获取视口相对坐标点击 checkbox
+    # 旧版 DOM.getBoxModel 返回 layout 坐标，滚动页面时 Y 为负导致误点空白（audiences 实测点击坐标 (24,-1003) 越界）
+    # 视口坐标与 CDP Input.dispatchMouseEvent 的 x/y 一致，且天然处理滚动偏移
+    $rect = Get-CfWidgetViewportRect -Session $Session
+    if (-not $rect) { return "cdp:no-rect" }
+    return (Invoke-CfClickFromRect -Rect $rect -Session $Session -Attempt $Attempt)
 }
 
-# v4.12.6: 用 CDP Input.dispatchMouseEvent 点击 CF Turnstile iframe 的 checkbox
-# checkbox 在 iframe 左侧 (minX+24, centerY)，不是中心
-function Invoke-CdpClickIframe {
-    param(
-        $BoxResult,
-        [string]$Session
-    )
-    $content = $BoxResult.model.content
-    if (-not $content -or $content.Count -lt 4) { return "cdp:invalid-content" }
+# v4.12.7: 获取 CF widget/iframe 的视口相对坐标（getBoundingClientRect），与 CDP Input 坐标系一致
+function Get-CfWidgetViewportRect {
+    param([string]$Session)
+    $js = @'
+(function(){
+  function rectOf(el){ if(!el||!el.getBoundingClientRect) return null; var r=el.getBoundingClientRect(); return {x:r.x,y:r.y,w:r.width,h:r.height}; }
+  // v4.12.7: 拓宽匹配 hCaptcha / 非标准 CF 控件（audiences 等站点的"人机验证"非 .cf-turnstile）
+  var w = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]') || document.querySelector('[class*="cf-"]') || document.querySelector('#challenge-stage') || document.querySelector('[class*="hcaptcha"]') || document.querySelector('[class*="captcha"]');
+  if(w){ var r=rectOf(w); if(r) return {found:'widget', x:r.x,y:r.y,w:r.w,h:r.h, vw:window.innerWidth, vh:window.innerHeight}; }
+  var ifr = document.querySelector('iframe[src*="challenges.cloudflare.com"]') || document.querySelector('iframe[src*="captcha"]') || document.querySelector('iframe[src*="hcaptcha"]');
+  if(ifr){ var r2=rectOf(ifr); if(r2) return {found:'iframe', x:r2.x,y:r2.y,w:r2.w,h:r2.h, vw:window.innerWidth, vh:window.innerHeight}; }
+  return null;
+})()
+'@
+    try {
+        $res = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10
+        if ($res -is [string]) { return ($res | ConvertFrom-Json -ErrorAction SilentlyContinue) }
+        if ($res -and $res.value) { return ($res.value | ConvertFrom-Json -ErrorAction SilentlyContinue) }
+    } catch {}
+    return $null
+}
 
-    $minX = [math]::Min($content[0], [math]::Min($content[2], [math]::Min($content[4], $content[6])))
-    $maxX = [math]::Max($content[0], [math]::Max($content[2], [math]::Max($content[4], $content[6])))
-    $minY = [math]::Min($content[1], [math]::Min($content[3], [math]::Min($content[5], $content[7])))
-    $maxY = [math]::Max($content[1], [math]::Max($content[3], [math]::Max($content[5], $content[7])))
+function Invoke-CfClickFromRect {
+    param($Rect, [string]$Session, [int]$Attempt = 0)
+    # 偶数次点左侧 checkbox（x+24），奇数次点中心，提升不同 Turnstile 布局的通过率
+    if ($Attempt % 2 -eq 0) {
+        $cx = [math]::Min([math]::Max(2, [int]($Rect.x + 24)), [int]($Rect.vw - 2))
+    } else {
+        $cx = [math]::Min([math]::Max(2, [int]($Rect.x + $Rect.w / 2)), [int]($Rect.vw - 2))
+    }
+    $cy = [math]::Min([math]::Max(2, [int]($Rect.y + $Rect.h / 2)), [int]($Rect.vh - 2))
+    return (Invoke-CdpClickAt -X $cx -Y $cy -Session $Session)
+}
 
-    # CF Turnstile checkbox 在 iframe 左侧约 24px 处
-    $clickX = [math]::Round($minX + 24, 0)
-    $clickY = [math]::Round(($minY + $maxY) / 2, 0)
+function Invoke-CdpClickAt {
+    param([double]$X, [double]$Y, [string]$Session)
+    $ix = [int]$X; $iy = [int]$Y
+    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Input.dispatchMouseEvent"; params=@{type="mouseMoved"; x=$ix; y=$iy}} -Session $Session -TimeoutSec 10
+    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Input.dispatchMouseEvent"; params=@{type="mousePressed"; x=$ix; y=$iy; button="left"; clickCount=1}} -Session $Session -TimeoutSec 10
+    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Input.dispatchMouseEvent"; params=@{type="mouseReleased"; x=$ix; y=$iy; button="left"; clickCount=1}} -Session $Session -TimeoutSec 10
+    return "cdp:clicked:($ix,$iy)"
+}
 
-    # 鼠标移动 → 按下 → 释放
-    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Input.dispatchMouseEvent"; params=@{type="mouseMoved"; x=$clickX; y=$clickY}} -Session $Session -TimeoutSec 10
-    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Input.dispatchMouseEvent"; params=@{type="mousePressed"; x=$clickX; y=$clickY; button="left"; clickCount=1}} -Session $Session -TimeoutSec 10
-    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Input.dispatchMouseEvent"; params=@{type="mouseReleased"; x=$clickX; y=$clickY; button="left"; clickCount=1}} -Session $Session -TimeoutSec 10
+# v4.12.8: 强制布局视口（Emulation.setDeviceMetricsOverride）
+# 根因：WebBridge 标签页所在浏览器窗口为 159x27（仅标题栏）的折叠窗口，layout viewport 为 0x0
+#        导致 getBoundingClientRect / elementFromPoint / CDP Input.dispatchMouseEvent 全部坐标失效，
+#        仅 JS .click() 站点（无坐标需求）可成功；CF Turnstile / ALTCHA 等坐标点击站点全部失败。
+# 通过 setDeviceMetricsOverride 强制一个真实 CSS 视口（仅改变布局视口，不改变窗口是否置顶/弹出），
+# 使坐标系一致，从而让坐标点击生效；且不破坏「后台无焦点弹出」的要求。
+$LvwWidth = 1280
+$LvwHeight = 800
+function Enable-LayoutViewport {
+    param([string]$Session)
+    try {
+        $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method="Emulation.setDeviceMetricsOverride"; params=@{ width=$LvwWidth; height=$LvwHeight; deviceScaleFactor=1; mobile=$false } } -Session $Session -TimeoutSec 10
+        Start-Sleep -Milliseconds 300
+        return $true
+    } catch { return $false }
+}
+function Disable-LayoutViewport {
+    param([string]$Session)
+    try {
+        $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method="Emulation.clearDeviceMetricsOverride"; params=@{} } -Session $Session -TimeoutSec 10
+    } catch {}
+}
 
-    return "cdp:clicked:($clickX,$clickY)"
+# 检查 ALTCHA 是否已完成验证（aria-checked / data-state=verified / 隐藏 JWT 字段）
+function Test-AltchaVerified {
+    param([string]$Session)
+    $js = @'
+(function(){
+  var w=document.querySelector('altcha-widget'); var state=null,tokenLen=0;
+  if(w){var d=w.querySelector('.altcha'); if(d) state=d.getAttribute('data-state');}
+  var af=document.querySelector('input[name="altchaPayload"], input[name*="altcha"], input[value^="eyJ"]');
+  if(af&&af.value) tokenLen=af.value.length;
+  return JSON.stringify({verified:(state==='verified'||tokenLen>10)});
+})()
+'@
+    try {
+        $r = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10
+        if ($r -is [string]) { $o = $r | ConvertFrom-Json -ErrorAction SilentlyContinue; if ($o) { return $o.verified } }
+        if ($r -and $r.value) { $o = $r.value | ConvertFrom-Json -ErrorAction SilentlyContinue; if ($o) { return $o.verified } }
+    } catch {}
+    return $false
 }
 
 # v4.12.5: 检查 CF Turnstile 是否已通过（cf-turnstile-response 有值）
@@ -452,6 +565,39 @@ function Test-CfTurnstilePassed {
         if ($result.value) { return $result.value }
     } catch {}
     return "check-failed"
+}
+
+# v4.12.11: FreeFarm 滑块验证绕过（set_access_token token 提取）
+# 背景：FreeFarm（pt.0ff.cc）在登录态失效/首次访问时可能弹出滑动验证（slide_check_*.js）。
+# 该 JS 内含 set_access_token-<hash> API，直接 fetch 该 URL 即可绕过滑块（skill lesson 6 / rule D）。
+# 实现：定位 script[src*=slide] → 抓取 JS 文本 → 正则提取 token 路径 → fetch(tokenUrl, credentials:include) → reload。
+# 返回 $true 表示绕过成功（页面将 reload 进入签到态）；否则 $false（无 slide 脚本 / 提取失败）。
+function Invoke-SlideBypass {
+    param([string]$Session, [string]$SiteName)
+    $js = @'
+(function(){
+  return new Promise(function(resolve){
+    try {
+      var slide = document.querySelector('script[src*="slide"]');
+      if(!slide){ resolve('no_slide_script'); return; }
+      fetch(slide.src).then(function(r){return r.text();}).then(function(jsText){
+        var m = jsText.match(/set_access_token[\w\-]*/i) || jsText.match(/set_access_token[^\s"'<>]+/i);
+        if(!m){ resolve('no_token_in_js'); return; }
+        var path = m[0];
+        var url = (path.indexOf('http')===0) ? path : (location.origin + (path.charAt(0)==='/' ? path : '/' + path));
+        fetch(url, {credentials:'include'}).then(function(){ setTimeout(function(){ location.reload(); }, 1500); resolve('bypassed:'+url); })
+          .catch(function(e){ resolve('fetch_fail:'+e); });
+      }).catch(function(e){ resolve('js_fetch_fail:'+e); });
+    } catch(e){ resolve('err:'+e); }
+  });
+})()
+'@
+    try {
+        $r = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 20
+        $s = if ($r -is [string]) { $r } elseif ($r.value) { "$($r.value)" } else { "$r" }
+        Write-Host "  [WebBridge] $SiteName : slide-bypass: $s"
+        return ($s -match "^bypassed:")
+    } catch { return $false }
 }
 
 # 保存页面调试快照为 JSON

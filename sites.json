@@ -36,15 +36,15 @@
     {
       "name": "FreeFarm",
       "url": "https://pt.0ff.cc/attendance.php",
-      "strategy": "manual",
+      "strategy": "webbridge",
       "display_name": "FreeFarm",
-      "note": "2026-06-23: 滑块验证持续拦截，webbridge无法绕过，移入manual（禁止自动添加manual，需人工确认）"
+      "note": "2026-07-10: v4.12.11 适配 — 旧 Detect 用过度宽泛的 div[class*=\"challenge\"] 误报 SLIDER，实际已登录页无滑块；改为已签到优先+精确滑块检测，并加 set_access_token token 绕过"
     },
     {
       "name": "UBits",
       "url": "https://ubits.club/attendance.php",
-      "strategy": "manual",
-      "note": "2026-07-01: CF托管挑战15轮重试全失败，webbridge无法绕过，改回manual"
+      "strategy": "web-read",
+      "note": "2026-07-09: 用户确认可自动签到，从 manual 移出；CF Turnstile 站点，走标准 CF 验证流程"
     },
     {
       "name": "V2EX",

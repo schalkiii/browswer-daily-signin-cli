@@ -1,6 +1,6 @@
 {
-  "version": "v4.10.1",
-  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v4.10.1: vclib/521（验证码）、zxiaoruan/littlesheep/xt-url（OAuth登录）、42w/pp（URL失效）改为manual。",
+  "version": "v4.12.11",
+  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v4.10.1: vclib/521（验证码）、zxiaoruan/littlesheep/xt-url（OAuth登录）、42w/pp（URL失效）改为manual。v4.12.11: FreeFarm（滑块误判修复+set_access_token绕过）、UBits、Yemapt（ALTCHA）、42w（URL恢复）经 webbridge 验证可自动签到，从 manual_sites 移回 sites（auto）。DepthStudio/audiences 为 CF 严格日波动，仍在基线中追踪回归。",
   "sites": [
     "GGPT",
     "V2EX",
@@ -50,23 +50,23 @@
     "huan666",
     "anyrouter",
     "vclib",
-    "521"
+    "521",
+    "Yemapt",
+    "FreeFarm",
+    "UBits",
+    "42w"
   ],
   "manual_sites": [
     "北洋园PT",
     "TJUPT",
-    "FreeFarm",
-    "UBits",
-    "Yemapt",
     "vclib",
     "521",
     "zxiaoruan",
     "littlesheep",
     "xt-url",
-    "42w",
     "pp"
   ],
-  "auto_total": 49,
-  "manual_total": 12,
-  "last_updated": "2026-07-07 03:03:27"
+  "auto_total": 57,
+  "manual_total": 8,
+  "last_updated": "2026-07-10 01:15:00"
 }
