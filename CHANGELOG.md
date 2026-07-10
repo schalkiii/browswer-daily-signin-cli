@@ -1,5 +1,11 @@
 # Changelog
 
+## [v4.12.12] - 2026-07-10
+
+### 修复 / 新增
+- **audiences / DepthStudio**：CF 单次重试等待 `CfRetryWaitMs` 20s→45s（用户要求拉长，覆盖更硬的 CF 插页）；单站最坏等待 ≈ 24s + 6×45s ≈ 294s。
+- **新增 `push-cumulative.ps1`**：解耦飞书推送。续跑流程（`rerun-remaining.ps1` / `signin-web.ps1`）本不含推送逻辑，新增脚本读取 `rerun-cumulative.json` 一次性推送飞书卡片，保留崩溃安全的同时补上推送环节（07-10 结果据此补推）。
+
 ## [v4.12.11] - 2026-07-10
 
 ### FreeFarm 滑块误报修复 + PigGo 雷池 WAF 修复 + DepthStudio/audiences CF 耐心 + 基线回归修复

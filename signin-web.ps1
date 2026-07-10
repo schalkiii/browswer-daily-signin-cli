@@ -739,10 +739,11 @@ $WebSignInConfigs = @{
         # 验证：CF 托管挑战偶发（CF 反爬强度波动），宽松日可过，严格日 no-rect 失败属站点侧行为。
         # v4.12.11: 加大 CF 耐心（WaitMs 18s→24s，重试 4→6 次、单次 15s→20s）以应对严格日更长的
         #   全页 CF 插页；宽松日 CF 快速通过会在首次重试即跳出，不增加耗时。
+        # v4.12.12: 单次 CF 重试等待 20s→45s（用户要求拉长，覆盖更硬的插页）。
         WaitMs = 24000
         PostClickMs = 8000
         CfRetryCount = 6
-        CfRetryWaitMs = 20000
+        CfRetryWaitMs = 45000
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPCfSignInClick
     }
@@ -904,10 +905,11 @@ $WebSignInConfigs = @{
         Url = "https://audiences.me/attendance.php"
         # v4.12.5: CF 站点需要更长等待 + 多次 CF 重试 + CF 通过后提交表单
         # v4.12.11: 加大 CF 耐心（WaitMs 18s→24s，重试 4→6 次、单次 15s→20s），同 DepthStudio
+        # v4.12.12: 单次 CF 重试等待 20s→45s（用户要求拉长，覆盖更硬的插页）。
         WaitMs = 24000
         PostClickMs = 8000
         CfRetryCount = 6
-        CfRetryWaitMs = 20000
+        CfRetryWaitMs = 45000
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPCfSignInClick
     }
