@@ -1,5 +1,10 @@
 # Changelog
 
+## [v4.12.14] - 2026-07-11
+
+### 修复
+- **`push-cumulative.ps1` 失败站点可点击链接丢失**：失败列表拼装（原第 106 行）误用 `Get-Dn`（仅展示名纯文本），改为 `Format-SiteLink` → `[display_name](url)` 飞书 lark_md 可点击链接。与 `signin-batch.ps1` 的 `Send-FeishuSummary` 行为对齐（该版本失败区一直用 `Format-SiteLink`）。成功列表仍保持纯文本，避免 30+ 链接撑爆卡片。
+
 ## [v4.12.13] - 2026-07-11
 
 ### 改进

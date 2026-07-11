@@ -103,7 +103,7 @@ $successMd = "$e_green **签到成功 ($successCount)**`n$okJoined"
 
 $failMd = "$e_red **签到失败 ($failCount)**`n"
 foreach ($label in ($grouped.Keys | Sort-Object)) {
-    $names = ($grouped[$label] | Sort-Object | ForEach-Object { Get-Dn $_ }) -join ", "
+    $names = ($grouped[$label] | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
     $failMd += "- $($reasonMap.Values | Where-Object { $_.label -eq $label } | Select-Object -First 1 | ForEach-Object { $_.icon })$label ($($grouped[$label].Count)): $names`n"
 }
 
