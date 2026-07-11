@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 base = r"D:\workspace\browswer-daily-signin-cli"
 with open(base + r"\rerun-cumulative.json", encoding="utf-8") as f:
@@ -46,7 +47,7 @@ sign_ok = [e for e in succ if e["signal"] == "SIGN_OK"]
 already = [e for e in succ if e["signal"] == "ALREADY_SIGNED"]
 visited = [e for e in succ if e["signal"] == "VISITED"]
 
-now = "2026-07-10 01:15"
+now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
 def esc(s):
     return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
@@ -152,7 +153,7 @@ a:hover{{text-decoration:underline;}}
 <div class="meta">报告由浏览器真实签到生成 · 失败项多为 CF 严格日 / 图片验证码 / OAuth 登录 / 源站故障 / 浏览器扩展 OCR，需对应环境恢复或人工处理。</div>
 </div></body></html>"""
 
-out = base + r"\signin-report-2026-07-10.html"
+out = base + r"\signin-report-" + datetime.now().strftime("%Y-%m-%d") + ".html"
 with open(out, "w", encoding="utf-8") as f:
     f.write(html)
 print("WROTE", out, "| success", len(succ), "fail", len(fail))

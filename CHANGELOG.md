@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.12.13] - 2026-07-11
+
+### 改进
+- **`gen-report.py` 日期自动化**：报告标题时间戳与输出文件名 `signin-report-YYYY-MM-DD.html` 改为按当前日期动态生成，不再硬编码（此前每次跑需手改日期）。
+- **skill 文档固化推送路径**：`pt-signin-skill.md` / `pt-signin-skill-cn.md` 的「运行后动作」明确两条推送路径——`signin-batch.ps1` 末尾自动 `Send-FeishuSummary`；续跑流程 `rerun-remaining.ps1` 跑完 4 块后须单独 `.\push-cumulative.ps1` 补推（该路径本身无推送，漏跑则收不到飞书）。
+
+### 2026-07-11 全量结果（续跑流程，42/49 成功）
+- 成功：22 SIGN_OK + 13 ALREADY_SIGNED + 7 VISITED。
+- 失败 7（均站点/环境侧，非代码缺陷）：TJUPT / vclib / 521（图片/imagestring 验证码）、ptlao（HTTP 500）、xt-url（OAuth BODY_NULL）、DepthStudio / audiences（CF 严格日全页墙，45s 等待已证实无效）。
+- 相较上轮：UsefulTrash 瞬断（NAV_FAIL）重试恢复为 VISITED；zxiaoruan 由 BODY_NULL 恢复为 SIGN_OK。
+
 ## [v4.12.12] - 2026-07-10
 
 ### 修复 / 新增

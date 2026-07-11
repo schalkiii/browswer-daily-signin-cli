@@ -521,8 +521,10 @@ PT sites only allow one sign-in per day. Each run must be treated as a high-valu
 
 **Post-run actions** (every run, no exceptions):
 
-- Generate detailed sign-in report with auto/manual split
+- Generate detailed sign-in report with auto/manual split (`gen-report.py`, outputs `signin-report-YYYY-MM-DD.html` for the current date)
 - Push report to Feishu webhook
+  - Via `signin-batch.ps1` main flow: `Send-FeishuSummary` is called automatically at the end — no extra step
+  - Via rerun flow (`rerun-remaining.ps1`, used to avoid losing all results when a background task is reclaimed across turns): you MUST run `.\push-cumulative.ps1` separately after all 4 blocks finish — this path has no built-in push, otherwise no Feishu notification arrives
 - Clean temporary debug files from working directory
 - Update skill doc with any new patterns, fixes, or methodology improvements
 - Sync Chinese skill doc with all English changes
