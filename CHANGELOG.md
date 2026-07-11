@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.12.15] - 2026-07-12
+
+### 修复
+- **Yemapt ALTCHA 验证时机**：`kimi-webbridge.ps1` 的 ALTCHA 候选点击原每次仅等 2s 即查 `Test-AltchaVerified`，且 5 个候选点连点会反复重置 ALTCHA 的 PoW 计算，导致永远验证不完（多候选点均失效）。改为：候选点收拢到精确复选框点(rx,ry)附近小簇（±12px），每次点击后等 **8s** 让 PoW 完成；页面内 `setInterval` 轮询在验证完成后自动点「立即签到」。实测 Yemapt 由 NEED_SIGN → SIGN_OK。
+- **invites 误判排查**：原批量跑报 NEED_SIGN（点击后 recheck 仍 NEED_SIGN）。诊断确认其为 SPA 异步渲染时机竞态——按钮先短暂显示黄色「签到」，等后端 API 返回后才切绿色「已签到 X 天」；批量跑恰好卡在黄色阶段。Detect 逻辑本身正确（识别绿色/「已签到」即 SIGN_OK），重跑即通过为 ALREADY_SIGNED，**无需改代码**。
+
+### 本轮结果（2026-07-12 全量）
+- 49 站分 6 块前台续跑（rerun-remaining），44/49 成功（24 SIGN_OK + 13 ALREADY_SIGNED + 7 VISITED）。
+- 较 07-11 的 42/49 提升：DepthStudio/audiences（CF 宽松日+45s 等待）、Yemapt（ALTCHA 时机修复）、invites（SPA 竞态重跑）均恢复。
+- 仍失败 5 站（站点侧，代码层不可修）：TJUPT/vclib/521（图片/imagestring 验证码）、ptlao（HTTP 500）、xt-url（OAuth 登录态缺失）。
+
 ## [v4.12.14] - 2026-07-11
 
 ### 修复

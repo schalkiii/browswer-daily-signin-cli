@@ -355,20 +355,21 @@ function Test-WebBridgeSignIn {
                 $vals = ($clickedSig -replace '^ALTCHA_RECT:','') -split ','
                 if ($vals.Count -ge 4) {
                     $rx = [int]$vals[0]; $ry = [int]$vals[1]; $rw = [int]$vals[2]; $rh = [int]$vals[3]
-                    # 候选点：主点(左+约30%) → 中心 → 左+20% → 左+约50% → 中心+70%
+                    # v4.12.15: ALTCHA 复选框是小目标，集中在精确点(rx,ry=JS算出的复选框中心)附近密集重试；
+                    #   每次点击后等 8s 让 PoW 完成（原 2s 太短，且多点快速连点会重置 PoW 导致永远验证不完）
                     $cands = @(
                         @{x=$rx; y=$ry},
-                        @{x=$rx; y=[int]($ry + $rh*0.5)},
-                        @{x=[int]($rx - [int]($rw*0.03)); y=[int]($ry + $rh*0.2)},
-                        @{x=[int]($rx + [int]($rw*0.5)); y=[int]($ry + $rh*0.3)},
-                        @{x=$rx; y=[int]($ry + $rh*0.7)}
+                        @{x=$rx+12; y=$ry},
+                        @{x=[Math]::Max(1,$rx-12); y=$ry},
+                        @{x=$rx; y=$ry+10},
+                        @{x=$rx+24; y=$ry+5}
                     )
                     $altchaDone = $false
                     foreach ($c in $cands) {
                         if ($c.x -lt 1 -or $c.y -lt 1) { continue }
                         $null = Invoke-CdpClickAt -X $c.x -Y $c.y -Session $session
                         Write-Host "  [WebBridge] $SiteName : CDP click ALTCHA candidate ($($c.x),$($c.y))"
-                        Start-Sleep -Seconds 2
+                        Start-Sleep -Seconds 8
                         if (Test-AltchaVerified -Session $session) { $altchaDone = $true; Write-Host "  [WebBridge] $SiteName : ALTCHA verified at ($($c.x),$($c.y))"; break }
                     }
                     if (-not $altchaDone) { Write-Host "  [WebBridge] $SiteName : ALTCHA 未能验证（多候选点均失效）" -ForegroundColor Yellow }
