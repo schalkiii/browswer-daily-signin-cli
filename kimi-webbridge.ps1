@@ -355,24 +355,37 @@ function Test-WebBridgeSignIn {
                 $vals = ($clickedSig -replace '^ALTCHA_RECT:','') -split ','
                 if ($vals.Count -ge 4) {
                     $rx = [int]$vals[0]; $ry = [int]$vals[1]; $rw = [int]$vals[2]; $rh = [int]$vals[3]
-                    # v4.12.15: ALTCHA 复选框是小目标，集中在精确点(rx,ry=JS算出的复选框中心)附近密集重试；
-                    #   每次点击后等 8s 让 PoW 完成（原 2s 太短，且多点快速连点会重置 PoW 导致永远验证不完）
-                    $cands = @(
-                        @{x=$rx; y=$ry},
-                        @{x=$rx+12; y=$ry},
-                        @{x=[Math]::Max(1,$rx-12); y=$ry},
-                        @{x=$rx; y=$ry+10},
-                        @{x=$rx+24; y=$ry+5}
-                    )
+                    # v4.12.16: 先单击精确点一次（启动 PoW），随后只轮询验证、不再连点，
+                    #   避免原多候选点 8s 连点会重置 PoW（重复点击导致 PoW 永远验证不完）。
+                    #   仅当首点 + 长轮询仍失败时，才退而用小簇候选点各点一次并分别长轮询。
                     $altchaDone = $false
-                    foreach ($c in $cands) {
-                        if ($c.x -lt 1 -or $c.y -lt 1) { continue }
-                        $null = Invoke-CdpClickAt -X $c.x -Y $c.y -Session $session
-                        Write-Host "  [WebBridge] $SiteName : CDP click ALTCHA candidate ($($c.x),$($c.y))"
-                        Start-Sleep -Seconds 8
-                        if (Test-AltchaVerified -Session $session) { $altchaDone = $true; Write-Host "  [WebBridge] $SiteName : ALTCHA verified at ($($c.x),$($c.y))"; break }
+                    # 第一击：精确点（复选框中心 rx,ry）
+                    $null = Invoke-CdpClickAt -X $rx -Y $ry -Session $session
+                    Write-Host "  [WebBridge] $SiteName : CDP click ALTCHA primary ($rx,$ry), polling PoW (up to 42s)..."
+                    for ($i = 0; $i -lt 14; $i++) {
+                        Start-Sleep -Seconds 3
+                        if (Test-AltchaVerified -Session $session) { $altchaDone = $true; Write-Host "  [WebBridge] $SiteName : ALTCHA verified (primary)"; break }
                     }
-                    if (-not $altchaDone) { Write-Host "  [WebBridge] $SiteName : ALTCHA 未能验证（多候选点均失效）" -ForegroundColor Yellow }
+                    # 退路：首点 + 长轮询仍失败，用紧邻小簇各点一次并分别长轮询（不再连点重置 PoW）
+                    if (-not $altchaDone) {
+                        $altCands = @(
+                            @{x=$rx+12; y=$ry},
+                            @{x=[Math]::Max(1,$rx-12); y=$ry},
+                            @{x=$rx; y=$ry+10}
+                        )
+                        foreach ($c in $altCands) {
+                            if ($c.x -lt 1 -or $c.y -lt 1) { continue }
+                            $null = Invoke-CdpClickAt -X $c.x -Y $c.y -Session $session
+                            Write-Host "  [WebBridge] $SiteName : CDP click ALTCHA alt ($($c.x),$($c.y)), polling PoW (up to 30s)..."
+                            $ok = $false
+                            for ($j = 0; $j -lt 10; $j++) {
+                                Start-Sleep -Seconds 3
+                                if (Test-AltchaVerified -Session $session) { $ok = $true; break }
+                            }
+                            if ($ok) { $altchaDone = $true; Write-Host "  [WebBridge] $SiteName : ALTCHA verified (alt $($c.x),$($c.y))"; break }
+                        }
+                    }
+                    if (-not $altchaDone) { Write-Host "  [WebBridge] $SiteName : ALTCHA 未能验证（首点+候选点长轮询均失效）" -ForegroundColor Yellow }
                 }
             }
 

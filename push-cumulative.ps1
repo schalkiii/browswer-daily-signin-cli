@@ -82,7 +82,7 @@ $reasonMap = @{
     "CF_CHALLENGE" = @{ label = "CF/WAF 拦截"; icon = $e_cf }
     "NEED_SIGN"    = @{ label = "需验证码/人工"; icon = $e_q }
     "BODY_NULL"    = @{ label = "页面空/OAuth"; icon = $e_q }
-    "SERVER_ERROR" = @{ label = "源站错误"; icon = $e_cross }
+    "SERVER_ERROR" = @{ label = "连接被关闭(ERR_CONNECTION_CLOSED)"; icon = $e_cross }
 }
 $grouped = @{}
 foreach ($r in $failures) {

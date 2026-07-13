@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.12.16] - 2026-07-13
+
+### 修复
+- **Yemapt ALTCHA PoW 重置（真正根因）**：v4.12.15 的「±12px 小簇 + 8s 等待」仍未解决本质问题——多个候选点依次 CDP 点击会**反复重置 ALTCHA 的工作量证明（PoW）**，导致 PoW 永远算不完。改为：**单击精确点(rx,ry)一次启动 PoW，随后仅轮询 `Test-AltchaVerified`（每 3s，最多 42s）不再连点**；仅首点 + 长轮询失败时，才退而用小簇候选点各点一次并分别长轮询。本次重跑由 NEED_SIGN → **SIGN_OK ✓**（验证修复有效）。
+
+### 本轮环境事件（2026-07-13 全量，15/49）
+- **成功率骤降主因为网络出口故障，非代码缺陷**：快照取证确认 17 个 `SERVER_ERROR` 站点实为 `chrome-error://chromewebdata/` + `ERR_CONNECTION_CLOSED`（浏览器 TCP 连接被对端关闭），属代理/VPN/防火墙或 ISP 出口问题。重跑结果一致（持久），重跑无法修复。
+- 成功 15（5 SIGN_OK + 3 ALREADY_SIGNED + 7 VISITED）；失败 34 分类：连接关闭 17、页面空/OAuth 5(BODY_NULL)、UNKNOWN 10（hdbao 快照亦为 ERR_CONNECTION_CLOSED，其余多为同因或 SPA 未渲染）、CF_CHALLENGE 1(OurBits)、LOGIN_REQUIRED 1(NodeSeek)。
+- 仅 Yemapt 为可修复代码问题（已修复）；其余均站点/网络侧。建议网络恢复后重跑或检查本机代理/VPN。
+- 报告 `gen-report.py` 的 `SERVER_ERROR` 原因文案修正为「连接被关闭(ERR_CONNECTION_CLOSED)」；`push-cumulative.ps1` 失败分组标签同步更新。
+
 ## [v4.12.15] - 2026-07-12
 
 ### 修复

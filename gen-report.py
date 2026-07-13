@@ -31,7 +31,7 @@ def reason(name, sig):
     if sig == "BODY_NULL":
         return "页面 body 为空（OAuth 登录页 / WAF 挑战页未渲染，需人工登录）"
     if sig == "SERVER_ERROR":
-        return "源站服务器错误（HTTP 5xx，站点侧）"
+        return "网络连接被对端关闭（ERR_CONNECTION_CLOSED）：浏览器无法到达站点，代理/VPN/防火墙或网络出口问题，非代码缺陷"
     if sig == "UNKNOWN":
         return "页面已加载但状态未识别"
     if sig == "SLIDER":
@@ -122,8 +122,18 @@ a:hover{{text-decoration:underline;}}
 </div>
 
 <section>
-<h2>本次适配 / 变更（v4.12.11）</h2>
+<h2>环境说明（2026-07-13）</h2>
 <div class="note"><ul>
+<li><b>本次成功率骤降（14/49）主因为网络出口故障</b>：快照取证确认 17 个 SERVER_ERROR 站点实为 <code>ERR_CONNECTION_CLOSED</code>（浏览器 TCP 连接被对端关闭），属代理/VPN/防火墙或 ISP 出口问题，<b>非代码缺陷</b>，重跑结果一致。</li>
+<li>失败站点中仅 <span class="tag">Yemapt</span> 为可修复代码问题（已修复，见下）；其余失败均为网络/CF/OAuth/验证码等站点侧原因。</li>
+<li>建议网络恢复后重跑未成功站点，或检查本机代理/VPN 连接。</li>
+</ul></div>
+</section>
+
+<section>
+<h2>本次适配 / 变更（v4.12.16）</h2>
+<div class="note"><ul>
+<li><span class="tag">Yemapt</span> v4.12.16 修复 ALTCHA PoW 验证：原多候选点 8s 连点会<b>重置工作量证明</b>导致永远验证不完。改为<b>单击精确点一次 + 长轮询验证（最多 42s，不再连点）</b>，仅首点失败时退而用小簇候选点各点一次并分别长轮询。本次重跑由 NEED_SIGN → <b>SIGN_OK ✓</b></li>
 <li><span class="tag">FreeFarm</span> 旧 Detect 用过度宽泛的 <code>div[class*="challenge"]</code> 误报 SLIDER，实际已登录页无滑块。改为<b>已签到优先 + 精确滑块检测</b>，并新增 <code>Invoke-SlideBypass</code>（set_access_token token 提取）绕过真实滑块；<code>sites.json</code> 策略 manual→webbridge。结果 <b>ALREADY_SIGNED ✓</b></li>
 <li><span class="tag">PigGo</span> 雷池(Safeline) WAF JS 挑战页 body 初始为空导致 UNKNOWN。加大 <code>WaitMs</code> 12s→30s 让 WAF 挑战求解。结果 <b>ALREADY_SIGNED ✓</b>（修复基线回归）</li>
 <li><span class="tag">DepthStudio</span> / <span class="tag">audiences</span> CF 全页挑战波动：加大 CF 耐心（WaitMs 18s→24s、重试 4→6 次、单次 15s→20s）。今日仍被严格 CF 拦截（CDP 无法绕过），宽松日可自动过。</li>
