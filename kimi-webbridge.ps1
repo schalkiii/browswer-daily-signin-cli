@@ -278,6 +278,22 @@ function Test-WebBridgeSignIn {
 
         if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
             for ($retry = 0; $retry -lt $CfRetryCount; $retry++) {
+                # v4.12.17: 每次重试先重跑完整 Detect —— 修复 xloli 类误判：
+                # BODY_NULL/CF_CHALLENGE 实为页面渲染滞后或 CF 后台已通过，真实已签到
+                # （"得到魔力加成"等短语）被卡在 CF 重试而漏判成功。
+                $reDetect0 = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+                $reSig0 = if ($reDetect0 -is [string]) { $reDetect0 } elseif ($reDetect0.value) { "$($reDetect0.value)" } else { "$reDetect0" }
+                if ($reSig0 -and $reSig0 -notmatch "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
+                    Write-Host "  [WebBridge] $SiteName : retry detect signal=$reSig0"
+                    if ($reSig0 -match "SIGN_OK|ALREADY_SIGNED") {
+                        $cfPassSignal = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
+                        Save-DebugSnapshot $SiteName $session "sign_ok_after_cf" $DebugDir $SaveDebugSnapshot
+                        return $cfPassSignal
+                    }
+                    if ($reSig0 -match "NEED_SIGN|UNKNOWN") { $signal = $reSig0; break }
+                    if ($reSig0 -match "LOGIN_REQUIRED") { Save-DebugSnapshot $SiteName $session "login_required" $DebugDir $SaveDebugSnapshot; return "LOGIN_REQUIRED" }
+                }
+                # 仍判定 CF/BODY_NULL → 走原有 CF 点击流程
                 # v4.12.5: Invoke-CfVerifyClick 内部会 scrollIntoView + 点击 iframe/widget
                 $cfClickResult = Invoke-CfVerifyClick $session $SiteName $retry
                 if ($cfClickResult) { Write-Host "  [WebBridge] $SiteName : CF verify: $cfClickResult" }

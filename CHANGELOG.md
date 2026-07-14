@@ -1,5 +1,27 @@
 # Changelog
 
+## [v4.12.17] - 2026-07-14
+
+### 修复
+- **xloli BODY_NULL / CF 误判（v4.12.9 类变体）**：`kimi-webbridge.ps1` 的 CF 重试循环仅在首次 Detect 返回 `CF_CHALLENGE|BODY_NULL|REDIRECTING` 时进入；xloli 在 CF 挑战期首次 Detect 返回 `BODY_NULL`（页面尚未渲染完），进入重试后**只查 CF 状态、不再重跑完整 Detect**，导致后来渲染出的"得到魔力加成"（已签到）页面永不被识别，最终以失败漏判。
+- **修复**：CF 重试循环每次迭代开头先重跑完整 `$DetectEval`；若返回非 `CF_CHALLENGE`/`BODY_NULL` 信号（`SIGN_OK`/`ALREADY_SIGNED`/`NEED_SIGN`/`LOGIN_REQUIRED` 等）则按该信号处理并退出循环，真 CF 站点行为不变。重跑 xloli → **ALREADY_SIGNED ✓**（07-14 计入成功，总体 39/49）。
+
+### 工程改进
+- **`signin-batch.ps1` 逐站增量落盘**：原仅在全部跑完才写 `signin-log.json`，后台任务被环境回收则结果全丢。改为每跑完一站在 `finally` 写入 `rerun-cumulative.json` 同结构文件（最终完整 summary 仍结尾覆盖），中途回收也能从 log 读到已完成部分。
+
+### 本轮结果（2026-07-14 全量，网络恢复后重跑，39/49）
+- 成功 39（21 SIGN_OK + 11 ALREADY_SIGNED + 7 VISITED）；失败 10，全部站点侧，非代码缺陷。
+- 对比 07-13 的 15/49：17 个 `ERR_CONNECTION_CLOSED` 故障在网络恢复后几乎全部消失（仅 ptlao 仍 `ERR_CONNECTION_CLOSED`、Tokyo 转 `ERR_PROXY_CONNECTION_FAILED`，均属站点/代理侧）。
+- 失败 10 分类：
+  - `CF_CHALLENGE` ×2：OurBits、audiences（真 CF 全页挑战 / Turnstile，CDP 无法绕过）
+  - `SERVER_ERROR` ×2：Tokyo（`ERR_PROXY_CONNECTION_FAILED` 代理路由）、ptlao（`ERR_CONNECTION_CLOSED` 站点/代理关连接）
+  - `NEED_SIGN` ×2：vclib、521（imagestring 验证码，浏览器 OCR 扩展未成功填入）
+  - `UNKNOWN` ×1：Rousi（SPA 状态未识别，潜在 detect 增强点）
+  - `BODY_NULL` ×2：42w、zxiaoruan（OAuth/源站 521，manual 站）
+  - manual ×3：TJUPT（图片验证码）、42w、zxiaoruan（策略 manual，需人工）—— 注 42w/zxiaoruan 同时出现在 BODY_NULL 与 manual 分类
+- **代码可优化候选**：① Rousi（SPA 动态渲染，07-08/09 曾成功，07-14 UNKNOWN，疑似时序/结构变化）；② audiences（07-09 快照 body 含"每日签到 完成"，疑似已签到被 CF 检测误判，需加强"已签到优先于 CF"判断）。二者非阻断，留待后续。
+- 报告 `signin-report-2026-07-14.html`（gen-report.py 按当前日期动态生成）。
+
 ## [v4.12.16] - 2026-07-13
 
 ### 修复

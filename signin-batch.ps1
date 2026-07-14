@@ -327,6 +327,26 @@ foreach ($site in $config.sites) {
 
     $r.elapsed = "$([math]::Round(((Get-Date)-$start).TotalSeconds,1))s"
     $results += $r
+    # v4.12.17: 增量落盘 —— 后台任务跨 turn 可能被回收，逐站写 log 保证可调试
+    $partialSummary = @{
+        timestamp     = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+        total         = $total
+        success       = $signals.ok_sites.Count
+        failed        = $signals.fail_sites.Count
+        skipped       = $signals.skip_sites.Count
+        iterations    = $script:iterationLog.Count
+        baseline_known= $baseline.sites.Count
+        new_successes = $tracking.new_sites
+        regressions   = $tracking.regressions
+        needs_manual_review = $tracking.needs_manual_review
+        ok_sites      = $signals.ok_sites
+        fail_sites    = $signals.fail_sites
+        skip_sites    = $signals.skip_sites
+        iteration_log = $script:iterationLog
+        results       = $results
+        partial       = $true
+    }
+    $partialSummary | ConvertTo-Json -Depth 4 | Out-File $ResultFile -Encoding UTF8
     Write-Output ""
 }
 
