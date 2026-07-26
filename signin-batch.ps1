@@ -6,7 +6,8 @@ param(
     [string]$FeishuChatId = "",
     [string]$FeishuWebhook = "",
     [switch]$SaveDebugSnapshot,
-    [switch]$NoFocus
+    # v4.13.0: 仅执行配置一致性校验并退出（不打开浏览器、不签到）
+    [switch]$ValidateConfig
 )
 
 $ErrorActionPreference = "Continue"
@@ -35,6 +36,22 @@ if (-not (Test-Path $ConfigFile)) { Write-Output "[ERROR] Config not found: $Con
 $configRaw = Get-Content $ConfigFile -Raw -Encoding UTF8
 $configRaw = $configRaw -replace '^\uFEFF', ''
 $config = $configRaw | ConvertFrom-Json
+
+# v4.13.0: 配置一致性校验（防止"非 manual 站点缺 $WebSignInConfigs → NO_CONFIG 静默跳过"）
+# 不依赖浏览器，运行前即可发现配置债务。-ValidateConfig 时仅校验并退出。
+$configIssues = Test-SigninConfigConsistency -Config $config
+if ($configIssues.Count -gt 0) {
+    foreach ($iss in $configIssues) {
+        if ($iss.severity -eq 'WARN') { Write-Warning "CONFIG[$($iss.site)]: $($iss.message)" }
+        else { Write-Output "  [config-note] $($iss.site): $($iss.message)" }
+    }
+}
+if ($ValidateConfig) {
+    $warnCount = ($configIssues | Where-Object { $_.severity -eq 'WARN' }).Count
+    Write-Output ""
+    Write-Output "Config validation done: $($configIssues.Count) issue(s), $warnCount warning(s)."
+    if ($warnCount -gt 0) { exit 1 } else { exit 0 }
+}
 
 # 飞书配置优先级: 命令行参数 > config.json > sites.json（旧字段, 向后兼容）
 if ([string]::IsNullOrEmpty($FeishuWebhook) -and $GlobalCfg -and $GlobalCfg.feishu) {
@@ -188,7 +205,7 @@ function Sync-Bookmarks {
     $syncLogFile = "$PSScriptRoot\sync-log.json"
     $syncRecord = [PSCustomObject]@{
         timestamp      = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-        bookmarkCount  = $bookmarkUrls.Count
+        bookmarkCount  = $bookmarkInfos.Count
         total          = $newSites.Count
         added          = @($added)
         removed        = @($removed)
@@ -219,7 +236,7 @@ if (Test-Path $WebArticlesDir) {
     Get-ChildItem $WebArticlesDir -File | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-Write-Output "=== PT Sign-in v3.8 (self-iterating + baseline + forum click + cleanup + bookmark-sync) ==="
+Write-Output "=== PT Sign-in v4.12.25 (self-iterating + baseline + forum click + cleanup + bookmark-sync) ==="
 Write-Output "Started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 Write-Output "Sites: $($config.sites.Count)"
 Write-Output ""
@@ -250,9 +267,16 @@ function Track-Baseline($siteName, $status) {
 # webbridge daemon 健康检查：不可用时自动清理 pid 并重启
 $script:webbridgeAvailable = Ensure-WebBridgeDaemon
 
+# v4.12.19: 批处理开始前整会话强关残留 tab（上一轮被硬杀时 per-site finally 未执行会残留）
+if ($script:webbridgeAvailable) {
+    try { $null = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session "daily-signin" -TimeoutSec 8 } catch {}
+}
+
 foreach ($site in $config.sites) {
     $idx = $config.sites.IndexOf($site) + 1
-    $session = "pt$idx"
+    # v4.12.25: 删除原 $session="pt$idx" 死变量。所有站点必须共用 "daily-signin" 单一会话，
+    #   这是 Open-SiteTab(Close-SiteTabs-Verified) 能"关掉上一站点 tab"的前提；若改传独立 session，
+    #   close_session 只清自己 → 上一站 tab 永不关 → 泄漏重现。Test-WebBridgeSignIn 内 $session 硬编码 "daily-signin"。
     $start = Get-Date
     $r = @{ index = $idx; name = $site.name; url = $site.url; strategy = $site.strategy; status = "UNKNOWN"; signal = ""; elapsed = "" }
 
@@ -271,7 +295,9 @@ foreach ($site in $config.sites) {
                     $r.status = "SKIPPED"; $r.signal = "DAEMON_DOWN"
                     $signals.skip_sites += $site.name; Write-Output "  => SKIPPED (webbridge daemon 不可用)"
                 } else {
-                    $wbResult = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$NoFocus
+                    # v4.12.24: 批处理全程后台，绝不弹前台（用户明确要求）。
+                    #   单独站点调试可用 signin-single.ps1（其已硬编码 -NoFocus:$true）。
+                    $wbResult = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$true
                     $r.signal = $wbResult
                     switch -Wildcard ($wbResult) {
                         "SIGN_OK"       { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
@@ -284,6 +310,8 @@ foreach ($site in $config.sites) {
                         "NO_CONFIG"     { $r.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => NO_CONFIG" }
                         "BODY_NULL"     { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (body null)" }
                         "REDIRECTING"   { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => REDIRECTING" }
+                        "SERVER_ERROR"  { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (server/network error)" }
+                        "EVAL_FAIL"     { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (evaluate failed)" }
                         default         { $r.status = "NO_DETECT"; $signals.fail_sites += $site.name; Write-Output "  => $wbResult (webbridge)" }
                     }
                     # 失败重试：CF_BLOCKED / SLIDER_FAIL / PAGE_ERROR / NO_DETECT / TIMEOUT 最多重试 2 次
@@ -292,7 +320,7 @@ foreach ($site in $config.sites) {
                         for ($retry = 1; $retry -le 2; $retry++) {
                             Write-Output "  [RETRY $retry/2] $($site.name) - waiting 10s..."
                             Start-Sleep -Seconds 10
-                            $wbResult2 = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$NoFocus
+                            $wbResult2 = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$true
                             $r.signal = $wbResult2
                             if ($wbResult2 -eq "SIGN_OK" -or $wbResult2 -eq "VISITED" -or $wbResult2 -eq "ALREADY_SIGNED") {
                                 if ($wbResult2 -eq "VISITED") {
@@ -459,16 +487,11 @@ function Send-FeishuSummary {
     # ===== Classify failures by reason =====
     $capSites = @(); $deadSites = @(); $nodetectSites = @(); $otherSites = @()
     foreach ($r in $results) {
-        if ($r.status -ne "SUCCESS" -and $r.status -ne "ALREADY_DONE" -and $r.status -ne "LOGGED_IN" -and $r.status -ne "SKIPPED" -and $r.status -ne "VISITED") {
+        if ($r.status -ne "SUCCESS" -and $r.status -ne "ALREADY_DONE" -and $r.status -ne "SKIPPED" -and $r.status -ne "VISITED") {
             switch ($r.status) {
-                "CAPTCHA"      { $capSites += $r.name }
-                "TOO_SMALL"    { $capSites += $r.name }
-                "CF_DETECTED"  { $capSites += $r.name }
-                "CF_BLOCKED"   { $capSites += $r.name }
-                "NO_ARTICLE"   { $deadSites += $r.name }
-                "NO_DETECT"    { $nodetectSites += $r.name }
-                "UNKNOWN"      { $otherSites += $r.name }
-                default        { $otherSites += $r.name }
+                "CF_BLOCKED"  { $capSites += $r.name }
+                "NO_DETECT"   { $nodetectSites += $r.name }
+                default       { $otherSites += $r.name }
             }
         }
     }

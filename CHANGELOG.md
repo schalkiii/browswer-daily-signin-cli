@@ -1,5 +1,193 @@
 # Changelog
 
+## [v4.13.7] - 2026-07-26
+
+### 根治导航 30s 超时 + 反复开 tab（用户实跑复现的根因）
+
+- **根因（实测锤死）**：daemon 的 `navigate` 动作**完全忽略 `waitUntil` 参数**，永远死等 `load` 事件；而大多数 PT 站（CF 挑战 / 慢子资源 / 长连接 / 折叠后台窗口）的 `load` 在 30s 内不触发 → 超时 → **daemon 直接销毁 tab** → 重试路径反复 `newTab` 开新 tab 堆积。v4.13.4 的 `waitUntil=domcontentloaded` 方案（及此前所有尝试）均因此无效——`about:blank` 各取值(commit/load/domcontentloaded…)全 30s 超时即为铁证；baidu 偶成功只是其 `load` 碰巧快。
+- **新导航方案（已现场验证）**：`Open-SiteTab` 不再用 `navigate` 跳真目标，改为
+  1. `navigate` 到本地 `data:text/html` seed（秒回、零网络/代理依赖）建一个"活" tab；
+  2. `cdp Page.navigate` 跳到真目标——**非阻塞、不等 load、不销毁 tab**；
+  3. 就绪判定完全交给已有的 `Wait-PageReady` 轮询 DOM。
+  - WAF 站(雷池等)会让 daemon 的 `cdp` 包装一直等"导航提交"而卡住（HDKYL 实测 20s+），但导航实际已发起且 tab 存活（实测客户端 8s 提前 abort 后 tab 仍在、HDKYL 已 `complete` 加载）。故 `cdp Page.navigate` 用**短超时 12s + 容错**：超时即视为已发起、转交轮询；导航后仅校验 `list_tabs` tab 仍存活。
+- **清理无效参数**：删除全链路 `NavWaitUntil`（daemon 不吃，已成死参数）——`Open-SiteTab`/`Test-WebBridgeSignIn` 参数、6 处调用点、`Invoke-WebSignIn` 透传、pbh-btn 配置。
+- **现场复核**：Kufirc `VISITED`(17s)、OurBits `CF_CHALLENGE`(35s)、HDKYL `CF_CHALLENGE`(113s，雷池循环挑战属站点侧)——**均无 30s load 超时、无 tab 堆积**（结束 `list_tabs`=0）。校验：两文件 pwsh7 解析 0 错误；`Test-SigninConfigConsistency` ISSUES=0。
+- **未改动的已知次生问题**（与本次无关）：CF Turnstile 在折叠后台窗口里 `cdp:no-rect` 点不中（OurBits/HDKYL 等硬盾站仍返回 `CF_CHALLENGE`，需用户偶尔手动过盾）。
+
+## [v4.13.6] - 2026-07-26
+
+### 全局自然分辨率 + 全局动态轮询 + daemon/extension 自愈
+
+- **默认自然分辨率**（用户要求"不需坐标系一致的站点都恢复自然分辨率"）：`Enable-LayoutViewport`(1280×800) 由"所有站点默认启用"反转为**默认跳过**。`SkipLayoutViewport` 语义反转为 **`ForceLayoutViewport`**（默认 `$false`）：仅坐标点击站声明 `$true`——OurBits/DepthStudio/audiences（CF Turnstile）、Yemapt（ALTCHA，rect 由 ClickEval 在点击前算出，懒启用来不及）。HDKYL 删除冗余 `SkipLayoutViewport`。
+- **懒启用兜底**：`Invoke-CfVerifyClick` 顶部新增 `Enable-LayoutViewport`（在 scroll/rect 计算**之前**）——自然分辨率站点中途意外遇到 CF 挑战时坐标系仍一致；对已 Force 的站点幂等无害。
+- **全局动态轮询**（用户要求"所有站点长延迟+动态轮询"）：`Test-WebBridgeSignIn` 参数 `LoadWaitSec` 默认 **0→45**，所有站点导航后走 `Wait-PageReady`（每 2s 轮询，就绪即继续，正常站 2~6s 通过，不拖慢）。`Invoke-WebSignIn` 透传改用 `ContainsKey('LoadWaitSec')`，允许站点显式 0 退回固定 `WaitMs`。HDKYL 保持 60。
+- **daemon/extension 自愈**：
+  - `Test-WebBridgeConnection` 三态探测（ok / extension_down / daemon_down）。⚠️ **弃用 `ping`——现役扩展根本不支持该动作**（现场实测返回 `Unknown tool: ping`，可用动作无 ping），改用 `list_tabs`（真·扩展路径连通判据）。
+  - `Restart-WebBridgeDaemon`：stop→清 pid→start→轮询端口+扩展重连（≤30s）。不用 `iex`；exe 缺失只提示手动安装。
+  - `Ensure-WebBridgeDaemon` 改走新探测+自愈；新增 `Ensure-WebBridgeHealthy` 挂在 `Test-WebBridgeSignIn` 入口——每站开工前快速探测，断连自动重启（**每次运行至多一次**，防重启风暴），自愈失败返回 NAV_FAIL。
+- **顺手修复两个现场踩中的 bug**：
+  - `Open-SiteTab` 的 `$ForceNew` 由 `[bool]` 改 **`[switch]`**——调用点裸传 `-ForceNew` 在 [bool] 下报 "Missing an argument"（HDKYL evaluate 失败重导航路径现场触发，属旧隐患现形）。
+  - HDKYL Detect 头部加 `if(!document.body) return 'REDIRECTING'`——雷池盾每 ~5s 循环重载（complete→loading），body 为 null 瞬间取 `innerText` 抛 TypeError → EVAL_FAIL 误判。
+- **现场复核**（daemon+扩展本次在线）：`Test-WebBridgeConnection`=ok；HDKYL 干净走完流程返回 CF_CHALLENGE（雷池盾对折叠后台窗口无限循环挑战，+30s 曾见"验证完成"后又被重新挑战，1280×800 也过不去，**站点侧 bot 评分问题非代码缺陷**）；`waitUntil=domcontentloaded` 机制正常（baidu 3s 返回）；OurBits 本次 NAV_FAIL 为站点/CF 侧 30s 内 DOM 都不可达，重试链路行为正确。
+- **校验**：两文件 pwsh7 解析 0 错误；`Test-SigninConfigConsistency` ISSUES=0。
+
+## [v4.13.5] - 2026-07-26
+
+### HDKYL：跳过强制视口 + 过盾动态等待
+
+- **分辨率太小**：HDKYL 过网站盾(WAF)，强制 `Emulation.setDeviceMetricsOverride` 1280×800 反而让它显得分辨率很小。新增 per-site `$cfg.SkipLayoutViewport=$true`：跳过 `Enable-LayoutViewport`，标签页用**浏览器窗口的自然分辨率**。其余站点仍保持 1280×800（CF Turnstile / ALTCHA 坐标点击需要坐标系一致）。
+- **过盾等待太短**：原固定 `WaitMs` 对盾求解不够，常误判 UNKNOWN/SERVER_ERROR。新增 per-site `$cfg.LoadWaitSec=N`：把固定等待换成 `Wait-PageReady` **动态轮询**——每 2s 检查「body 文本足够长且无盾关键词(雷池/正在检查/DDoS/Just a moment/…)」，就绪即继续，最多等 N 秒（不空等满延迟）。HDKYL 设 `LoadWaitSec=60`（用户建议 45s~1min）。
+- `Wait-PostNavigate` 统一导航后等待入口（开 `LoadWaitSec` 走动态，否则沿用固定 `WaitMs`，行为不变）；`SkipLayoutViewport`/`LoadWaitSec`/`ReadyEval` 贯穿 `Open-SiteTab`→`Test-WebBridgeSignIn`→`Invoke-WebSignIn`。`ReadyEval` 可选，提供自定义就绪判定 JS（期望 `JSON {ready:true}` 或布尔）。
+- **校验**：两文件 pwsh7 解析 0 错误；`Test-SigninConfigConsistency` ISSUES=0。
+- ⚠️ **未现场复核**：daemon 当前 502（浏览器/扩展断开），HDKYL 过盾行为与分辨率待浏览器重连后由用户实跑确认。
+
+## [v4.13.4] - 2026-07-26
+
+### 修复：批量运行时重复开大量相同 tab + 普遍 30s 导航超时
+
+- **现象（用户 07-26 实跑复现）**：几乎每个站点反复打开很多个相同 tab，且未先关旧 tab 再重试；`navigate` 普遍 `page load timeout (30s)`，Tokyo/UsefulTrash 等均超时。
+- **根因①（主导）**：daemon `navigate` 默认等 **`load` 事件**，多数站点（代理 7890 / CF / 慢子资源）30s 内 `load` 不触发 → 导航超时；卡在"加载中"的 tab 在「函数内 3 次重试 × 外层 3 次重试」里累积，即成"重复开很多相同 tab"。
+- **根因②（放大）**：`Close-SiteTabs-Verified` 仅在 `list_tabs` 校验发现漏关时才跑「逐 id 关」退路；若 `close_session` 漏关且 `list_tabs` 因 extension 抖动返回空（假阴性），退路永不触发 → tab 静默累积。
+- **修复①**：`Open-SiteTab` 默认 `waitUntil` 由 daemon 的 `load` 改为显式 **`domcontentloaded`**（pbh-btn 已证可行）。本 CLI 检测靠 `evaluate` 轮询 DOM + `WaitMs` 延后，无需等全部子资源；domcontentloaded 让导航 1~3s 返回，规避 30s 超时且不残留卡加载 tab。单站可用 `$cfg.NavWaitUntil='load'` 覆盖（确须等 load 时）。
+- **修复②**：`Close-SiteTabs-Verified` 把「逐 id 关」(`Clear-WebBridgeTabs`) 提为**常驻第二关**（best-effort 总跑），与 daemon 级 `close_session` 双保险，不再依赖 `list_tabs` 校验假阴性。
+- **校验**：两文件 pwsh7 解析 0 错误；`Test-SigninConfigConsistency` ISSUES=0。
+- ⚠️ **未现场复核**：编写时 daemon `ping` 返回 502（浏览器/扩展已断开），未能实跑单站确认导航速度与 tab 数；待浏览器重连后由用户重跑验证。
+
+## [v4.13.3] - 2026-07-26
+
+### pbh-btn 适配修正（现场 DOM 核验，非对齐蜂巢）
+
+- **修正 v4.13.2 的致命选择器错误**：v4.13.2 编写时 daemon 离线，按蜂巢(pting)模式假设 pbh-btn 按钮为 `<button id="checkInButton">`，但 daemon 上线后现场核验证明 pbh-btn 的 Flarum check-in 插件**按钮无 id**。
+  - 真实 DOM：未签 = `<button class="Button CheckInButton--yellow hasIcon">签到</button>`（可点）；已签 = `<button class="Button CheckInButton--green hasIcon disabled">已签到N天</button>`。
+  - 原 `#checkInButton` 选择器在 pbh-btn 上**永远匹配不到** → 误判 `UNKNOWN`/`NO_DETECT`。
+- **Detect 改为 class 选择器**：`document.querySelector('button.CheckInButton--yellow, button.CheckInButton--green')`；命中且 `disabled` 或文本含「已签到」→ `ALREADY_SIGNED`，否则（黄、未 disable）→ `NEED_SIGN`；并保留「签到/每日签到」文本兜底。
+- **Click 加护栏**：仅点「未签」状态按钮（黄且未 disabled、文本非已签），避免对已签按钮重复点击；兜底按文本点。
+- **新增 `NavWaitUntil` 贯穿通道**（解决 Flarum SPA 导航超时）：
+  - `Open-SiteTab` 新增 `[string]$NavWaitUntil` 参数，非空时向 daemon `navigate` 传 `waitUntil`；`Test-WebBridgeSignIn` 在 5 处 `Open-SiteTab` 调用（首开/extension 就绪重试/NAV_FAIL 重试/evaluate 丢 tab 重试/SERVER_ERROR 重导/点击后重导）均透传；`Invoke-WebSignIn` 增加 `if ($cfg.NavWaitUntil) { $params.NavWaitUntil = $cfg.NavWaitUntil }`。
+  - pbh-btn 配置加 `NavWaitUntil = "domcontentloaded"`：Flarum 子资源常挂起导致 `load` 永不触发 → 原 30s 超时；改 `domcontentloaded` 让导航先返回再靠 `WaitMs`(15s) 轮询按钮渲染。
+- **现场复核（daemon 在线）**：`Invoke-WebSignIn -SiteName pbh-btn` → 导航成功（无 30s 超时）、Detect 返回 `ALREADY_SIGNED`（今日已签，按钮 green disabled「已签到1天」）。校验：两文件 pwsh7 解析 0 错误；`Test-SigninConfigConsistency` ISSUES=0。
+- 注意：今日已签，`NEED_SIGN`→点击→`ALREADY_SIGNED` 的真实点击路径未现场跑（按钮 disabled 点击为 no-op）；逻辑与 Detect 对称，待明日未签态再验证一次点击。
+
+## [v4.13.2] - 2026-07-26
+
+### pbh-btn（PBH-BTN 论坛）真实签到适配
+
+- 用户指出 pbh-btn 有真实签到逻辑（此前仅是 SPA 访问保活：`Detect=$SPASignInDetect, Click=$null`）。
+- pbh-btn 是 Flarum 论坛，与蜂巢(pting)同款 check-in 插件（`<button id="checkInButton">签到</button>`，点击后按钮消失、显示连续签到天数）。
+- 改用与蜂巢同一模式的真实 Detect+Click，并加**文本兜底**（`button/a` 文本精确为「签到」/「每日签到」）以防插件选择器略有差异；已签检测用「已签到/连续签到/今日已签到」文本。
+- 从 SPA 通用模板区块移出，并入 v4.12.26 真实签到区块（与 chybenzun/pting 并列）；`sites.json` 策略本就是 `webbridge`，note 更新。
+- ⚠️ **编写时 WebBridge daemon 离线，未能现场核验 DOM**。按计划对齐蜂巢模式；若 pbh-btn 实际插件选择器不同，Detect 兜底会回退 `UNKNOWN`（报 `NO_DETECT`，不静默跳过），待 daemon 上线后跑一次单站复核。
+- 校验：`signin-web.ps1` 语法 0 错误；`Test-SigninConfigConsistency` ISSUES=0；pbh-btn 配置 `Detect`/`Click` 均已设置。
+
+## [v4.13.1] - 2026-07-26
+
+### 清理 `-ValidateConfig` 报告的 9 条死配置（0 WARN / 0 INFO）
+
+- 运行 `signin-batch.ps1 -ValidateConfig` 报告 9 条 `config-note`（均为 INFO，0 WARN）：
+  5 个 `manual` 站点仍带 `$WebSignInConfigs` 条目（FreeFarm / TJUPT / 42w / zxiaoruan / xt-url）+ 4 个无对应 sites.json 的孤儿配置（littlesheep / anyrouter / h-e / pp）。
+- 全部删除：`manual` 站点不进入 `Invoke-WebSignIn`，配置永不被触发；孤儿配置无 sites.json 站点，纯死代码。
+- 保留 SPA 区块有效条目 `onrender` / `huan666` / `pbh-btn`（非 manual、有 sites.json 对应）。
+- 复检：`signin-web.ps1` 语法 0 错误；`Test-SigninConfigConsistency` 现在 **ISSUES=0**（无 WARN 无 INFO）。改动均 git 可追溯。
+
+## [v4.13.0] - 2026-07-26
+
+### 全面代码审查落地（正确性 + 可维护性，语法校验通过；未运行整批签到）
+
+- **🔴 消除 7 个 NexusPHP 站点的「CF 优先」Detect 回归**：OurBits / GGPT / HDDolby / HDHome / TJUPT / HDBao / HHCLUB 各自手写 `if(cf-turnstile) return 'CF_CHALLENGE'` 在**已签到判定之前**，重新引入了 v4.12.9 已修的误判——attendance 页残留 CF widget 的已签页面被误判 `CF_CHALLENGE` → 进入 CF 重试 → 最终 `CF_BLOCKED`（算失败）。
+  - 修复：将 7 份近重复 Detect **合并为唯一共享模板 `$NexusPHPSignInDetect`**（已含「已签到优先 + CF token 感知」正确顺序），并扩充信号词并集（补 `签到得鲸币`/`签到得憨豆`/`立即签到`/`已领取`/`本次签到获得`/`异地登录`/`两步验证`/take2fa + `REDIRECTING` 兜底）。7 站直接 `Detect = $NexusPHPSignInDetect`。行为等价且更鲁棒（CF token 已填入时不再误报 CF）。
+- **🔴 新增配置一致性校验 `Test-SigninConfigConsistency`**（signin-web.ps1）：排查根因——书签同步新增 `strategy=web-read/browser-open` 站点却忘补 `$WebSignInConfigs` 条目时，`Invoke-WebSignIn` 返回 `NO_CONFIG` 被批处理静默归为 `SKIPPED`，新站点永不签到且无提示。
+  - 校验：非 `manual` 站点缺配置 → **醒目 `Write-Warning`**；`manual` 站点仍含配置 / 孤儿配置（无对应 sites.json 站点）→ `INFO`。
+  - 接线：`signin-batch.ps1` 循环前自动跑（WARN 输出）；`signin-single.ps1` 加载后跑（WARN 输出）；新增 **`-ValidateConfig` 开关**——仅校验并退出（不打开浏览器、不签到），便于 CI/人工预检。
+  - 已用真实 sites.json 验证：0 WARN（无活跃站点会被静默跳过）；负向用例（注入缺配置站点）正确报 WARN。
+- **🟡 状态分类修正（signin-batch.ps1）**：补 `SERVER_ERROR` / `EVAL_FAIL` → `PAGE_ERROR`（此前落入 `default`→`NO_DETECT`，分类与重试都失真；现正确归入可重试的 `PAGE_ERROR`）。
+- **🟡 清理死代码 / 一致性**：
+  - `kimi-webbridge.ps1`：`Test-WebBridgeSignIn` 点击结果改用 `Get-ResultSignal`（消除第 476 行散落的 `$clicked.value` 分支样板，与 v4.12.25 去重目标一致）；删除永不触发的 `CAPTCHA` 死条件（第 347 行 `LOGIN_REQUIRED|CAPTCHA` → `LOGIN_REQUIRED`）；`Clear-WebBridgeTabs` 补全「extension 未连接返回 -1」契约（`list_tabs` 为 `$null` 时显式 `return -1`，此前误返回 0）。
+  - `signin-batch.ps1`：删除飞书失败分类 `switch` 中永不命中的死分支（`CAPTCHA`/`TOO_SMALL`/`CF_DETECTED`/`NO_ARTICLE`/`UNKNOWN`），引擎实际只产出 `CF_BLOCKED`/`NO_DETECT`/`其他`。
+  - `signin-single.ps1`：调试快照诊断过滤器 `.html` → `.json`（`Save-DebugSnapshot` 实际写 `.json`，原过滤器永远匹配不到，诊断输出形同虚设）。
+
+### 审查中识别但**本版未实施**（低风险/需活体验证，列出供后续）
+- **V2EX / Yemapt / FreeFarm 的 CF 优先 Detect**：V2EX 为真实 managed-challenge 流（title 驱动），FreeFarm 已 `manual`，Yemapt 为 SPA+ALTCHA 特殊流；三者非 NexusPHP attendance 模式、当前可工作，强行重排 CF 顺序有回归风险，**留待活体验证后单独处理**。
+- **`$NexusPHPClick` 抽共享模板**：5 份「收紧匹配」Click JS 完全重复，属纯维护性问题、当前可工作，机械替换风险低但未做（避免大批量相同块锚定出错）。
+- **孤儿配置清理 / `iterationLog` 死代码 / 魔法数字集中化 / `scan-bookmarks` 与 `Sync-Bookmarks` 模式统一**：均为低优先级维护项，本版未动以避免误删用户可能启用的配置或破坏飞书卡片渲染。
+
+### 改动文件
+`signin-web.ps1`（共享 Detect 合并 + 配置校验函数）、`signin-batch.ps1`（校验接线 + `-ValidateConfig` + 状态分类 + 飞书死分支清理）、`kimi-webbridge.ps1`（Get-ResultSignal/死条件/-1 契约）、`signin-single.ps1`（.json 过滤器 + 校验接线）、`CHANGELOG.md`。
+
+## [v4.12.26] - 2026-07-23
+
+### 站点适配（参考 07-23 签到结果，针对性修复 4 站 + FreeFarm 结论）
+
+- **🔴 NodeSeek 检测误判回归（真 bug）**：原 Detect 末尾 `return 'LOGIN_REQUIRED'` 为兜底，
+  导致 NodeSeek 自有「Oops! Nework Error」网络错误页被误判为「登录失效」→ 误报 `LOGIN_REQUIRED` 回归
+  （实际 07-14 曾 SIGN_OK，是站点/代理侧波动）。
+  - 修复：`Network Error`/`Nework Error`/`Oops`/`重新加载` → `SERVER_ERROR`；并补 `chrome-error:`/`ERR_` 预检；
+    兜底由 `LOGIN_REQUIRED` 改为 `UNKNOWN`（不再触发「需重新登录」通知）。仅改分类逻辑，登录失效页（`请登录` 等）仍正确判 `LOGIN_REQUIRED`。
+- **🔴 cdy（传道院）配置补全**：原 `web-read` 策略但 `$WebSignInConfigs` 缺条目 → `NO_CONFIG` 被跳过。
+  `pt.cdy.pics/attendance.php` 为 NexusPHP 通用签到页，补配置
+  `Detect=$NexusPHPSignInDetect` + `Click=$NexusPHPCfSignInClick`（兼容「访问即签到」与「需提交表单」两种形态，比 `Click=$null` 更稳）；策略 `web-read`→`webbridge`。
+- **🟢 chybenzun（CHY 公益订阅）/ pting（蜂巢）补真实签到逻辑（用户指正：二者均有签到按钮，非 visit-only）**：
+  原 `browser-open` 但缺配置 → `NO_CONFIG` 跳过；上一版误判为非签到页改 `visit-only`，本次据实际网页 DOM 修正。
+  - **CHY**：主页 `<a class="btn btn-primary" href="/claim">领取今日 5GB</a>` 为每日领流量按钮。点击跳 `/?msg=` 并显示 `.banner`；
+    banner 含「领取成功」→ `SIGN_OK`，含「今日已领取过奖励」→ `ALREADY_SIGNED`（按钮常驻页面，故首页无 banner 即 `NEED_SIGN`）。
+  - **蜂巢**：Flarum 论坛 `<button id="checkInButton">签到</button>`；点击后按钮消失（被连续签到天数取代）→ 按钮存在=`NEED_SIGN`，消失=`ALREADY_SIGNED`。
+  - 二者改 `webbridge` 并补 `Detect`+`Click` 配置；排查中已实际点击验证：CHY 成功领取 5GB、蜂巢按钮消失显示「已签到 6 天」。
+- **🔴 FreeFarm SLIDER 结论：当前架构无法自动适配 → strategy 改 `manual`（用户要求）**。
+  `Invoke-SlideBypass` 依赖页面 JS 中的 `set_access_token` 端点做 token 注入式绕过；
+  现 FreeFarm 已切换为**真·拖拽滑块**（页面纯「拖动滑块验证」，HTML 无 `set_access_token`，`slide_check_*.js` 文件名哈希滚动），
+  该 token 注入法已失效。自动适配需实现「识别滑块图 → 计算位移 → CDP 模拟人类拖拽」的真实滑块求解器，
+  属显著新功能且对抗站点反爬、脆弱，**超出本 CLI 范围**。故 `sites.json` 中 FreeFarm `strategy` 由 `webbridge` 改 `manual`，不再自动尝试，需人工点滑块。
+
+### 改动文件
+`signin-web.ps1`（NodeSeek Detect 修复 + cdy/chybenzun/pting 真实签到配置）、`sites.json`（chybenzun/pting→webbridge、FreeFarm→manual、cdy→webbridge）、`CHANGELOG.md`。
+
+## [v4.12.25] - 2026-07-22
+
+### 优化落地（落实代码 & 文档审查的全部优化点）
+
+- **🔴 关后校验 + 重试（真正可观测的去重）**：新增 `Close-SiteTabs-Verified`（kimi-webbridge.ps1）。`Open-SiteTab` 不再裸调 `Close-WebBridgeSession`，改为：整会话强关 → `list_tabs` 校验 → 仍非空则再强关一次 + 退路 `Clear-WebBridgeTabs`（逐 id 关）→ 末次校验。漏关数 `$leaked>0` 时**写日志告警**，使"daemon 漏关"从静默累积变为一眼可见（直击 v4.12.24 的未实证假设）。`Clear-WebBridgeTabs` 由此从死函数变为真实的第二道清理。
+- **🔴 删除 `signin-batch.ps1` 的死变量 `$session="pt$idx"`**：它从未传给 `Invoke-WebSignIn`（后者硬编码 `"daily-signin"`），却会让后人"好心修 bug"传 `-Session` 导致各站独立会话、上一站 tab 永不关 → 泄漏重现。已删，并在 `Open-SiteTab` 注释写明"所有站点必须共用单一会话"的不变量。
+- **🔴 `NoFocus` 默认翻转为 `$true`**（signin-web.ps1）：任何漏传调用方都会触发 `Page.bringToFront` 弹前台（刚修掉的现象），故默认后台、前台改为显式 opt-in；顺手删掉 `signin-batch.ps1` 已不被读取的 `[switch]$NoFocus`。
+- **🔴 布局视口覆盖改为 per-navigate 启用**（kimi-webbridge.ps1）：原 `Enable-LayoutViewport` 只在 `Test-WebBridgeSignIn` 顶部启用一次，函数内 `Open-SiteTab` 重开 tab（evaluate 丢 tab / SERVER_ERROR / 点击后重开）后视口覆盖丢失 → 0×0 → CF/ALTCHA 坐标点击静默失效。现收进 `Open-SiteTab`，每次 navigate 成功后立即启用，任意新 tab 都带 1280×800 视口。
+- **🔴 确认 bug：`Sync-Bookmarks` 日志变量名写错**：`bookmarkCount = $bookmarkUrls.Count` 中 `$bookmarkUrls` 全程未定义（函数用 `$bookmarkInfos`），导致 `sync-log.json` 的 `bookmarkCount` 永远记 0。改为 `$bookmarkInfos.Count`。
+- **🟡 信号提取去重**：抽 `Get-ResultSignal` 统一处理 `evaluate` 返回的字符串/`value` 分支，替换 `Test-WebBridgeSignIn` 内 12 处复制粘贴样板，消除"漏 `.value` 分支"类不一致隐患；快照分支的 `"{}"` 兜底保留。
+- **🟡 CHANGELOG 自我修正**：v4.12.24 把"close_session 可靠"写成事实，今补注其为**未实证假设**；`signin-batch.ps1` 过时版本串 `v3.8` → `v4.12.25`。
+- **🟢 文档**：新增 `README.md`——4 个入口脚本的使用时机（日常/batch、单站调试/single、失败续跑/rerun-remaining、续跑补推飞书/push-cumulative）+ `sites.json` 三态 strategy 矩阵（webbridge / visit-only / manual）。
+
+### 改动文件
+`kimi-webbridge.ps1`、`signin-web.ps1`、`signin-batch.ps1`、`CHANGELOG.md`、`README.md`（新增）。
+
+## [v4.12.24] - 2026-07-22
+
+### 修复（重复开 tab 真正结构性根治 —— v4.12.22/23 均未能解决）
+- **现象**：`signin-batch.ps1` 运行期间同一站点被重复开出大量相同 tab，**比修复前更多**（用户 07-22 反馈）。说明 v4.12.22/23 的「先关后开」逻辑从未真正抑制累积。
+- **根因（复盘，推翻 v4.12.23 的作用域论断）**：
+  1. v4.12.22 把「尽量复用 tab」改成「**每次都 `newTab=true`**」——每站点开 6+ 次新 tab，比旧版开得多；泄漏随「关不净」复利放大。
+  2. 关旧 tab 依赖 `list_tabs`（extension 抖动会误报，用户早前已确认）+ `close_tab`（签到 tab 在**折叠后台 window** 中 `active=False`，按 id 关也常命中不到）→ **不可靠**。
+  3. v4.12.23 的「`$script:` 记忆单 tabId 关旧 tab」仍受上述 `close_tab`/`list_tabs` 不可靠牵连；且 `$script:` 跨 dot-source 作用域本就脆弱。故该修复未生效，累积依旧。
+- **真正修复（结构性，不依赖 list_tabs / close_tab / 单 tabId 记忆）**：`Open-SiteTab` 每次导航前先 **`Close-WebBridgeSession`**（daemon 级强关，见 v4.12.19「**即使 extension 断开也生效**」），整会话清空后再 `newTab=true` 开**唯一**一个 tab。
+  - 任意时刻本会话 **≤ 1 个 tab**，与 `list_tabs` 是否误报、`close_tab` 是否命中**无关**。
+  - 首次 / NAV_FAIL 重试 / extension 就绪重试 / evaluate 丢 tab 重试 / CF 重试 / SLIDER 重开 / 点击后重开 **全部走 `Open-SiteTab`** → 每次必定先整会话强关再开新，满足「**即便重试也先关旧 tab 再开新的**」。
+  - 移除已失效的 `$_wbSiteTabId` 跟踪机制与入口/ finally 的 `Clear-WebBridgeTabs` 预清（改由 `Open-SiteTab` 强关统一负责）；`Clear-WebBridgeTabs` 保留为后备函数。
+- **验证**：仅做语法校验（用户要求今日不运行脚本）。逻辑上 `Close-WebBridgeSession` 为 daemon 级、不受 extension 抖动影响，是比 `list_tabs`+`close_tab` 更可靠的唯一清场手段；现有「站点间 finally `close_session` → 下一站点 `navigate` 重建 tab」模式已被长期证明可行，故站内每次 `close_session`+`navigate` 同样安全。
+- **事后补记（v4.12.25）**：上句"`close_session` 可靠"为**未实证假设**——`close_session` 能否关掉折叠 159×27 后台窗口里的 tab 从未在真实场景验证，而 `list_tabs`/`close_tab` 对同类 tab 已证不可靠。v4.12.25 已把"关"改为**关后 `list_tabs` 校验 + 重试 + `Clear-WebBridgeTabs` 退路**（`Close-SiteTabs-Verified`），泄漏从静默累积变为日志可见。
+
+### 附：前台弹窗修复（同轮次）
+- **现象**：运行 `signin-batch.ps1` 时浏览器标签页被弹到前台（用户明确「不希望弹前台」）。
+- **根因**：`signin-batch.ps1` 调用 `Invoke-WebSignIn` 传的是 `-NoFocus:$NoFocus`，而批次自身的 `[switch]$NoFocus` 默认 `$false` → 触发 `Test-WebBridgeSignIn` 内 `Page.bringToFront`（kimi-webbridge.ps1:223-225，CF Turnstile 需焦点才渲染 iframe）。`signin-single.ps1` / `rerun-remaining.ps1` 早已硬编码 `-NoFocus:$true`，唯独 batch 默认抢前台。
+- **修复**：`signin-batch.ps1` 两处调用（`Invoke-WebSignIn` 首跑 + 失败重试）统一改为 `-NoFocus:$true`，批处理全程后台，与 single/rerun 一致。注：daemon 的 `navigate newTab=true` 本身不抬窗口（v4.12.22 注释已确认「-NoFocus 时浏览器全程后台」），故关闭 `Page.bringToFront` 即彻底避免弹前台；CF Turnstile 站点因此可能渲染失败（原本经 CDP 点击亦不稳），但与「不弹前台」的用户诉求相比优先级更低。
+
+## [v4.12.23] - 2026-07-21
+> ⚠️ 该版本对重复 tab 的修复**未生效**（见 v4.12.24）。其作用域诊断偏离真正根因，仅作历史记录保留。
+
+### 修复（重复开 tab 真正根因 —— v4.12.22 修复因作用域 bug 从未生效）
+- **现象**：`signin-batch.ps1` 运行期间同一站点被重复开出大量相同 tab，重试时旧 tab 未关就又开新的（用户报告）。
+- **根因**：v4.12.22 引入的「确定性单 tab」跟踪变量 `$_wbSiteTabId` 存在 **PowerShell 作用域 bug**——脚本顶层声明后，`Open-SiteTab` / `Test-WebBridgeSignIn` 内部对它的**赋值全部使用裸 `$_wbSiteTabId = ...`**，在函数内会创建**函数局部变量**而非更新脚本级变量。结果：`Open-SiteTab` 打开 tab 后 tabId 从未持久化到脚本级 → 下次调用读到 `$null` → 确定性「先关后开」永不触发 → 静默退化为不可靠的 `list_tabs`（`Clear-WebBridgeTabs`）清理 → tab 累积（重试尤甚）。
+- **修复**：`kimi-webbridge.ps1` 中全部 `$_wbSiteTabId` 读写统一改为 **`$script:_wbSiteTabId`**（声明、Open-SiteTab 读+关+写、Test-WebBridgeSignIn 入口重置、finally 兜底关闭）。所有导航（首开 / NAV_FAIL 重试 / CF 重试 / SERVER_ERROR 重试 / 点击后重开）均走 `Open-SiteTab`，故每次导航前必先关上一个 tab；每次 `Invoke-WebSignIn`（含 batch 层重试）的 finally 也会关掉本次 tab。
+- **验证**：AsianDVDClub 连续 3 次 NAV_FAIL 重试后 `list_tabs` 返回 `tabs:[]`（0 残留）——修复前该场景会残留 3 个 tab。
+
+### 变更
+- **AsianDVDClub 改为 visit-only**：`sites.json` 策略 `webbridge` → `visit-only`（用户要求仅打开网页、不签到）。其在 `signin-web.ps1` `$WebSignInConfigs` 中本就是 `Detect=$null/Click=$null`，故走 visit-only 分支返回 `VISITED`；本次仅对齐 `strategy` 语义。
+
 ## [v4.12.17] - 2026-07-14
 
 ### 修复

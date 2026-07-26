@@ -27,6 +27,12 @@ Write-Output ""
 # v4.10: 统一走 kimi webbridge 后端
 . "$scriptDir\signin-web.ps1"
 
+# v4.13.0: 配置一致性预检（仅 WARN 输出，不阻断单站调试）
+$singleIssues = Test-SigninConfigConsistency -Config $config
+foreach ($iss in $singleIssues) {
+    if ($iss.severity -eq 'WARN') { Write-Warning "CONFIG[$($iss.site)]: $($iss.message)" }
+}
+
 if ($site.strategy -eq "manual") {
     Write-Output "Manual site, skip."
     if ($site.reason) { Write-Output "Reason: $($site.reason)" }
@@ -39,7 +45,7 @@ if (-not (Ensure-WebBridgeDaemon)) {
 }
 
 $debugDir = Join-Path $scriptDir "debug-snapshots"
-$result = Invoke-WebSignIn -SiteName $SiteName -SaveDebugSnapshot:$SaveDebugSnapshot -DebugDir $debugDir
+$result = Invoke-WebSignIn -SiteName $SiteName -SaveDebugSnapshot:$SaveDebugSnapshot -DebugDir $debugDir -NoFocus:$true
 
 Write-Output ""
 Write-Output "=== Result ==="
@@ -47,7 +53,7 @@ Write-Output "Signal: $result"
 
 # 诊断：读取最近的 debug snapshot（如果存在）
 if ($SaveDebugSnapshot -and (Test-Path $debugDir)) {
-    $latestSnap = Get-ChildItem $debugDir -Filter "$SiteName-*.html" -EA SilentlyContinue |
+    $latestSnap = Get-ChildItem $debugDir -Filter "$SiteName-*.json" -EA SilentlyContinue |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if ($latestSnap) {
         Write-Output ""

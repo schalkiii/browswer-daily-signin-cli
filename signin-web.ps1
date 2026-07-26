@@ -11,14 +11,17 @@ $NexusPHPSignInDetect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
+  // v4.13.0: 2FA / 异地登录（HDDolby 等）优先判定为登录失效
+  if(location.pathname.indexOf('take2fa.php')>-1||t.indexOf('异地登录')>-1||t.indexOf('两步验证')>-1) return 'LOGIN_REQUIRED';
   // v4.12.9: 已签到状态优先于 CF 检测 —— 部分站点（xloli）attendance 页始终残留 .cf-turnstile
   // 空 token widget，若先判 CF 会把"今日签到，得到魔力加成"误判成 CF_CHALLENGE 导致无限重试。
-  // 故先确认已签到，再处理 CF widget。
+  // v4.13.0: 统一为所有 NexusPHP 站点的唯一 Detect（合并 OurBits/GGPT/HDDolby/HDHome/TJUPT/HDBao/HHCLUB
+  //   近重复的"CF 优先"实现），消除"各自手写 CF 优先 Detect 重新引入该误判"的回归风险。
   // 简体 + 繁体匹配（SBPT 等繁体站点使用 "簽到成功"）
   if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
   if(t.indexOf('簽到已得')>-1||t.indexOf('今日已簽到')>-1||t.indexOf('已簽到')>-1||t.indexOf('簽到成功')>-1) return 'SIGN_OK';
-  // v4.12.9: 站点特有"今日签到，得到魔力加成"等已签短语
   if(t.indexOf('今日签到')>-1||t.indexOf('得到魔力加成')>-1) return 'SIGN_OK';
+  if(t.indexOf('已领取')>-1||t.indexOf('本次签到获得')>-1) return 'SIGN_OK';
   // v4.12.6: CF Turnstile 检测 — token 已填入时跳过 CF 文本检测
   // CF 通过后 .cf-turnstile div 仍在 DOM 中，attendance-captcha-table label 含"安全验证"文本
   // 旧逻辑误判：token 已填入但页面含"安全验证"文本 → 仍返回 CF_CHALLENGE → 无限重试
@@ -39,12 +42,15 @@ $NexusPHPSignInDetect = @'
     // "安全验证"仅在无 CF widget 时才算 CF_CHALLENGE（有 widget 时是 label 文本）
     if(t.indexOf('安全验证')>-1 && !cfWidget) return 'CF_CHALLENGE';
   }
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  // NEED_SIGN（含 签到得鲸币/魔力/憨豆/领取/立即签到/打卡，简繁体）
+  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到得憨豆')>-1||t.indexOf('签到领取')>-1||t.indexOf('立即签到')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
   if(t.indexOf('簽到得魔力')>-1||t.indexOf('簽到得鯨幣')>-1||t.indexOf('簽到得鲸币')>-1||t.indexOf('簽到領取')>-1) return 'NEED_SIGN';
   if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('必须登录')>-1) return 'LOGIN_REQUIRED';
   // chrome-error 页面（HTTP 500/502 等服务器错误）
   if(location.protocol==='chrome-error:'||t.indexOf('HTTP ERROR')>-1||t.indexOf('当前无法使用此页面')>-1) return 'SERVER_ERROR';
-  if(t.length<20) return 'BODY_NULL';
+  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
+  var match = t.match(/签到.{0,20}/);
+  if(match) return 'NEED_SIGN:'+match[0];
   return 'UNKNOWN';
 })()
 '@
@@ -155,57 +161,6 @@ $WebSignInConfigs = @{
 '@
     }
 
-    "FreeFarm" = @{
-        Url = "https://pt.0ff.cc/attendance.php"
-        WaitMs = 15000
-        PostClickMs = 5000
-        # v4.12.11: FreeFarm 适配修复
-        # 根因：旧 Detect 将 SLIDER 检测放在已签到关键词之前，且使用过度宽泛的
-        #   div[class*="challenge"] 选择器（会命中布局 div）→ 即使已签到也误报 SLIDER，
-        #   导致站点长期被误判为"滑块拦截"而移入 manual。
-        # 诊断（2026-07-10）证实：已登录页显示"签到成功/这是您的第806次签到"，
-        #   无任何 .cf-turnstile / challenge iframe / div[class*="challenge"]。
-        # 修复：已签到关键词优先；滑块仅精确匹配真实验证 UI（CF Turnstile iframe / 滑动滑块文本），
-        #   移除 div[class*="challenge"] 等误判源。SLIDER 交由 kimi-webbridge 的
-        #   Invoke-SlideBypass（set_access_token token 提取）尝试绕过。
-        Detect = @'
-(function(){
-  var t = document.body.innerText||'';
-  var title = document.title||'';
-  // 1. 已签到优先（避免残留 challenge 元素误判 SLIDER）
-  if(t.indexOf('签到成功')>-1||t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('这是您的第')>-1||t.indexOf('连续签到')>-1) return 'SIGN_OK';
-  // 2. 真实滑块/人机验证（精确匹配，不滥用 div[class*="challenge"]）
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],iframe[src*="turnstile"]')) return 'SLIDER';
-  if(t.indexOf('滑动滑块')>-1||t.indexOf('验证您是真人')>-1||t.indexOf('确认您是真人')>-1||title.indexOf('滑动认证')>-1) return 'SLIDER';
-  if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1||t.indexOf('DDoS')>-1||t.indexOf('turnstile')>-1) return 'CF_CHALLENGE';
-  // 3. 尚未签到 → 需点击
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请先登录')>-1||t.indexOf('未登录')>-1) return 'LOGIN_REQUIRED';
-  var match = t.match(/签到.{0,20}/);
-  return 'UNKNOWN:'+(match?match[0]:'no_match')+'; title='+title.substring(0,50);
-})()
-'@
-        Click = @'
-(function(){
-  var bolds = document.querySelectorAll('b');
-  for(var i=0;i<bolds.length;i++){
-    var v = (bolds[i].textContent||'').trim();
-    if(v.indexOf('签到得魔力')>-1){ bolds[i].click(); return 'CLICKED_B:'+v; }
-  }
-  var fonts = document.querySelectorAll('font');
-  for(var j=0;j<fonts.length;j++){
-    var fv = (fonts[j].textContent||'').trim();
-    if(fv.indexOf('签到得魔力')>-1){ fonts[j].click(); return 'CLICKED_FONT:'+fv; }
-  }
-  var links = document.querySelectorAll('a');
-  for(var k=0;k<links.length;k++){
-    var lv = (links[k].textContent||'').trim();
-    if(lv==='签到得魔力'||lv.indexOf('签到得')===0){ links[k].click(); return 'CLICKED_A:'+lv; }
-  }
-  return 'NO_BTN';
-})()
-'@
-    }
 
     "NodeSeek" = @{
         Url = "https://www.nodeseek.com/board"
@@ -219,9 +174,14 @@ $WebSignInConfigs = @{
   if(t.indexOf('今日还未签到')>-1||t.indexOf('试试手气')>-1) return 'NEED_SIGN';
   if(t.indexOf('请登录')>-1||t.indexOf('必须登录')>-1||t.indexOf('您还未登录')>-1) return 'LOGIN_REQUIRED';
   if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
+  // v4.12.26: NodeSeek 自有"Oops! Nework Error"网络错误页曾被兜底 LOGIN_REQUIRED 误判为登出，
+  //   导致误报回归（实际是站点/代理侧波动）。显式识别网络错误 → SERVER_ERROR（非登录失效）。
+  if(t.indexOf('Network Error')>-1||t.indexOf('Nework Error')>-1||t.indexOf('Oops')>-1||t.indexOf('重新加载')>-1) return 'SERVER_ERROR';
+  if(location.protocol==='chrome-error:'||t.indexOf('无法访问此页面')>-1||t.indexOf('ERR_')>-1) return 'SERVER_ERROR';
   var idx = t.indexOf('签到');
   if(idx>-1) return 'NEED_SIGN:'+t.substring(idx,idx+40).replace(/\s+/g,' ');
-  return 'LOGIN_REQUIRED';
+  // v4.12.26: 兜底改为 UNKNOWN（不再误判为 LOGIN_REQUIRED，避免触发"需重新登录"通知）。
+  return 'UNKNOWN';
 })()
 '@
         Click = @'
@@ -243,8 +203,14 @@ $WebSignInConfigs = @{
         Url = "https://www.hdkyl.in/attendance.php"
         WaitMs = 15000
         PostClickMs = 5000
+        # v4.13.5: HDKYL 过网站盾(WAF)需更长等待；v4.13.6 起自然分辨率已是全局默认，无需单独声明。
+        #   LoadWaitSec: 导航后动态轮询"页面就绪"（body 文本足够长且无盾关键词）最多 60s，盾一解立即继续（全局默认 45s，此处加长）。
+        LoadWaitSec = 60
         Detect = @'
 (function(){
+  // v4.13.6: 雷池盾重载瞬间 body 为 null（现场实测每 ~5s 循环 complete→loading），
+  //   直接取 innerText 会 TypeError → EVAL_FAIL 误判。返回 REDIRECTING 进 CF 重试循环等待。
+  if(!document.body) return 'REDIRECTING';
   var t = document.body.innerText||'';
   // v4.12.3: 检测 chrome-error 页面（服务器连接关闭 ERR_CONNECTION_CLOSED 等）
   if(location.protocol==='chrome-error:'||t.indexOf('无法访问此页面')>-1||t.indexOf('ERR_CONNECTION')>-1) return 'SERVER_ERROR';
@@ -335,21 +301,9 @@ $WebSignInConfigs = @{
         Url = "https://ourbits.club/attendance.php"
         WaitMs = 12000
         PostClickMs = 5000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
-  return 'UNKNOWN';
-})()
-'@
+        # v4.13.6: CF Turnstile 坐标点击站——必须导航后即固定 1280x800 视口（默认已改为自然分辨率）
+        ForceLayoutViewport = $true
+        Detect = $NexusPHPSignInDetect
         Click = @'
 (function(){
   // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
@@ -378,21 +332,7 @@ $WebSignInConfigs = @{
         Url = "https://www.gamegamept.com/attendance.php"
         WaitMs = 12000
         PostClickMs = 5000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
-  return 'UNKNOWN';
-})()
-'@
+        Detect = $NexusPHPSignInDetect
         Click = @'
 (function(){
   // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
@@ -422,23 +362,7 @@ $WebSignInConfigs = @{
         Url = "https://www.hddolby.com/attendance.php"
         WaitMs = 12000
         PostClickMs = 5000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  // v4.12.0: 异地登录触发 2FA 验证（URL 跳转到 take2fa.php），需人工输入两步验证码
-  if(location.pathname.indexOf('take2fa.php')>-1||t.indexOf('异地登录')>-1||t.indexOf('两步验证')>-1) return 'LOGIN_REQUIRED';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
-  return 'UNKNOWN';
-})()
-'@
+        Detect = $NexusPHPSignInDetect
         Click = @'
 (function(){
   // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
@@ -468,21 +392,7 @@ $WebSignInConfigs = @{
         Url = "https://hdhome.org/attendance.php"
         WaitMs = 12000
         PostClickMs = 5000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
-  return 'UNKNOWN';
-})()
-'@
+        Detect = $NexusPHPSignInDetect
         Click = @'
 (function(){
   // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
@@ -508,49 +418,6 @@ $WebSignInConfigs = @{
 '@
     }
 
-    "TJUPT" = @{
-        Url = "https://www.tjupt.org/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
-  return 'UNKNOWN';
-})()
-'@
-        Click = @'
-(function(){
-  // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
-  var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
-  for(var i=0;i<candidates.length;i++){
-    var el = candidates[i];
-    if(el.children.length>1) continue;
-    var v = (el.textContent||el.value||'').trim();
-    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'){
-      el.click(); return 'CLICKED_EXACT:'+v;
-    }
-  }
-  for(var j=0;j<candidates.length;j++){
-    var el2 = candidates[j];
-    if(el2.children.length>1) continue;
-    var v2 = (el2.textContent||el2.value||'').trim();
-    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)){
-      el2.click(); return 'CLICKED_PREFIX:'+v2;
-    }
-  }
-  return 'NO_BTN';
-})()
-'@
-    }
 
     "BTSchool" = @{
         Url = "https://pt.btschool.club/index.php"
@@ -608,18 +475,7 @@ $WebSignInConfigs = @{
         Url = "https://hdbao.cc/attendance.php"
         WaitMs = 12000
         PostClickMs = 5000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('立即签到')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1) return 'LOGIN_REQUIRED';
-  return 'UNKNOWN';
-})()
-'@
+        Detect = $NexusPHPSignInDetect
         Click = @'
 (function(){
   var btn = document.querySelector('input[value*="签到"]');
@@ -650,21 +506,7 @@ $WebSignInConfigs = @{
         Url = "https://hhanclub.net/attendance.php"
         WaitMs = 15000
         PostClickMs = 8000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage')) return 'CF_CHALLENGE';
-  if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1||t.indexOf('Just a moment')>-1) return 'CF_CHALLENGE';
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1||t.indexOf('已领取')>-1||t.indexOf('本次签到获得')>-1) return 'SIGN_OK';
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到得憨豆')>-1||t.indexOf('签到领取')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('登入')>-1&&t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-  if(t.length<20||(document.title||'').indexOf('Redirecting')>-1) return 'REDIRECTING';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
-  return 'UNKNOWN';
-})()
-'@
+        Detect = $NexusPHPSignInDetect
         Click = @'
 (function(){
   // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
@@ -744,6 +586,8 @@ $WebSignInConfigs = @{
         PostClickMs = 8000
         CfRetryCount = 6
         CfRetryWaitMs = 45000
+        # v4.13.6: CF Turnstile 坐标点击站——必须导航后即固定 1280x800 视口（默认已改为自然分辨率）
+        ForceLayoutViewport = $true
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPCfSignInClick
     }
@@ -910,6 +754,8 @@ $WebSignInConfigs = @{
         PostClickMs = 8000
         CfRetryCount = 6
         CfRetryWaitMs = 45000
+        # v4.13.6: CF Turnstile 坐标点击站——必须导航后即固定 1280x800 视口（默认已改为自然分辨率）
+        ForceLayoutViewport = $true
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPCfSignInClick
     }
@@ -923,6 +769,9 @@ $WebSignInConfigs = @{
         PostClickMs = 15000
         CfRetryCount = 4
         CfRetryWaitMs = 15000
+        # v4.13.6: ALTCHA 坐标点击站——rect 由 ClickEval 在【点击前】算出，必须导航后即固定 1280x800
+        #   视口（懒启用来不及：启用发生在 rect 计算之后会导致坐标系不一致）
+        ForceLayoutViewport = $true
         Detect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
@@ -1027,8 +876,128 @@ $WebSignInConfigs = @{
         Click = $null
     }
 
+    # v4.12.22: daxiangjiao 补配置（原 web-read 策略但 $WebSignInConfigs 缺条目 → NO_CONFIG 被跳过）
+    #   实为 NexusPHP attendance 站（"DaXiangJiao :: 签到"），走标准"访问即签到"流程。
+    "daxiangjiao" = @{
+        Url = "https://pt.daxiangjiao.org/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+
+    # v4.12.26: cdy（传道院）补配置（原 web-read 策略但 $WebSignInConfigs 缺条目 → NO_CONFIG 被跳过）。
+    #   pt.cdy.pics/attendance.php 为 NexusPHP 通用签到页。Click 用 $NexusPHPCfSignInClick：
+    #   既能兼容"访问即签到"（Detect 直接 SIGN_OK/ALREADY_SIGNED），也能在需要提交表单时点击 submit，
+    #   比 Click=$null 更稳妥（避免 NEED_SIGN 无点击 → NO_DETECT）。
+    "cdy" = @{
+        Url = "https://pt.cdy.pics/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $NexusPHPCfSignInClick
+    }
+
     # === v4.10: browser-visit 站点迁移（visit-only，无 Detect/Click）===
     # kimi-webbridge.ps1 的 visit-only 分支：navigate + wait + close_tab，返回 "VISITED"。
+
+    # v4.12.26: CHY（公益订阅）/ 蜂巢（pting）实际都有「签到/领取」按钮，需真正点击。
+    #   CHY: 主页 <a class="btn btn-primary" href="/claim">领取今日 5GB</a>；点击跳 /?msg= 并显示 .banner。
+    #        banner 含「领取成功」→ SIGN_OK；含「今日已领取过奖励」→ ALREADY_SIGNED；按钮常驻，首页无 banner 即 NEED_SIGN。
+    #   蜂巢: Flarum 论坛，<button id="checkInButton">签到</button>；点击后按钮消失（被连续签到天数取代）→ 按钮存在=未签(NEED_SIGN)，消失=已签(ALREADY_SIGNED)。
+    "chybenzun" = @{
+        Url = "https://dy.chybenzun.top/"
+        WaitMs = 8000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  var full = document.body.innerText || '';
+  var b = document.querySelector('.banner');
+  var banner = b ? (b.innerText || '').trim() : '';
+  if (banner.indexOf('领取成功') > -1 || full.indexOf('领取成功') > -1) return 'SIGN_OK';
+  if (banner.indexOf('今日已领取') > -1 || banner.indexOf('已领取') > -1 || full.indexOf('今日已领取过奖励') > -1) return 'ALREADY_SIGNED';
+  if (full.indexOf('领取今日 5GB') > -1) return 'NEED_SIGN';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  var els = document.querySelectorAll('a');
+  for (var i = 0; i < els.length; i++) {
+    if ((els[i].innerText || '').indexOf('领取今日 5GB') > -1) { els[i].click(); return 'CLICKED'; }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
+    "pting" = @{
+        Url = "https://pting.club/?sort=newest"
+        WaitMs = 12000
+        PostClickMs = 3000
+        Detect = @'
+(function(){
+  var b = document.getElementById('checkInButton');
+  if (b) return 'NEED_SIGN';
+  var full = document.body.innerText || '';
+  if (full.indexOf('已签到') > -1) return 'ALREADY_SIGNED';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  var b = document.getElementById('checkInButton');
+  if (b) { b.click(); return 'CLICKED'; }
+  return 'NO_BTN';
+})()
+'@
+    }
+
+    # v4.13.3: pbh-btn（PBH-BTN 论坛）真实签到适配 —— 经 daemon 上线后现场 DOM 核验修正。
+    #   与蜂巢(pting)同款 Flarum check-in 插件，但 **按钮无 id**：未签为
+    #   <button class="Button CheckInButton--yellow hasIcon">签到</button>（可点），
+    #   已签后变为 <button class="Button CheckInButton--green hasIcon disabled">已签到N天</button>。
+    #   v4.13.7 起导航统一走 cdp Page.navigate（非阻塞、不等 load），Flarum SPA 子资源挂起不再是问题。
+    "pbh-btn" = @{
+        Url = "https://bbs.pbh-btn.com/"
+        WaitMs = 15000
+        PostClickMs = 3000
+        Detect = @'
+(function(){
+  // 主检测：pbh-btn 无 id，按 class 取 check-in 按钮（黄=未签，绿=已签）
+  var btn = document.querySelector('button.CheckInButton--yellow, button.CheckInButton--green');
+  if (btn) {
+    var txt = (btn.innerText || btn.textContent || '').trim();
+    if (btn.classList.contains('disabled') || /已签到/.test(txt)) return 'ALREADY_SIGNED';
+    return 'NEED_SIGN';
+  }
+  // 兜底：按文本「签到」找按钮（覆盖其他 class 变体）
+  var els = document.querySelectorAll('button, a');
+  for (var i = 0; i < els.length; i++) {
+    var t = (els[i].innerText || els[i].textContent || '').trim();
+    if (t === '签到' || t === '每日签到') return 'NEED_SIGN';
+  }
+  // 已签：页面出现连续签到天数
+  var full = document.body.innerText || '';
+  if (full.indexOf('已签到') > -1 || full.indexOf('连续签到') > -1 || full.indexOf('今日已签到') > -1) return 'ALREADY_SIGNED';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  // 仅点「未签」状态的按钮（黄且未 disabled、文本非已签），避免对已签按钮重复点击
+  var btn = document.querySelector('button.CheckInButton--yellow, button.CheckInButton--green');
+  if (btn && !btn.classList.contains('disabled') && !/已签到/.test((btn.innerText || btn.textContent || ''))) {
+    btn.click(); return 'CLICKED';
+  }
+  var els = document.querySelectorAll('button, a');
+  for (var i = 0; i < els.length; i++) {
+    var t = (els[i].innerText || els[i].textContent || '').trim();
+    if (t === '签到' || t === '每日签到') { els[i].click(); return 'CLICKED'; }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
 
     "AsianDVDClub" = @{
         Url = "https://asiandvdclub.org/index.php"
@@ -1077,41 +1046,6 @@ $WebSignInConfigs = @{
     # 这些站点是书签同步新增，签到结构未知。先用 SPA 通用模板（登录态保持即视为成功），
     # 根据 signin-log.json 结果再迭代调整。
 
-    "42w" = @{
-        Url = "https://api.42w.shop/"
-        WaitMs = 12000
-        PostClickMs = 5000
-        Detect = $SPASignInDetect
-        Click = $null
-    }
-    "h-e" = @{
-        Url = "https://elysiver.h-e.top/console/personal"
-        WaitMs = 10000
-        PostClickMs = 5000
-        Detect = $SPASignInDetect
-        Click = $null
-    }
-    "zxiaoruan" = @{
-        Url = "https://gyapi.zxiaoruan.cn/profile"
-        WaitMs = 10000
-        PostClickMs = 5000
-        Detect = $SPASignInDetect
-        Click = $null
-    }
-    "pp" = @{
-        Url = "https://ioll.pp.ua/console/personal"
-        WaitMs = 10000
-        PostClickMs = 5000
-        Detect = $SPASignInDetect
-        Click = $null
-    }
-    "littlesheep" = @{
-        Url = "https://ai.littlesheep.cc/profile"
-        WaitMs = 10000
-        PostClickMs = 5000
-        Detect = $SPASignInDetect
-        Click = $null
-    }
     "onrender" = @{
         Url = "https://new-api-bxhm.onrender.com/console/personal"
         WaitMs = 10000
@@ -1126,27 +1060,46 @@ $WebSignInConfigs = @{
         Detect = $SPASignInDetect
         Click = $null
     }
-    "xt-url" = @{
-        Url = "https://checkin.new-api.xt-url.com/"
-        WaitMs = 10000
-        PostClickMs = 5000
-        Detect = $SPASignInDetect
-        Click = $null
+}
+
+# v4.13.0: 配置一致性校验
+# 排查根因：书签同步向 sites.json 新增 strategy=web-read/browser-open 站点时，若忘记补 $WebSignInConfigs 条目，
+#   Invoke-WebSignIn 返回 NO_CONFIG 并被 signin-batch 静默归类为 SKIPPED，导致新站点从不签到且无醒目提示。
+# 本函数在批处理/单站运行前校验：对"非 manual 站点缺配置"给醒目 WARNING；对孤儿配置 / visit-only 误配给 INFO。
+function Test-SigninConfigConsistency {
+    param(
+        [Parameter(Mandatory=$true)]
+        $Config
+    )
+    $issues = @()
+    if (-not $Config -or -not $Config.sites) { return $issues }
+    $cfgNames = @($WebSignInConfigs.Keys)
+    $siteNames = @($Config.sites | ForEach-Object { $_.name })
+    foreach ($s in $Config.sites) {
+        $hasCfg = $cfgNames -contains $s.name
+        if ($s.strategy -eq 'manual') {
+            if ($hasCfg) {
+                $issues += @{ site = $s.name; severity = 'INFO'; message = "manual 站点但存在 `$WebSignInConfigs 条目（不会被自动执行，可清理）" }
+            }
+            continue
+        }
+        if (-not $hasCfg) {
+            $issues += @{ site = $s.name; severity = 'WARN'; message = "strategy='$($s.strategy)' 但缺少 `$WebSignInConfigs 条目 → 将被 NO_CONFIG 静默跳过" }
+            continue
+        }
+        # 配置存在：校验 strategy 与配置形态是否一致
+        $c = $WebSignInConfigs[$s.name]
+        if ($s.strategy -eq 'visit-only' -and ($null -ne $c.Detect -or $null -ne $c.Click)) {
+            $issues += @{ site = $s.name; severity = 'INFO'; message = "visit-only 但配置含 Detect/Click（将仍执行检测，非纯保活）" }
+        }
     }
-    "pbh-btn" = @{
-        Url = "https://bbs.pbh-btn.com/"
-        WaitMs = 10000
-        PostClickMs = 5000
-        Detect = $SPASignInDetect
-        Click = $null
+    # 孤儿配置：$WebSignInConfigs 中存在但 sites.json 无对应站点 → 永不被触发
+    foreach ($cn in $cfgNames) {
+        if ($siteNames -notcontains $cn) {
+            $issues += @{ site = $cn; severity = 'INFO'; message = "`$WebSignInConfigs 条目无对应 sites.json 站点（孤儿配置，永不被触发）" }
+        }
     }
-    "anyrouter" = @{
-        Url = "https://anyrouter.top/console"
-        WaitMs = 10000
-        PostClickMs = 5000
-        Detect = $SPASignInDetect
-        Click = $null
-    }
+    return $issues
 }
 
 function Invoke-WebSignIn {
@@ -1154,7 +1107,9 @@ function Invoke-WebSignIn {
         [string]$SiteName,
         [bool]$SaveDebugSnapshot = $false,
         [string]$DebugDir = "",
-        [bool]$NoFocus = $false
+        # v4.12.25: 默认后台（不弹前台）。前台(opt-in) 仅 CF Turnstile 站偶尔需要焦点才渲染，
+        #   但用户明确优先级是"不弹前台"，故默认 $true；若要前台调试 CF，显式传 -NoFocus:$false。
+        [bool]$NoFocus = $true
     )
     $cfg = $WebSignInConfigs[$SiteName]
     if (-not $cfg) {
@@ -1176,5 +1131,11 @@ function Invoke-WebSignIn {
     if ($cfg.NavTimeoutSec) { $params.NavTimeoutSec = $cfg.NavTimeoutSec }
     if ($cfg.CfRetryCount) { $params.CfRetryCount = $cfg.CfRetryCount }
     if ($cfg.CfRetryWaitMs) { $params.CfRetryWaitMs = $cfg.CfRetryWaitMs }
+    # v4.13.6: LoadWaitSec 全局默认 45s（在 Test-WebBridgeSignIn 参数默认值中）；
+    #   用 ContainsKey 判断，允许站点显式设 LoadWaitSec=0 退回固定 WaitMs（if($cfg.LoadWaitSec) 会把 0 当假漏传）。
+    if ($cfg.ContainsKey('LoadWaitSec')) { $params.LoadWaitSec = $cfg.LoadWaitSec }
+    if ($cfg.ReadyEval) { $params.ReadyEval = $cfg.ReadyEval }
+    # v4.13.6: 默认自然分辨率；仅坐标点击站（CF Turnstile/ALTCHA/SLIDER）声明 ForceLayoutViewport=$true
+    if ($cfg.ForceLayoutViewport) { $params.ForceLayoutViewport = $cfg.ForceLayoutViewport }
     return Test-WebBridgeSignIn @params
 }

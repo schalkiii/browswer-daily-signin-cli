@@ -1,4 +1,4 @@
-# kimi-webbridge.ps1 — 签到脚本 kimi WebBridge 集成模块
+﻿# kimi-webbridge.ps1 — 签到脚本 kimi WebBridge 集成模块
 # 通过本地 daemon 操控用户真实浏览器完成签到
 # URL 可透过 config.json → webbridge.baseUrl 自定义
 # 用法: . .\kimi-webbridge.ps1; $r = Invoke-WebBridgeCommand "navigate" @{url="https://..."; newTab=$true} "session-name"
@@ -13,51 +13,94 @@ if (Test-Path $ConfigPath) {
     } catch {}
 }
 
-# daemon 健康检查与自动修复
-# 解决: daemon 异常退出后残留 daemon.pid 导致无法重启
-function Ensure-WebBridgeDaemon {
-    # 先检测 API 是否可用（通过 navigate 探测，__health__ 无 tab 会失败）
+# v4.13.6: 连接状态三态探测。
+# ⚠️ 不能用 'ping'——当前扩展版本不支持该动作（返回 "Unknown tool: ping"），且 ping 仅证明 daemon
+#   HTTP 存活、无法证明扩展已连接。改用 'list_tabs'（最轻量的扩展路径动作）：
+#   ok             = daemon + extension 均正常（list_tabs 成功）
+#   extension_down = daemon 有响应但扩展断开/报错
+#   daemon_down    = HTTP 层失败（端口未监听/进程死亡）
+function Test-WebBridgeConnection {
+    param([int]$TimeoutSec = 5)
     try {
-        $null = Invoke-RestMethod -Uri $WebBridgeBase -Method Post -ContentType "application/json" -Body '{"action":"ping","args":{},"session":"__health__"}' -TimeoutSec 3
-        return $true
+        $resp = Invoke-RestMethod -Uri $WebBridgeBase -Method Post -ContentType "application/json" -Body '{"action":"list_tabs","args":{},"session":"__health__"}' -TimeoutSec $TimeoutSec
+        if ($resp.ok) { return "ok" }
+        return "extension_down"
     } catch {
-        # 如果响应是 JSON 格式的错误（daemon 在运行），也算成功
-        if ($_.Exception.Message -match "tool_error|no tab") { return $true }
+        # 502/超时/拒绝连接 → daemon 层不可用；但 5xx 带 JSON body 的情况多为扩展断开（daemon 在代理转发）
+        if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 502) { return "extension_down" }
+        return "daemon_down"
     }
+}
 
-    # API 不可用，尝试修复 pid 文件并重启
+# v4.13.6: daemon 重启（自愈核心）。stop→清 pid→start→轮询端口与扩展重连。
+# 扩展与 daemon 之间会自动重连：daemon 重启后扩展一般在数秒~30s 内恢复连接，故重启后轮询等待。
+# 安全约束：不使用 iex；exe 缺失时提示手动安装（自动下载 install.ps1 涉及远程代码，只提示不执行）。
+function Restart-WebBridgeDaemon {
+    param([int]$ExtensionWaitSec = 30)
     $wbDir = Join-Path $env:USERPROFILE ".kimi-webbridge"
     $pidFile = Join-Path $wbDir "daemon.pid"
     $exePath = Join-Path $wbDir "bin\kimi-webbridge.exe"
 
     if (-not (Test-Path $exePath)) {
-        Write-Host "[WebBridge] daemon 未安装，跳过 webbridge 站点" -ForegroundColor Yellow
+        Write-Host "[WebBridge] daemon 未安装（缺 $exePath）。请手动安装: irm https://cdn.kimi.com/webbridge/install.ps1 下载后审查执行" -ForegroundColor Yellow
         return $false
     }
 
-    # 删除残留 pid 文件（使用 .NET 方法绕过安全限制）
-    if (Test-Path $pidFile) {
-        Write-Host "[WebBridge] 清理残留 daemon.pid..."
-        try { [System.IO.File]::Delete($pidFile) } catch {}
-    }
+    Write-Host "[WebBridge] 重启 daemon..." -ForegroundColor Yellow
+    try { & $exePath stop 2>&1 | Out-Null } catch {}
+    Start-Sleep -Seconds 2
+    # 兜底：stop 无效时按进程名清理
+    try { Get-Process -Name "kimi-webbridge" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue } catch {}
+    # 清残留 pid 文件（.NET 方法绕过安全限制）
+    if (Test-Path $pidFile) { try { [System.IO.File]::Delete($pidFile) } catch {} }
 
-    # 启动 daemon
-    Write-Host "[WebBridge] 启动 daemon..."
     try {
         & $exePath start 2>&1 | Out-Null
-        Start-Sleep -Seconds 5
-        # 验证：通过 netstat 检查端口 + 简单 API 调用
-        $portCheck = netstat -ano 2>$null | Select-String "127.0.0.1:10086.*LISTENING"
-        if (-not $portCheck) {
-            Write-Host "[WebBridge] daemon 启动失败（端口未监听）" -ForegroundColor Red
-            return $false
-        }
-        Write-Host "[WebBridge] daemon 启动成功" -ForegroundColor Green
-        return $true
     } catch {
-        Write-Host "[WebBridge] daemon 启动失败，跳过 webbridge 站点" -ForegroundColor Red
+        Write-Host "[WebBridge] daemon 启动命令失败: $_" -ForegroundColor Red
         return $false
     }
+    Start-Sleep -Seconds 3
+    $portCheck = netstat -ano 2>$null | Select-String "127.0.0.1:10086.*LISTENING"
+    if (-not $portCheck) {
+        Write-Host "[WebBridge] daemon 重启失败（端口未监听）" -ForegroundColor Red
+        return $false
+    }
+    # 端口已监听，等待扩展重连（轮询 list_tabs）
+    $deadline = (Get-Date).AddSeconds($ExtensionWaitSec)
+    while ((Get-Date) -lt $deadline) {
+        if ((Test-WebBridgeConnection) -eq "ok") {
+            Write-Host "[WebBridge] daemon 重启成功，扩展已重连" -ForegroundColor Green
+            return $true
+        }
+        Start-Sleep -Seconds 3
+    }
+    Write-Host "[WebBridge] daemon 已重启，但扩展 ${ExtensionWaitSec}s 内未重连（请检查浏览器是否在运行/扩展是否启用）" -ForegroundColor Yellow
+    return $false
+}
+
+# daemon 健康检查与自动修复（批处理/单站入口调用）
+# v4.13.6: 探测改用 Test-WebBridgeConnection（list_tabs 真连通判据，弃用扩展不支持的 ping）；
+#   daemon_down / extension_down 均尝试 Restart-WebBridgeDaemon 自愈一次。
+function Ensure-WebBridgeDaemon {
+    $state = Test-WebBridgeConnection
+    if ($state -eq "ok") { return $true }
+    Write-Host "[WebBridge] 连接异常（$state），尝试自愈重启..." -ForegroundColor Yellow
+    return (Restart-WebBridgeDaemon)
+}
+
+# v4.13.6: 运行中自愈——每站点开工前快速探测，断连则整个会话内只自动重启一次（防止反复重启风暴）。
+$script:WbSelfHealTried = $false
+function Ensure-WebBridgeHealthy {
+    $state = Test-WebBridgeConnection -TimeoutSec 4
+    if ($state -eq "ok") { return $true }
+    if ($script:WbSelfHealTried) {
+        Write-Host "  [WebBridge] 连接仍异常（$state），本次运行已自愈过，不再重启" -ForegroundColor Yellow
+        return $false
+    }
+    $script:WbSelfHealTried = $true
+    Write-Host "  [WebBridge] 站点开工前检测到连接异常（$state），触发自愈重启..." -ForegroundColor Yellow
+    return (Restart-WebBridgeDaemon)
 }
 
 function Invoke-WebBridgeCommand {
@@ -83,6 +126,17 @@ function Invoke-WebBridgeCommand {
     }
 }
 
+# v4.12.25: 统一从 daemon 返回值提取信号字符串。
+# 消除 Test-WebBridgeSignIn 中 ~10 处复制粘贴的 "if ($x -is [string])...elseif ($x.value)" 样板，
+# 降低后续出现"漏一行 .value 分支"类不一致 bug 的概率。
+function Get-ResultSignal {
+    param($Result)
+    if ($null -eq $Result) { return $null }
+    if ($Result -is [string]) { return $Result }
+    if ($Result.value) { return "$($Result.value)" }
+    return "$Result"
+}
+
 # 循环关闭 session 下所有 tab，避免标签累积泄漏
 # 返回关闭的 tab 数量；extension 未连接时返回 -1
 # v4.12.10: 必须按 list_tabs 返回的显式 tabId 逐个关闭。
@@ -97,7 +151,11 @@ function Clear-WebBridgeTabs {
     for ($i = 0; $i -lt $MaxClose; $i++) {
         try {
             $listResp = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
-            if (-not $listResp -or -not $listResp.tabs -or $listResp.tabs.Count -eq 0) {
+            if ($null -eq $listResp) {
+                # extension 未连接 / 无法列出 tab → 返回 -1 让调用方区分"0 残留"与"探测失败"
+                return -1
+            }
+            if (-not $listResp.tabs -or $listResp.tabs.Count -eq 0) {
                 break
             }
             $tabCount = $listResp.tabs.Count
@@ -126,6 +184,136 @@ function Clear-WebBridgeTabs {
     return $closedCount
 }
 
+# v4.12.19: daemon 级整会话强关（不依赖 per-tab extension 状态）
+# 用于: (a) per-tab 关闭失效（extension 断开）时的兜底清理；(b) 批处理/续跑块收尾与块间清扫。
+# 与 Clear-WebBridgeTabs 区别: 此处直接让 daemon 关闭 session 下全部 tab，即使 extension 断开也能生效。
+# 下一站点 navigate 会重建 tab（signin-batch.ps1 末尾 close_session 后重跑即用此机制）。
+function Close-WebBridgeSession {
+    param([string]$Session = "daily-signin")
+    try {
+        $r = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $Session -TimeoutSec 8
+        return ($null -ne $r)
+    } catch { return $false }
+}
+
+# v4.12.25: 「关后校验 + 重试」——把 v4.12.24 的"整会话强关"从静默假设变成可观测。
+# 根因风险：v4.12.24 假设 close_session 能关掉折叠 159x27 后台窗口里的 tab，
+#   但该场景从未被实证；而 list_tabs/close_tab 对这类 tab 已证不可靠。若 close_session 同样漏关，
+#   v4.12.24 会静默累积（正是用户历史现象）。
+# 本函数：close_session -> list_tabs 校验 -> 仍非空则再 close_session 一次 + 退路 Clear-WebBridgeTabs(逐 id 关)
+#   -> 再次 list_tabs 校验。无论 daemon 是否漏关，泄漏都被限制在"下一站开工前"一瞬，且 $leaked 会让调用方在日志看见。
+function Close-SiteTabs-Verified {
+    param([string]$Session = "daily-signin", [int]$VerifyTimeoutSec = 5)
+    $leaked = 0
+    # 第一关：daemon 级整会话强关（不依赖 extension，extension 断开也生效）
+    try { $null = Close-WebBridgeSession -Session $Session } catch {}
+    # 第二关：逐 id 关（best-effort，extension 连上时 close_tab 通常可用；即便第一关已清空也无害）
+    #   v4.13.3: 提为常驻第二关（非仅漏关时才跑）——close_session 对"卡在加载中/折叠后台窗口"的 tab
+    #   可能漏关而 list_tabs 又因 extension 抖动返回空(假阴性)，导致退路永不触发、tab 静默累积（用户 07-26 复现）。
+    try { $null = Clear-WebBridgeTabs -Session $Session } catch {}
+    # 校验
+    try {
+        $chk = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec $VerifyTimeoutSec
+        if ($chk -and $chk.tabs -and $chk.tabs.Count -gt 0) {
+            $leaked = $chk.tabs.Count
+            # 第三关：再强关 + 再逐 id 关（应对偶发漏关）
+            try { $null = Close-WebBridgeSession -Session $Session } catch {}
+            try { $null = Clear-WebBridgeTabs -Session $Session } catch {}
+            # 末次校验
+            try {
+                $chk2 = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec $VerifyTimeoutSec
+                if ($chk2 -and $chk2.tabs) { $leaked = $chk2.tabs.Count }
+            } catch { $leaked = -1 }
+        }
+    } catch { $leaked = -1 }
+    if ($leaked -gt 0) {
+        Write-Host "  [WebBridge] ⚠️ close_session 后仍有 $leaked 个 tab 残留（折叠窗口/extension 抖动？），请检查 daemon" -ForegroundColor Yellow
+    }
+    return ($leaked -eq 0)
+}
+
+# v4.12.24: 结构性单 tab —— 根治重复开 tab（v4.12.22/23 的"先关后开"仍漏关、重复 tab 反而更多）
+#   根因复盘：
+#     • v4.12.22 改为"每次都 newTab=true + 关旧 tab"，打开次数比旧版(尽量复用)多，泄漏随 close 失败复利放大；
+#     • 关旧 tab 依赖 list_tabs(抖动误报) + close_tab(折叠后台 window active=False 难命中) → 不可靠；
+#     • v4.12.23 用 $script: 记忆单 tabId 关旧 tab，仍受 close_tab/list_tabs 不可靠牵连。
+#   本版不再依赖 list_tabs / 单 tabId 记忆，直接 Close-WebBridgeSession(daemon 级强关，
+#   即使 extension 抖动或断开也生效——见 v4.12.19) 整会话清空，再 newTab=true 开唯一一个。
+#   任意时刻本会话 ≤ 1 个 tab，且与 list_tabs 是否误报、close_tab 是否命中无关；
+#   首次 / NAV_FAIL 重试 / extension 就绪重试 / evaluate 丢 tab 重试 / CF 重试 / SLIDER 重开 / 点击后重开
+#   全部走本函数 → 每次必定先整会话强关再开新，满足"即便重试也先关旧 tab 再开新的"。
+function Open-SiteTab {
+    param(
+        [string]$Url,
+        [string]$Session = "daily-signin",
+        [int]$NavTimeoutSec = 60,
+        # v4.13.6: 必须是 [switch]——调用点均为裸开关式 `-ForceNew`，[bool] 会报
+        #   "Missing an argument for parameter 'ForceNew'"（该隐患随重试路径增多现形，HDKYL 实测触发）
+        [switch]$ForceNew,
+        [bool]$ForceLayoutViewport = $false
+    )
+    # 结构性清场：整会话 daemon 级强关 + 关后校验（v4.12.25 Close-SiteTabs-Verified）。
+    # 不依赖 extension / list_tabs 状态，且若 daemon 漏关会在日志告警（不再静默累积）。
+    # ⚠️ 所有站点必须共用同一 $Session（"daily-signin"）：本函数靠 close_session 清掉"上一站点"的 tab，
+    #    若各站用独立 session，close_session 只清自己 → 上一站 tab 永不关 → 泄漏重现。signin-batch.ps1 的 $session="pt$idx" 死变量即此陷阱，已删。
+    try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
+
+    # v4.13.7: 根治 daemon navigate 死等 load → 30s 超时 + tab 被销毁 → 重试无限开 tab（用户 07-26 复现的根因）。
+    #   实测关键事实：daemon 的 navigate **完全忽略 waitUntil 参数**，永远死等 `load` 事件；而多数 PT 站
+    #   （CF 挑战 / 慢子资源 / 长连接 / 后台折叠窗口）的 `load` 在 30s 内不触发 → 超时 → daemon 直接销毁 tab。
+    #   v4.13.4 的 waitUntil=domcontentloaded 方案（及本次前所有尝试）均因此无效——baidu 偶成功只是其 load 碰巧快。
+    #   新方案（已现场验证）：先用本地 data: URL 作 seed 瞬时建一个"活"tab（navigate 对本地 data: 秒回，零网络/代理依赖），
+    #   再走 cdp Page.navigate 跳到真目标（**非阻塞、不等 load、不杀 tab**）；后续由 Wait-PageReady 轮询 DOM 就绪。
+    #   验证：seed(data:) → cdp Page.navigate(kufirc) → evaluate 轮询，poll#0 即拿到真实签到页（len 4350）。
+    $seedOk = $false
+    try {
+        $seed = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = 'data:text/html,<html><body>seed</body></html>'; newTab = $true } -Session $Session -TimeoutSec 20
+        $seedOk = ($null -ne $seed -and $seed.success)
+    } catch { $seedOk = $false }
+    if (-not $seedOk) {
+        # 退化兜底：用本机 daemon 端口（仍本地、秒回）
+        try {
+            $seed = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = 'http://127.0.0.1:10086'; newTab = $true } -Session $Session -TimeoutSec 20
+            $seedOk = ($null -ne $seed -and $seed.success)
+        } catch { $seedOk = $false }
+    }
+    if (-not $seedOk) {
+        Write-Host "  [WebBridge] Open-SiteTab: seed tab 创建失败（daemon/extension 不可用）" -ForegroundColor Red
+        return @{ success = $false; error = "seed_tab_failed" }
+    }
+
+    # cdp Page.navigate 到真目标（非阻塞，不等 load，不销毁 tab）。
+    # 关键：WAF 站(雷池等)会让 daemon 的 cdp 包装一直等"导航提交"而卡住，但导航实际已发起且 tab 存活
+    #   （实测：客户端 8s 提前 abort 后 tab 仍在、HDKYL 已 complete 加载）。故用短超时 + 容错：
+    #   无论 cdp 是否及时返回，都视为已发起，转由 Wait-PageReady 轮询 DOM 最终判定。
+    try {
+        $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "Page.navigate"; params = @{ url = $Url } } -Session $Session -TimeoutSec 12 -ErrorAction SilentlyContinue
+    } catch {}
+
+    # 确认 tab 仍存活（seed 已建，cdp 不至销毁）；否则视为失败触发上层重试
+    $alive = $false
+    try {
+        $chk = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
+        if ($chk -and $chk.tabs -and $chk.tabs.Count -ge 1) { $alive = $true }
+    } catch {}
+    if (-not $alive) {
+        Write-Host "  [WebBridge] Open-SiteTab: 导航后 tab 丢失" -ForegroundColor Red
+        return @{ success = $false; error = "tab_lost_after_nav" }
+    }
+
+    # v4.13.6: 默认自然分辨率（用户 07-26 要求：不需坐标系一致的站点一律用浏览器窗口原生分辨率）。
+    #   仅当站点显式声明 ForceLayoutViewport=$true（CF Turnstile/ALTCHA/SLIDER 等坐标点击站）才在导航后
+    #   立即启用 1280x800 覆盖——这类站的坐标必须在 rect 计算前就固定视口，否则 getBoundingClientRect
+    #   与 Input.dispatchMouseEvent 坐标系不一致。其余站点若中途意外遇到 CF 挑战，由
+    #   Invoke-CfVerifyClick 顶部的「懒启用」兜底（先启用视口再算 rect，坐标系仍一致）。
+    if ($ForceLayoutViewport) {
+        $null = Enable-LayoutViewport -Session $Session
+    }
+
+    # 合成成功对象，使调用方走正常 Detect / Wait 流程（就绪判定交给 Wait-PageReady 轮询，不再依赖 load 事件）
+    return @{ success = $true; method = "cdp-Page.navigate"; url = $Url }
+}
+
 function Test-WebBridgeSignIn {
     param(
         [string]$SiteName,
@@ -139,20 +327,28 @@ function Test-WebBridgeSignIn {
         [int]$CfRetryWaitMs = 10000,
         [bool]$SaveDebugSnapshot = $false,
         [string]$DebugDir = "",
-        [bool]$NoFocus = $false
+        [bool]$NoFocus = $false,
+        # v4.13.6: 全局默认动态轮询 45s（用户 07-26 要求：所有站点长延迟+动态轮询，就绪即继续）。
+        #   页面就绪（body 文本足够长且无盾关键词）通常 2~6s 即返回，不会拖慢正常站点；
+        #   过盾/慢站最多等 45s。站点可用 $cfg.LoadWaitSec 覆盖（HDKYL=60）；显式 0 退回固定 WaitMs。
+        [int]$LoadWaitSec = 45,
+        [string]$ReadyEval = "",
+        [bool]$ForceLayoutViewport = $false
     )
     $session = "daily-signin"
 
-    # v4.12.2: 循环关闭 session 下所有残留 tab，避免标签累积泄漏
-    # 旧版单次 close_tab 在 extension 断开时失败，导致旧 tab 残留，重试时新 tab 累积
-    $cleared = Clear-WebBridgeTabs -Session $session
-    if ($cleared -gt 0) {
-        Write-Host "  [WebBridge] $SiteName : 清理 $cleared 个残留 tab" -ForegroundColor DarkGray
+    # v4.13.6: 站点开工前连接自检——daemon/extension 断连时自动重启自愈（每次运行至多一次）
+    if (-not (Ensure-WebBridgeHealthy)) {
+        Write-Host "  [WebBridge] $SiteName : daemon/extension 不可用且自愈失败 -> NAV_FAIL" -ForegroundColor Red
+        return "NAV_FAIL"
     }
+
+    # v4.12.24: 入口不再预清残留 tab —— Open-SiteTab 每次都会整会话强关(Close-WebBridgeSession)，
+    #   结构保证本会话 ≤ 1 个 tab，无需此处 list_tabs 探测(抖动会误报，曾是漏 tab 根因之一)。
 
     try {
         Write-Host "  [WebBridge] $SiteName : navigate -> $Url"
-        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+        $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
         # v4.12.3: extension 冷启动等待 — daemon 启动后 extension 需要几秒才连接
         # 首个站点可能 navigate 失败，等待 extension 就绪后重试
         if (-not $nav -or -not $nav.success) {
@@ -164,7 +360,7 @@ function Test-WebBridgeSignIn {
                     $listCheck = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $session -TimeoutSec 5
                     if ($listCheck) {
                         Write-Host "  [WebBridge] $SiteName : extension 已就绪（重试 $($extRetry+1)/3）" -ForegroundColor Green
-                        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+                        $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
                         break
                     }
                     Write-Host "  [WebBridge] $SiteName : extension 重试 $($extRetry+1)/3 仍未就绪" -ForegroundColor Yellow
@@ -176,8 +372,8 @@ function Test-WebBridgeSignIn {
                     $navRetries = 0
                     while ((-not $nav -or -not $nav.success) -and $navRetries -lt 2) {
                         Write-Host "  [WebBridge] $SiteName : NAV_FAIL, re-navigate retry $($navRetries+1)/2..."
-                        Start-Sleep -Seconds 3
-                        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+                        Start-Sleep -Seconds 8
+                        $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
                         $navRetries++
                     }
                     if (-not $nav -or -not $nav.success) {
@@ -194,16 +390,40 @@ function Test-WebBridgeSignIn {
             } catch {}
         }
 
-        # v4.12.8: 强制真实布局视口，修复坐标点击（CF/ALTCHA）在折叠窗口 0x0 视口下失效的问题
-        $null = Enable-LayoutViewport -Session $session
+        # v4.12.25: 布局视口覆盖已收进 Open-SiteTab（每次 navigate 成功后立即启用），
+        #   此处不再重复启用，避免函数内重开 tab(272/306/475) 后视口丢失导致 CF/ALTCHA 坐标点击失效。
 
-        Write-Host "  [WebBridge] $SiteName : waiting ${WaitMs}ms for page load"
-        Start-Sleep -Milliseconds $WaitMs
+        Wait-PostNavigate -Session $session -SiteName $SiteName -WaitMs $WaitMs -LoadWaitSec $LoadWaitSec -ReadyEval $ReadyEval
 
         # visit-only 模式：无 DetectEval 时仅访问，不检测签到
         if (-not $DetectEval -or $DetectEval.Trim() -eq "") {
             Write-Host "  [WebBridge] $SiteName : visit-only (no detect), returning VISITED"
             return "VISITED"
+        }
+
+        # v4.12.18: 全局 chrome-error 预检（对所有站点生效）。
+        # 站点专属 detect 不会识别 chrome-error:// 页（如 V2EX 的 ERR_CONNECTION_CLOSED
+        # 会被误判成 UNKNOWN；NexusPHP 站虽有判断但非 NexusPHP 站缺此逻辑）。
+        # 这里先判连接错误，直接归 SERVER_ERROR（属网络/代理/站点侧，非代码缺陷）。
+        $chromeErrJs = @'
+(function(){
+  try {
+    if(location.protocol==='chrome-error:') return 'SERVER_ERROR';
+    var t = (document.body && document.body.innerText) || '';
+    if(t.indexOf('ERR_CONNECTION_CLOSED')>-1 || t.indexOf('ERR_CONNECTION_RESET')>-1 ||
+       t.indexOf('ERR_PROXY_CONNECTION_FAILED')>-1 || t.indexOf('ERR_TIMED_OUT')>-1 ||
+       t.indexOf('无法访问此页面')>-1 || t.indexOf('无法显示此页')>-1 ||
+       t.indexOf('找不到该页')>-1) return 'SERVER_ERROR';
+  } catch(e){}
+  return 'OK';
+})()
+'@
+        $errCheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $chromeErrJs } -Session $session -TimeoutSec 10
+        $errSig = Get-ResultSignal $errCheck
+        if ($errSig -eq "SERVER_ERROR") {
+            Write-Host "  [WebBridge] $SiteName : chrome-error detected (connection closed) -> SERVER_ERROR"
+            Save-DebugSnapshot $SiteName $session "server_error" $DebugDir $SaveDebugSnapshot
+            return "SERVER_ERROR"
         }
 
         Write-Host "  [WebBridge] $SiteName : evaluate detect"
@@ -212,10 +432,9 @@ function Test-WebBridgeSignIn {
             # evaluate 失败常见于 tab 丢失（webbridge daemon bug: navigate 返回 success 但 tab 在等待期间消失）
             # 修复：清理所有残留 tab 后重新 navigate + evaluate 一次
             Write-Host "  [WebBridge] $SiteName : evaluate failed (tab may be lost), retrying navigate..."
-            $null = Clear-WebBridgeTabs -Session $session
-            $navRetry = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+            $navRetry = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceNew -ForceLayoutViewport $ForceLayoutViewport
             if ($navRetry -and $navRetry.success) {
-                Start-Sleep -Milliseconds $WaitMs
+                Wait-PostNavigate -Session $session -SiteName $SiteName -WaitMs $WaitMs -LoadWaitSec $LoadWaitSec -ReadyEval $ReadyEval
                 $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
             }
         }
@@ -224,9 +443,7 @@ function Test-WebBridgeSignIn {
             return "EVAL_FAIL"
         }
 
-        if ($detect -is [string]) { $signal = $detect }
-        elseif ($detect.value) { $signal = "$($detect.value)" }
-        else { $signal = "$detect" }
+        $signal = Get-ResultSignal $detect
         Write-Host "  [WebBridge] $SiteName : signal=$signal"
 
         # 状态转换验证：区分"访问即签到"与"今天已签到"
@@ -237,20 +454,21 @@ function Test-WebBridgeSignIn {
             Save-DebugSnapshot $SiteName $session "sign_ok" $DebugDir $SaveDebugSnapshot
             return $firstSignal
         }
-        if ($signal -match "LOGIN_REQUIRED|SLIDER|CAPTCHA") {
+        if ($signal -match "LOGIN_REQUIRED") {
             Save-DebugSnapshot $SiteName $session $signal $DebugDir $SaveDebugSnapshot
             return $signal
         }
+        # v4.12.18: SLIDER 不再在此提前 return —— 否则下方 Invoke-SlideBypass 滑块绕过
+        # 逻辑（第 338 行起）成为死代码。SLIDER 必须落到该绕过块才能真正尝试绕过。
 
         # v4.12.7: SERVER_ERROR（HTTP 500/502 等）多为瞬时服务端错误，重新导航 1 次再判定，避免偶发失败
         if ($signal -match "SERVER_ERROR") {
             Write-Host "  [WebBridge] $SiteName : SERVER_ERROR, re-navigating once to confirm..."
-            $null = Clear-WebBridgeTabs -Session $session
-            $navSe = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+            $navSe = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
             if ($navSe -and $navSe.success) {
-                Start-Sleep -Milliseconds $WaitMs
+                Wait-PostNavigate -Session $session -SiteName $SiteName -WaitMs $WaitMs -LoadWaitSec $LoadWaitSec -ReadyEval $ReadyEval
                 $seDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-                $seSig = if ($seDetect -is [string]) { $seDetect } elseif ($seDetect.value) { "$($seDetect.value)" } else { "$seDetect" }
+                $seSig = Get-ResultSignal $seDetect
                 if ($seSig -and $seSig -notmatch "SERVER_ERROR") {
                     Write-Host "  [WebBridge] $SiteName : after re-nav, signal=$seSig"
                     $signal = $seSig
@@ -266,7 +484,7 @@ function Test-WebBridgeSignIn {
                 Start-Sleep -Seconds 5
                 $retryDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
                 if ($retryDetect) {
-                    $retrySig = if ($retryDetect -is [string]) { $retryDetect } elseif ($retryDetect.value) { "$($retryDetect.value)" } else { "$retryDetect" }
+                    $retrySig = Get-ResultSignal $retryDetect
                     if ($retrySig -ne "UNKNOWN") {
                         Write-Host "  [WebBridge] $SiteName : retry signal=$retrySig"
                         $signal = $retrySig
@@ -282,7 +500,7 @@ function Test-WebBridgeSignIn {
                 # BODY_NULL/CF_CHALLENGE 实为页面渲染滞后或 CF 后台已通过，真实已签到
                 # （"得到魔力加成"等短语）被卡在 CF 重试而漏判成功。
                 $reDetect0 = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-                $reSig0 = if ($reDetect0 -is [string]) { $reDetect0 } elseif ($reDetect0.value) { "$($reDetect0.value)" } else { "$reDetect0" }
+                $reSig0 = Get-ResultSignal $reDetect0
                 if ($reSig0 -and $reSig0 -notmatch "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
                     Write-Host "  [WebBridge] $SiteName : retry detect signal=$reSig0"
                     if ($reSig0 -match "SIGN_OK|ALREADY_SIGNED") {
@@ -310,7 +528,7 @@ function Test-WebBridgeSignIn {
                 if ($cfPassed -match "^passed:|^no-cf$") {
                     # CF 已通过或已消失，重新检测页面状态
                     $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-                    $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
+                    $reSig = Get-ResultSignal $reDetect
                     Write-Host "  [WebBridge] $SiteName : post-CF signal=$reSig"
                     if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
                         $cfPassSignal = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
@@ -343,7 +561,7 @@ function Test-WebBridgeSignIn {
                 if ($bypassed) {
                     Start-Sleep -Seconds 4
                     $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-                    $reSig = if ($reDetect -is [string]) { $reDetect } elseif ($reDetect.value) { "$($reDetect.value)" } else { "$reDetect" }
+                    $reSig = Get-ResultSignal $reDetect
                     Write-Host "  [WebBridge] $SiteName : post-bypass signal=$reSig"
                     if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
                         $sig2 = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
@@ -365,7 +583,8 @@ function Test-WebBridgeSignIn {
             Write-Host "  [WebBridge] $SiteName : click result=$clicked"
             # v4.12.7: Yemapt ALTCHA 返回 widget 视口坐标，用 CDP 受信任点击触发验证
             # （closed shadow checkbox 无法用 JS .click() 触发，真实坐标点击可命中 shadow 内复选框）
-            $clickedSig = if ($clicked -is [string]) { $clicked } elseif ($clicked.value) { "$($clicked.value)" } else { "$clicked" }
+            # v4.13.0: 统一用 Get-ResultSignal 提取信号，消除散落的 $clicked.value 分支样板
+            $clickedSig = Get-ResultSignal $clicked
             if ($clickedSig -match '^ALTCHA_RECT:') {
                 # v4.12.8: Click 返回 "ALTCHA_RECT:cx,cy,w,h"，在真实布局视口下尝试多个候选点命中 shadow 内复选框
                 $vals = ($clickedSig -replace '^ALTCHA_RECT:','') -split ','
@@ -410,17 +629,16 @@ function Test-WebBridgeSignIn {
 
             Write-Host "  [WebBridge] $SiteName : evaluate re-check"
             $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 30
-            $recheckSig = if ($recheck -is [string]) { $recheck } elseif ($recheck.value) { "$($recheck.value)" } else { "$recheck" }
+            $recheckSig = Get-ResultSignal $recheck
             # 点击后页面导航导致 tab 重建（如表单提交），复检引用失效 → 重新导航+重检测确认实际状态
             # 修复 xloli 等站点：点击返回 CLICKED 但复检报 "tab was closed"，信号变空（实则可能已签）
             if (-not $recheck -or [string]::IsNullOrEmpty($recheckSig)) {
                 Write-Host "  [WebBridge] $SiteName : re-check tab lost (navigated), re-navigating to confirm..."
-                $null = Clear-WebBridgeTabs -Session $session
-                $navRe = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $session -TimeoutSec $NavTimeoutSec
+                $navRe = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceNew -ForceLayoutViewport $ForceLayoutViewport
                 if ($navRe -and $navRe.success) {
-                    Start-Sleep -Milliseconds $WaitMs
+                    Wait-PostNavigate -Session $session -SiteName $SiteName -WaitMs $WaitMs -LoadWaitSec $LoadWaitSec -ReadyEval $ReadyEval
                     $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-                    $recheckSig = if ($recheck -is [string]) { $recheck } elseif ($recheck.value) { "$($recheck.value)" } else { "$recheck" }
+                    $recheckSig = Get-ResultSignal $recheck
                 }
             }
             # 点击后检测到已签到 → 本次签到成功（非 ALREADY_SIGNED）
@@ -437,8 +655,10 @@ function Test-WebBridgeSignIn {
     finally {
         # v4.12.8: 还原设备视口覆盖，避免影响后续站点/真实浏览器
         try { $null = Disable-LayoutViewport -Session $session } catch {}
-        # 函数结束清理本站点所有 tab，确保不残留给下一个站点
-        $null = Clear-WebBridgeTabs -Session $session
+        # v4.12.24: 结构性清场 —— 整会话 daemon 级强关，彻底杜绝 tab 残留给下一站点。
+        #   不依赖 list_tabs / close_tab（二者在折叠后台 window + extension 抖动下不可靠，正是漏 tab 根因）。
+        #   下一站点 Open-SiteTab 会 Close-WebBridgeSession + navigate 重建，不影响后续签到。
+        try { $null = Close-WebBridgeSession -Session $session } catch {}
     }
 }
 
@@ -453,6 +673,11 @@ function Invoke-CfVerifyClick {
         [string]$SiteName,
         [int]$Attempt = 0
     )
+
+    # v4.13.6: 懒启用布局视口——默认自然分辨率下，折叠后台窗口 layout viewport 为 0x0，
+    #   坐标点击必失效。在 scroll/rect 计算【之前】启用 1280x800，保证 getBoundingClientRect
+    #   与 Input.dispatchMouseEvent 坐标系一致。ForceLayoutViewport 站点重复启用无害（幂等）。
+    $null = Enable-LayoutViewport -Session $Session
 
     # 先滚动 widget 到视口（触发懒加载渲染 iframe）
     $scrollJS = @'
@@ -543,6 +768,68 @@ function Disable-LayoutViewport {
     } catch {}
 }
 
+# v4.13.5: 动态等待页面就绪（替代固定 WaitMs）。
+# 用于需过网站盾/WAF 的站点：盾求解前 body 多为空或含盾关键词，固定延迟太短会误判 UNKNOWN/SERVER_ERROR；
+#   本函数轮询直到"真实内容就绪"（body 文本足够长且不含盾关键词）或超时，就绪即继续（不空等满延迟）。
+# ReadyEval 为空用默认就绪判定；提供则用其返回值（期望 JSON {ready:true} 或布尔 true/1）。
+function Wait-PageReady {
+    param(
+        [string]$Session,
+        [int]$MaxWaitSec = 60,
+        [int]$PollMs = 2000,
+        [int]$MinBodyLen = 50,
+        [string]$ReadyEval = ""
+    )
+    $deadline = (Get-Date).AddSeconds($MaxWaitSec)
+    while ((Get-Date) -lt $deadline) {
+        $ready = $false
+        try {
+            if ($ReadyEval) {
+                $r = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $ReadyEval } -Session $Session -TimeoutSec 10
+                $sig = Get-ResultSignal $r
+                if ($sig -eq 'true' -or $sig -eq '1') { $ready = $true }
+                else { try { $o = $sig | ConvertFrom-Json -ErrorAction SilentlyContinue; if ($o -and ($o.ready -eq $true -or $o.ready -eq 1)) { $ready = $true } } catch {} }
+            } else {
+                $js = @"
+(function(){
+  var b = document.body; if(!b) return 0;
+  var t = (b.innerText||'').trim();
+  if (t.length < $MinBodyLen) return 0;
+  var shield = ['正在检查','安全验证','雷池','Checking your browser','Just a moment','DDoS','Attention Required','verify you are human','确认您是真人'];
+  for (var i=0;i<shield.length;i++){ if(t.indexOf(shield[i])>-1) return 0; }
+  return 1;
+})()
+"@
+                $r = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10
+                $sig = Get-ResultSignal $r
+                if ($sig -eq '1') { $ready = $true }
+            }
+        } catch {}
+        if ($ready) { return $true }
+        Start-Sleep -Milliseconds $PollMs
+    }
+    return $false
+}
+
+# v4.13.5: 导航后等待统一入口——开了 LoadWaitSec 的站点走动态轮询，否则沿用固定 WaitMs（行为不变）。
+function Wait-PostNavigate {
+    param(
+        [string]$Session,
+        [string]$SiteName,
+        [int]$WaitMs,
+        [int]$LoadWaitSec = 0,
+        [string]$ReadyEval = ""
+    )
+    if ($LoadWaitSec -and $LoadWaitSec -gt 0) {
+        Write-Host "  [WebBridge] $SiteName : dynamic wait for page ready (max ${LoadWaitSec}s)..."
+        $ready = Wait-PageReady -Session $Session -MaxWaitSec $LoadWaitSec -PollMs 2000 -MinBodyLen 50 -ReadyEval $ReadyEval
+        Write-Host "  [WebBridge] $SiteName : page ready=$ready (proceeding)"
+    } else {
+        Write-Host "  [WebBridge] $SiteName : waiting ${WaitMs}ms for page load"
+        Start-Sleep -Milliseconds $WaitMs
+    }
+}
+
 # 检查 ALTCHA 是否已完成验证（aria-checked / data-state=verified / 隐藏 JWT 字段）
 function Test-AltchaVerified {
     param([string]$Session)
@@ -624,7 +911,7 @@ function Invoke-SlideBypass {
 '@
     try {
         $r = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 20
-        $s = if ($r -is [string]) { $r } elseif ($r.value) { "$($r.value)" } else { "$r" }
+        $s = Get-ResultSignal $r
         Write-Host "  [WebBridge] $SiteName : slide-bypass: $s"
         return ($s -match "^bypassed:")
     } catch { return $false }
@@ -680,7 +967,8 @@ function Save-DebugSnapshot {
 })()
 '@
         $snapData = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $snapshotJS } -Session $Session -TimeoutSec 15
-        $snapJson = if ($snapData -is [string]) { $snapData } elseif ($snapData.value) { "$($snapData.value)" } else { "{}" }
+        $snapJson = Get-ResultSignal $snapData
+        if ([string]::IsNullOrEmpty($snapJson)) { $snapJson = "{}" }
 
         $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
         $safeName = $SiteName -replace '[\\/:*?"<>|]', '_'

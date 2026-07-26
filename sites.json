@@ -1,6 +1,6 @@
 {
   "version": "v4.12.0",
-  "total": 49,
+  "total": 52,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -36,9 +36,9 @@
     {
       "name": "FreeFarm",
       "url": "https://pt.0ff.cc/attendance.php",
-      "strategy": "webbridge",
+      "strategy": "manual",
       "display_name": "FreeFarm",
-      "note": "2026-07-10: v4.12.11 适配 — 旧 Detect 用过度宽泛的 div[class*=\"challenge\"] 误报 SLIDER，实际已登录页无滑块；改为已签到优先+精确滑块检测，并加 set_access_token token 绕过"
+      "note": "2026-07-10: v4.12.11 适配 — 旧 Detect 用过度宽泛的 div[class*=\"challenge\"] 误报 SLIDER，实际已登录页无滑块；改为已签到优先+精确滑块检测，并加 set_access_token token 绕过。2026-07-23 v4.12.26: 该 token 注入式绕过已随站点切「真·拖拽滑块」失效（slide_check JS 哈希滚动、HTML 无 set_access_token），自动适配不可行 → strategy 改 manual，需人工点滑块。"
     },
     {
       "name": "UBits",
@@ -61,8 +61,8 @@
     {
       "name": "AsianDVDClub",
       "url": "https://asiandvdclub.org/index.php",
-      "strategy": "webbridge",
-      "note": "书签同步: AsianDVDClub 仅访问"
+      "strategy": "visit-only",
+      "note": "用户要求：仅打开网页，不需要签到（visit-only：navigate+VISITED+关tab）"
     },
     {
       "name": "BiliDownload",
@@ -135,8 +135,8 @@
     {
       "name": "Kufirc",
       "url": "https://kufirc.com/index.php",
-      "strategy": "webbridge",
-      "note": "书签同步: Kufirc 仅访问"
+      "strategy": "visit-only",
+      "note": "用户要求：仅打开网页，不需要签到（visit-only，navigate+返回VISITED+关tab）"
     },
     {
       "name": "M-Team",
@@ -226,13 +226,6 @@
       "note": "v4.10.1: URL 返回 404 (页面未找到)，签到入口失效，需人工确认正确URL后改回webbridge"
     },
     {
-      "name": "h-e",
-      "url": "https://elysiver.h-e.top/console/personal",
-      "strategy": "webbridge",
-      "display_name": "Elysiver控制台",
-      "note": "auto: 书签同步新增"
-    },
-    {
       "name": "hdbao",
       "url": "https://hdbao.cc/attendance.php",
       "strategy": "webbridge",
@@ -307,13 +300,41 @@
       "url": "https://bbs.pbh-btn.com/",
       "strategy": "webbridge",
       "display_name": "PBH-BTN论坛",
-      "note": "auto: 书签同步新增"
+      "note": "v4.13.3: Flarum 真实签到（按钮无 id，按 class CheckInButton--yellow/green 判定；NavWaitUntil=domcontentloaded 规避 SPA 导航超时）；已现场核验 ALREADY_SIGNED 路径"
     },
     {
       "name": "invites",
       "url": "https://www.invites.fun/?sort=newest",
       "strategy": "webbridge",
       "display_name": "Invites邀请",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "daxiangjiao",
+      "url": "https://pt.daxiangjiao.org/attendance.php",
+      "strategy": "web-read",
+      "display_name": "DaXiangJiao :: 签到 - Powered by NexusPHP",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "chybenzun",
+      "url": "https://dy.chybenzun.top/",
+      "strategy": "webbridge",
+      "display_name": "CHY 公益订阅",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "pting",
+      "url": "https://pting.club/?sort=newest",
+      "strategy": "webbridge",
+      "display_name": "全部主题 - 蜂巢",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "cdy",
+      "url": "https://pt.cdy.pics/attendance.php",
+      "strategy": "webbridge",
+      "display_name": "传道院·PT :: 签到 - Powered by NexusPHP",
       "note": "auto: 书签同步新增"
     }
   ],
