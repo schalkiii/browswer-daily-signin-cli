@@ -262,9 +262,11 @@ function Open-SiteTab {
     #   实测关键事实：daemon 的 navigate **完全忽略 waitUntil 参数**，永远死等 `load` 事件；而多数 PT 站
     #   （CF 挑战 / 慢子资源 / 长连接 / 后台折叠窗口）的 `load` 在 30s 内不触发 → 超时 → daemon 直接销毁 tab。
     #   v4.13.4 的 waitUntil=domcontentloaded 方案（及本次前所有尝试）均因此无效——baidu 偶成功只是其 load 碰巧快。
-    #   新方案（已现场验证）：先用本地 data: URL 作 seed 瞬时建一个"活"tab（navigate 对本地 data: 秒回，零网络/代理依赖），
-    #   再走 cdp Page.navigate 跳到真目标（**非阻塞、不等 load、不杀 tab**）；后续由 Wait-PageReady 轮询 DOM 就绪。
-    #   验证：seed(data:) → cdp Page.navigate(kufirc) → evaluate 轮询，poll#0 即拿到真实签到页（len 4350）。
+    #   新方案（v4.13.7 起，v4.13.8 修正）：先用本地 data: URL 作 seed 瞬时建一个"活"tab（navigate 对本地 data: 秒回，
+    #   零网络/代理依赖），再走 evaluate 在 seed tab 自身上下文执行 location.href=url 跳到真目标
+    #   （**跳转与读 DOM 必同一 tab、非阻塞、不等 load、不杀 tab**；v4.13.7 原用 cdp Page.navigate，
+    #   批量残留 tab 时 cdp 与 evaluate 可能命中不同 tab 导致 Detect 读到 seed，v4.13.8 改为 evaluate 跳转从根消除）。
+    #   验证：seed(data:) → evaluate location.href=<url> → location.href 变、body 为真实 DOM。
     $seedOk = $false
     try {
         $seed = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = 'data:text/html,<html><body>seed</body></html>'; newTab = $true } -Session $Session -TimeoutSec 20
@@ -282,15 +284,40 @@ function Open-SiteTab {
         return @{ success = $false; error = "seed_tab_failed" }
     }
 
-    # cdp Page.navigate 到真目标（非阻塞，不等 load，不销毁 tab）。
-    # 关键：WAF 站(雷池等)会让 daemon 的 cdp 包装一直等"导航提交"而卡住，但导航实际已发起且 tab 存活
-    #   （实测：客户端 8s 提前 abort 后 tab 仍在、HDKYL 已 complete 加载）。故用短超时 + 容错：
-    #   无论 cdp 是否及时返回，都视为已发起，转由 Wait-PageReady 轮询 DOM 最终判定。
+    # v4.13.8: 用 evaluate 在 seed tab 自身上下文执行 location.href=url 跳转（替代旧 cdp Page.navigate）。
+    #   现场复现：cdp Page.navigate 与后续 evaluate(DOM 读取) 在 daemon 里各自解析"当前 tab"，
+    #   批量运行时若上一站 tab 未被 close_session 完全清掉，二者可能命中不同 tab → Detect 始终读到
+    #   seed 页，表现为"各站都停在 seed、无法判断是否签到成功"。evaluate 跳转使"跳转"与"读 DOM"必
+    #   然同一 tab。HTTP 层已验证：seed(data:) → evaluate location.href=<url> → href 变、body 为真实 DOM。
+    $navJs = "try{ window.location.href = " + ($Url | ConvertTo-Json -Compress) + "; 'nav_issued'; }catch(e){ 'nav_err:' + e.message; }"
     try {
-        $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "Page.navigate"; params = @{ url = $Url } } -Session $Session -TimeoutSec 12 -ErrorAction SilentlyContinue
-    } catch {}
+        $nr = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $navJs } -Session $Session -TimeoutSec 15
+        $navOk = ($null -ne $nr -and $nr.value -and "$($nr.value)" -notlike "nav_err*")
+    } catch { $navOk = $false }
 
-    # 确认 tab 仍存活（seed 已建，cdp 不至销毁）；否则视为失败触发上层重试
+    # 导航后校验：轮询 location.href 是否离开 seed；未离开则补发 evaluate 跳转重试（最多 2 次）。
+    #   仍卡 seed 直接返回失败，交由 Test-WebBridgeSignIn 重试 Open-SiteTab（重开 seed 再跳），
+    #   避免静默停在种子页导致"不知是否签到成功"。
+    $leftSeed = $false
+    for ($v = 0; $v -lt 5; $v++) {
+        Start-Sleep -Seconds 1
+        try {
+            $cur = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = "location.href" } -Session $Session -TimeoutSec 8
+            $curHref = if ($cur -and $cur.value) { "$($cur.value)" } elseif ($cur) { "$cur" } else { "" }
+            if ($curHref -and $curHref -notlike "data:text/html*" -and $curHref -notlike "about:blank*" -and $curHref -notlike "http://127.0.0.1:10086") {
+                $leftSeed = $true; break
+            }
+        } catch {}
+        if (-not $navOk) {
+            try { $null = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $navJs } -Session $Session -TimeoutSec 15 } catch {}
+        }
+    }
+    if (-not $leftSeed) {
+        Write-Host "  [WebBridge] Open-SiteTab: 导航后仍未离开 seed（location.href 仍停在种子页）" -ForegroundColor Red
+        return @{ success = $false; error = "stuck_on_seed" }
+    }
+
+    # 确认 tab 仍存活（seed 已建、evaluate 跳转不至销毁）；否则视为失败触发上层重试
     $alive = $false
     try {
         $chk = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
@@ -311,7 +338,7 @@ function Open-SiteTab {
     }
 
     # 合成成功对象，使调用方走正常 Detect / Wait 流程（就绪判定交给 Wait-PageReady 轮询，不再依赖 load 事件）
-    return @{ success = $true; method = "cdp-Page.navigate"; url = $Url }
+    return @{ success = $true; method = "evaluate-location.href"; url = $Url }
 }
 
 function Test-WebBridgeSignIn {

@@ -1,5 +1,13 @@
 # Changelog
 
+## [v4.13.8] - 2026-07-26
+
+### 根治"各站都停在 seed 页、无法判断是否签到成功"
+
+- **根因（现场复现）**：v4.13.7 用 `cdp Page.navigate` 跳真目标，但 daemon 的 `cdp` 动作与后续 `evaluate`(DOM 读取) 各自解析"当前 tab"。批量运行时若上一站 tab 未被 `close_session` 完全清掉（折叠后台窗口 daemon 漏关是历史老问题），`cdp Page.navigate` 可能命中旧 tab、而 `evaluate` 读新(seed) tab → Detect 始终读到 seed 页。单站测试因只有一个 tab 才恰好一致，掩盖了该分歧——即用户"各站点打开后最后都变成 seed"的画像。
+- **修复**：`Open-SiteTab` 改用 `evaluate` 在 seed tab 自身上下文执行 `window.location.href = url` 跳转。跳转与读 DOM 必然作用于**同一个(当前) tab**，从根上消除分歧；并新增"导航后校验"——轮询 `location.href` 是否离开 seed，未离开则补发 evaluate 跳转重试（最多 2 次），仍卡 seed 返回 `stuck_on_seed` 触发上层 `Open-SiteTab` 重开重试，杜绝静默停在种子页。
+- **验证（HTTP 层 + 真实 PS 代码路径双重）**：seed(data:) → `evaluate location.href=<url>` → `location.href` 变为真目标、body 为真实 DOM；真实 `Open-SiteTab -Url https://www.baidu.com` 跑通，`success:true` 且 `location.href=https://www.baidu.com/`。
+
 ## [v4.13.7] - 2026-07-26
 
 ### 根治导航 30s 超时 + 反复开 tab（用户实跑复现的根因）

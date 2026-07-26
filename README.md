@@ -35,17 +35,18 @@
 - **所有站点必须共用同一会话 `"daily-signin"`**——`close_session` 靠清掉「上一站点」的 tab 工作；若各站用独立 session，`close_session` 只清自己 → 上一站 tab 永不关 → 泄漏重现。
 - 若 daemon 仍漏关，`Close-SiteTabs-Verified` 会打印 `⚠️ close_session 后仍有 N 个 tab 残留` 告警（不再静默累积）。
 
-## 导航实现（v4.13.7 根治 30s 超时 + tab 堆积）
+## 导航实现（v4.13.7 根治 30s 超时；v4.13.8 根治卡 seed 页）
 
 ⚠️ **禁止直接用 daemon 的 `navigate` 跳真目标。** 实测 daemon `navigate` **完全忽略 `waitUntil`、永远死等 `load` 事件**；多数 PT 站（CF 挑战 / 慢子资源 / 长连接 / 折叠后台窗口）的 `load` 在 30s 内不触发 → 超时且 **daemon 直接销毁 tab** → 重试 `newTab` 无限开 tab（用户 07-26 实跑复现）。`about:blank` 传任意 `waitUntil` 取值全 30s 超时即铁证；baidu 偶成功只是其 `load` 碰巧快。
 
 `Open-SiteTab` 现用两条 daemon 调用绕开该陷阱：
 
 1. `navigate` 到本地 `data:text/html` **seed**（秒回、零网络/代理依赖）先建一个「活」tab；
-2. `cdp Page.navigate` 跳到真目标——**非阻塞、不等 `load`、不销毁 tab**；
-3. 页面就绪完全交给 `Wait-PageReady` 每 2s 轮询 DOM（body 文本足够长且无盾关键词即就绪）。
+2. **用 `evaluate` 在该 seed tab 自身上下文执行 `window.location.href = url` 跳到真目标**——跳转与读 DOM 必为**同一 tab**，从根消除 v4.13.7「cdp 与 evaluate 命中不同 tab → Detect 读到 seed」的分歧；**非阻塞、不等 `load`、不销毁 tab**；
+3. **导航后校验**：轮询 `location.href` 是否离开 seed，未离开补发 evaluate 跳转重试（最多 2 次），仍卡 seed 返回 `stuck_on_seed` 触发上层重开，杜绝静默停在种子页；
+4. 页面就绪完全交给 `Wait-PageReady` 每 2s 轮询 DOM（body 文本足够长且无盾关键词即就绪）。
 
-WAF 站（如 HDKYL 雷池）会让 daemon 的 `cdp` 包装一直等「导航提交」而卡住，但导航实际已发起、tab 存活；故 `cdp Page.navigate` 用**短超时 12s + 容错**（超时即视为已发起、转交轮询），导航后仅校验 `list_tabs` 确认 tab 仍在。
+> v4.13.8 改动：v4.13.7 原用 `cdp Page.navigate` 跳真目标，但 daemon 的 `cdp` 与 `evaluate` 各自解析「当前 tab」，批量残留 tab 时二者可能命中不同 tab 导致 Detect 始终读到 seed（用户反馈「各站都停在 seed 页、无法判断是否签到成功」）。改用 evaluate 跳转后二者必然同 tab，问题根除。
 
 ## 后台运行（不弹前台）
 
