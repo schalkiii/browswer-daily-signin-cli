@@ -16,6 +16,22 @@
 - **不再使用 `about:blank` 作跳板**：实测其 navigate 同样 20s+ 不返回（扩展等不到 `load`），比 `data:` 更差。
 - **验证（真实 PS 代码路径）**：baidu 5.4s / example.com 2.8s / zhihu 9.9s 均 `success:true`，`location.href` 为真实站点、无 seed 页，且每站结束 `list_tabs`=1 无泄漏；zhihu 由「30.6s 超时且 tab 被销毁」变为重试后 10.0s 成功。两文件 pwsh7 解析 0 错误。
 
+> ⚠️ v4.13.9 的「最多 3 次重试 + 失败不立即清场」在真实批量中暴露新问题（见 v4.13.10），已在 v4.13.10 用 `waitUntil=domcontentloaded` 取代重试。
+
+## [v4.13.10] - 2026-07-31
+
+### 根治重复 tab（十几个）+ `session has no tab` 风暴（接 v4.13.9）
+
+用户现场反馈 v4.13.9 跑批出现两类新故障：① 单站累积十几个 tab；② 海量 `[WebBridge] evaluate ERROR: session "daily-signin" has no tab`。两故障同源：
+
+- **根因**：旧逻辑每轮都 `newTab=true` 且 navigate **失败时不清场**；外层 `Test-WebBridgeSignIn` 又包了 `re-navigate retry 2 次`，嵌套重试 × `newTab` 累积出十几个 tab。而扩展 30s `load` 超时销毁 tab 后，旧逻辑仍去 `evaluate` 探测 → 刷一堆 `has no tab`。
+- **关键实测**：daemon `navigate` **支持 `waitUntil` 参数**（此前 README 误记"忽略 waitUntil"）。传 `waitUntil=domcontentloaded` 只等 DOMContentLoaded——CF 盾 / 慢子资源站的 DOM 几秒内就绪，zhihu 由「30.6s 超时且 tab 被销毁」变为 **11–14s 返回 `ok=True` 且 tab 存活、`evaluate` 拿到真实 DOM（bodyLen=1169）**，不再超时、不再 `has no tab`。
+- **修复**：
+  - `Open-SiteTab` 单次 `navigate` 即带 `waitUntil=domcontentloaded`，**默认不再需要重试**；仅失败兜底重试 1 次（兼容 extension 瞬时抖动），且每轮动手前 `Close-SiteTabs-Verified` 清场 → 任意时刻本会话 ≤ 1 tab；
+  - navigate 最终失败也先清场再返回，杜绝遗留 tab 被上层 `re-navigate` 叠加；
+  - 移除"navigate 报错后 `evaluate location.href` 探测是否已到达"的冗余分支（tab 被扩展销毁后探测必 `has no tab`，无意义）。
+- **验证（真实 PS 代码路径，4 站连跑）**：baidu 11.6s / zhihu 13.9s / example 3.4s / bing 3.7s 均 `success:true`，每站结束 `list_tabs=1` 无泄漏，`location.href` 为真实站点，**全程 0 条 `has no tab`**；zhihu 由 v4.13.9「30.6s 超时 + tab 被销毁」变为 13.9s 成功且 tab 存活。pwsh7 解析 0 错误、0 lint。
+
 ## [v4.13.8] - 2026-07-26
 
 ### 根治"各站都停在 seed 页、无法判断是否签到成功"

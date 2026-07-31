@@ -271,63 +271,57 @@ function Open-SiteTab {
     #   去掉中转后，跳转与读 DOM 天然同属 newTab 建出的同一个 tab，v4.13.8 想解决的
     #   "cdp 与 evaluate 命中不同 tab" 问题也不复存在。
     #
-    # 超时取 $NavTimeoutSec（默认 60s）而非固定 20s：写死 20s 是上述第 3 个症状的直接成因。
-    #   注意 $NavTimeoutSec 只是 PS 侧 HTTP 等待上限，真正的硬约束在扩展内部——
-    #   扩展对每次 navigate 有自己的 30s 页面加载超时，超时会回 extension_error 且**连 tab 一并销毁**
-    #   （实测 zhihu：30.6s 后报 "navigate: page load timeout (30s)"，随后 evaluate 报 "session has no tab"）。
-    #   因此 PS 侧超时设再大也无法让慢站通过，只能靠重试。
-    #
-    # 慢站重试：扩展的 30s 是"每次尝试"独立计时，首次尝试已完成 DNS / TCP / TLS 握手并预热连接与缓存，
-    #   重试时首屏通常能在 30s 内触发 load。这里最多再试 2 次（合计 3 次）。
-    #   不使用 about:blank / data: 作中转跳板：实测 about:blank 的 navigate 同样 20s+ 不返回
-    #   （扩展等不到 load 事件），data: 则会把种子页留在地址栏——即被移除的旧方案的原始症状。
+    # 重复 tab / "has no tab" 风暴根治（v4.13.10）：
+    #   旧逻辑每轮都 newTab=true 且失败时不清场，外层 Test-WebBridgeSignIn 又包 re-navigate 重试，
+    #   嵌套重试 × newTab 累积出十几个 tab；且扩展 30s load 超时销毁 tab 后仍去 evaluate，刷一堆 "has no tab"。
+    #   根因是 navigate 默认死等 `load` 事件——CF 盾 / 慢子资源 / 长连接 / 折叠后台窗口的 `load` 在 30s 内
+    #   不触发 → 扩展回 extension_error 且**连 tab 一并销毁**。实测关键：daemon navigate **支持 waitUntil 参数**，
+    #   传 `domcontentloaded` 即只等 DOMContentLoaded（CF 盾站 DOM 几秒内就绪），zhihu 由"30.6s 超时销毁 tab"
+    #   变为 11.5s 返回 ok=True 且 tab 存活、evaluate 拿到真实 DOM（bodyLen=1169），不再超时、不再 "has no tab"。
+    #   故本版单次 navigate 即带 waitUntil=domcontentloaded，无需重试；失败兜底仍清场，杜绝遗留 tab 叠加。
+    #   不使用 about:blank / data: 作中转跳板：实测 about:blank 同样 20s+ 不返回（扩展等不到 load）。
     $navOk = $false
     $navErr = ""
-    $maxNavAttempts = 3
-    for ($attempt = 1; $attempt -le $maxNavAttempts; $attempt++) {
+    # 进入即清场（上方函数头已 Close-SiteTabs-Verified 清上一站；此处双重保险，保证开工前 ≤ 0 tab）
+    try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
+    try {
+        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true; waitUntil = "domcontentloaded" } -Session $Session -TimeoutSec $NavTimeoutSec
+        $navOk = ($null -ne $nav -and $nav.success)
+    } catch {
+        $navOk = $false
+        $navErr = "$_"
+    }
+    if (-not $navOk) {
+        # domcontentloaded 仍失败：可能是 extension 未连 / daemon 异常 / 极端慢站。
+        # 先清场（navigate 可能已建了半截 tab），再尝试一次以兼容瞬时抖动；仍失败则交上层 re-navigate。
+        try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
         try {
-            $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $Session -TimeoutSec $NavTimeoutSec
+            $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true; waitUntil = "domcontentloaded" } -Session $Session -TimeoutSec $NavTimeoutSec
             $navOk = ($null -ne $nav -and $nav.success)
         } catch {
             $navOk = $false
-            $navErr = "$_"
-        }
-        if ($navOk) { break }
-
-        # navigate 报错不等于没到达：扩展可能只是等不到 load 事件，而 DOM 早已可用。
-        # 只要 tab 还在且已离开空白页，就按成功继续，避免白白重开浪费一轮 30s。
-        try {
-            $cur = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = "location.href" } -Session $Session -TimeoutSec 8
-            $curHref = if ($cur -and $cur.value) { "$($cur.value)" } elseif ($cur) { "$cur" } else { "" }
-            if ($curHref -and $curHref -notlike "about:blank*" -and $curHref -notlike "chrome://*") {
-                $navOk = $true
-                break
-            }
-        } catch {}
-
-        if ($attempt -lt $maxNavAttempts) {
-            Write-Host "  [WebBridge] Open-SiteTab: 第 $attempt 次 navigate 未成功，重试（连接已预热）..." -ForegroundColor Yellow
-            # 上一轮超时的 tab 可能已被扩展销毁，也可能残留；清场保证"任意时刻本会话 ≤ 1 tab"
-            try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
-            Start-Sleep -Seconds 2
+            if (-not $navErr) { $navErr = "$_" }
         }
     }
     if (-not $navOk) {
+        # 最终失败：清场兜底，确保不留遗留 tab 被上层 re-navigate 叠加成十几个
+        try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
         if ($navErr) {
-            Write-Host "  [WebBridge] Open-SiteTab: navigate 失败（已重试 $maxNavAttempts 次）- $navErr" -ForegroundColor Red
+            Write-Host "  [WebBridge] Open-SiteTab: navigate 失败（domcontentloaded）- $navErr" -ForegroundColor Red
         } else {
-            Write-Host "  [WebBridge] Open-SiteTab: navigate 未成功（已重试 $maxNavAttempts 次）" -ForegroundColor Red
+            Write-Host "  [WebBridge] Open-SiteTab: navigate 未成功（domcontentloaded）" -ForegroundColor Red
         }
         return @{ success = $false; error = "navigate_failed" }
     }
 
-    # 确认 tab 仍存活；否则视为失败触发上层重试
+    # 确认 tab 仍存活；否则视为失败触发上层重试（返回前清场，避免遗留）
     $alive = $false
     try {
         $chk = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
         if ($chk -and $chk.tabs -and $chk.tabs.Count -ge 1) { $alive = $true }
     } catch {}
     if (-not $alive) {
+        try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
         Write-Host "  [WebBridge] Open-SiteTab: 导航后 tab 丢失" -ForegroundColor Red
         return @{ success = $false; error = "tab_lost_after_nav" }
     }

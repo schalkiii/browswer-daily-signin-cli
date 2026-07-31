@@ -35,15 +35,14 @@
 - **所有站点必须共用同一会话 `"daily-signin"`**——`close_session` 靠清掉「上一站点」的 tab 工作；若各站用独立 session，`close_session` 只清自己 → 上一站 tab 永不关 → 泄漏重现。
 - 若 daemon 仍漏关，`Close-SiteTabs-Verified` 会打印 `⚠️ close_session 后仍有 N 个 tab 残留` 告警（不再静默累积）。
 
-## 导航实现（v4.13.9 起：直接 navigate + 慢站重试）
+## 导航实现（v4.13.10 起：navigate + waitUntil=domcontentloaded，单次直达）
 
-`Open-SiteTab` 用一次 `navigate`（`newTab=true`）直达目标站，随后：
+`Open-SiteTab` 用一次 `navigate`（`newTab=true` + `waitUntil=domcontentloaded`）直达目标站，随后：
 
-1. 若 navigate 报错，先用 `evaluate location.href` 判断是否其实已到达（扩展常只是等不到 `load`，而 DOM 早已可用），是则按成功继续，不浪费一轮重试；
-2. 确未到达才重试，**最多 3 次**；每次重试前 `Close-SiteTabs-Verified` 清场，保证任意时刻 ≤ 1 tab；
-3. 页面就绪完全交给 `Wait-PageReady` 每 2s 轮询 DOM（body 文本足够长且无盾关键词即就绪）。
+1. 仅当本次 navigate 仍失败才重试 **1 次**（兼容 extension 瞬时抖动），每次动手前 `Close-SiteTabs-Verified` 清场，保证任意时刻本会话 ≤ 1 tab；
+2. 页面就绪完全交给 `Wait-PageReady` 每 2s 轮询 DOM（body 文本足够长且无盾关键词即就绪）。
 
-**为什么重试有效**：扩展的 30s 加载超时是「每次尝试」独立计时，首次尝试已完成 DNS / TCP / TLS 握手并预热连接与缓存，重试时首屏通常能在 30s 内触发 `load`。实测 zhihu 首次 30.6s 超时、重试后 10.0s 成功。
+**为什么 `waitUntil=domcontentloaded` 是根治重复 tab / "has no tab" 的关键**：扩展内部对每次 navigate 有独立的 **30s `load` 事件超时**，超时回 `extension_error` 且**连 tab 一并销毁**。CF 盾 / 慢子资源 / 长连接 / 折叠后台窗口的 `load` 在 30s 内不触发 → 旧版每轮都 `newTab` + 失败时不清场，外层 `Test-WebBridgeSignIn` 又包 re-navigate 重试，嵌套 × newTab 累积出十几个 tab，且 tab 被销毁后还去 `evaluate` 刷一堆 `session has no tab`。实测 daemon `navigate` **支持 `waitUntil` 参数**：传 `domcontentloaded` 只等 DOMContentLoaded（CF 盾站 DOM 几秒内就绪），zhihu 由「30.6s 超时销毁 tab」变为 **11–14s 返回 `ok=True` 且 tab 存活、`evaluate` 拿到真实 DOM**，不再超时、不再 `has no tab`。
 
 ### ⚠️ 两个已被实测推翻的旧方案，勿再引入
 
