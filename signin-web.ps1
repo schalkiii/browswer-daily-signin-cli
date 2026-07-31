@@ -956,7 +956,8 @@ $WebSignInConfigs = @{
     #   与蜂巢(pting)同款 Flarum check-in 插件，但 **按钮无 id**：未签为
     #   <button class="Button CheckInButton--yellow hasIcon">签到</button>（可点），
     #   已签后变为 <button class="Button CheckInButton--green hasIcon disabled">已签到N天</button>。
-    #   v4.13.7 起导航统一走 cdp Page.navigate（非阻塞、不等 load），Flarum SPA 子资源挂起不再是问题。
+    #   Flarum SPA 子资源可能长时间挂起而不触发 load：导航失败时 Open-SiteTab 会先校验
+    #   location.href 是否其实已到达（DOM 常已可用），并按需重试，故不影响本站签到。
     "pbh-btn" = @{
         Url = "https://bbs.pbh-btn.com/"
         WaitMs = 15000

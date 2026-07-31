@@ -1,5 +1,21 @@
 # Changelog
 
+## [v4.13.9] - 2026-07-31
+
+### 回退 seed 中转方案，根治「地址栏停在 seed 页 / 打开 127.0.0.1:10086 / 刷 20s 超时报错」三连
+
+用户现场反馈的三个症状同源，均由 v4.13.7/4.13.8 引入的 "seed tab" 中转方案造成：
+
+- **症状 1「每站地址栏都是 `data:text/html,<html><body>seed</body></html>`、页面显示 seed」**：该 URL 正是方案里写死的种子页。后续 `evaluate` 跳转一旦失败便无从恢复，用户直接看到种子页。
+- **症状 2「有时打开 `127.0.0.1:10086`」**：seed 创建失败时的兜底分支会把 daemon **自身端口**当页面开进浏览器，页面显示的是 daemon 的 HTTP 响应。
+- **症状 3「终端反复刷 `navigate ERROR: HttpClient.Timeout of 20 seconds elapsing`（kimi-webbridge.ps1:272）」**：seed 步骤把超时写死为 20s，而对**已存在 tab** 做 navigate 时 daemon 走另一条慢路径，实测 **20.43s** —— 恰好稳定超出 20s，故每站必报。
+
+- **立论被实测推翻**：该方案基于「daemon navigate 死等 `load`、超时即销毁 tab」。HTTP 层实测相反——`navigate + newTab` 打开真实站点约 **9.2s** 正常返回 `success`。
+- **修复**：`Open-SiteTab` 恢复为直接 `navigate`（`newTab=true`）一步到位；超时改用 `$NavTimeoutSec`（默认 60s）而非写死 20s。去掉中转后，跳转与读 DOM 天然同属同一 tab，v4.13.8 想解决的「cdp 与 evaluate 命中不同 tab」问题自然消失。
+- **保留对真实约束的处理**：硬约束在**扩展内部**——每次 navigate 有独立 30s 加载超时，超时回 `extension_error` 且**连 tab 一并销毁**（实测 zhihu 30.6s 后 `navigate: page load timeout (30s)`，随后 `evaluate` 报 `session has no tab`）。PS 侧超时设再大也无用，故新增**最多 3 次重试**（每次重试前清场）；并在 navigate 报错后先用 `location.href` 判断是否其实已到达，避免白白重开一轮。
+- **不再使用 `about:blank` 作跳板**：实测其 navigate 同样 20s+ 不返回（扩展等不到 `load`），比 `data:` 更差。
+- **验证（真实 PS 代码路径）**：baidu 5.4s / example.com 2.8s / zhihu 9.9s 均 `success:true`，`location.href` 为真实站点、无 seed 页，且每站结束 `list_tabs`=1 无泄漏；zhihu 由「30.6s 超时且 tab 被销毁」变为重试后 10.0s 成功。两文件 pwsh7 解析 0 错误。
+
 ## [v4.13.8] - 2026-07-26
 
 ### 根治"各站都停在 seed 页、无法判断是否签到成功"

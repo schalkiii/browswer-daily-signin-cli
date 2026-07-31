@@ -35,18 +35,22 @@
 - **所有站点必须共用同一会话 `"daily-signin"`**——`close_session` 靠清掉「上一站点」的 tab 工作；若各站用独立 session，`close_session` 只清自己 → 上一站 tab 永不关 → 泄漏重现。
 - 若 daemon 仍漏关，`Close-SiteTabs-Verified` 会打印 `⚠️ close_session 后仍有 N 个 tab 残留` 告警（不再静默累积）。
 
-## 导航实现（v4.13.7 根治 30s 超时；v4.13.8 根治卡 seed 页）
+## 导航实现（v4.13.9 起：直接 navigate + 慢站重试）
 
-⚠️ **禁止直接用 daemon 的 `navigate` 跳真目标。** 实测 daemon `navigate` **完全忽略 `waitUntil`、永远死等 `load` 事件**；多数 PT 站（CF 挑战 / 慢子资源 / 长连接 / 折叠后台窗口）的 `load` 在 30s 内不触发 → 超时且 **daemon 直接销毁 tab** → 重试 `newTab` 无限开 tab（用户 07-26 实跑复现）。`about:blank` 传任意 `waitUntil` 取值全 30s 超时即铁证；baidu 偶成功只是其 `load` 碰巧快。
+`Open-SiteTab` 用一次 `navigate`（`newTab=true`）直达目标站，随后：
 
-`Open-SiteTab` 现用两条 daemon 调用绕开该陷阱：
+1. 若 navigate 报错，先用 `evaluate location.href` 判断是否其实已到达（扩展常只是等不到 `load`，而 DOM 早已可用），是则按成功继续，不浪费一轮重试；
+2. 确未到达才重试，**最多 3 次**；每次重试前 `Close-SiteTabs-Verified` 清场，保证任意时刻 ≤ 1 tab；
+3. 页面就绪完全交给 `Wait-PageReady` 每 2s 轮询 DOM（body 文本足够长且无盾关键词即就绪）。
 
-1. `navigate` 到本地 `data:text/html` **seed**（秒回、零网络/代理依赖）先建一个「活」tab；
-2. **用 `evaluate` 在该 seed tab 自身上下文执行 `window.location.href = url` 跳到真目标**——跳转与读 DOM 必为**同一 tab**，从根消除 v4.13.7「cdp 与 evaluate 命中不同 tab → Detect 读到 seed」的分歧；**非阻塞、不等 `load`、不销毁 tab**；
-3. **导航后校验**：轮询 `location.href` 是否离开 seed，未离开补发 evaluate 跳转重试（最多 2 次），仍卡 seed 返回 `stuck_on_seed` 触发上层重开，杜绝静默停在种子页；
-4. 页面就绪完全交给 `Wait-PageReady` 每 2s 轮询 DOM（body 文本足够长且无盾关键词即就绪）。
+**为什么重试有效**：扩展的 30s 加载超时是「每次尝试」独立计时，首次尝试已完成 DNS / TCP / TLS 握手并预热连接与缓存，重试时首屏通常能在 30s 内触发 `load`。实测 zhihu 首次 30.6s 超时、重试后 10.0s 成功。
 
-> v4.13.8 改动：v4.13.7 原用 `cdp Page.navigate` 跳真目标，但 daemon 的 `cdp` 与 `evaluate` 各自解析「当前 tab」，批量残留 tab 时二者可能命中不同 tab 导致 Detect 始终读到 seed（用户反馈「各站都停在 seed 页、无法判断是否签到成功」）。改用 evaluate 跳转后二者必然同 tab，问题根除。
+### ⚠️ 两个已被实测推翻的旧方案，勿再引入
+
+- **`data:` seed 中转页**（v4.13.7/8）：先开 `data:text/html,...seed` 再 `evaluate` 跳转。实际是 07-31 三个现场故障的根源——地址栏停在 `data:text/html,<html><body>seed</body></html>`、兜底把 `http://127.0.0.1:10086`（daemon 自身端口）开进浏览器、以及对**已存在 tab** 做 navigate 走 daemon 慢路径实测 **20.43s** 恰好撞破写死的 20s 超时 → 每站刷 `HttpClient.Timeout of 20 seconds elapsing`。其立论「daemon navigate 死等 load」也不成立：直接 `navigate + newTab` 打开真实站点实测约 9s 正常返回。
+- **`about:blank` 作跳板**：实测其 `navigate` 同样 20s+ 不返回（扩展等不到 `load`），比 `data:` 更差。
+
+**真正的硬约束**在扩展内部：每次 navigate 有独立的 30s 页面加载超时，超时回 `extension_error` 且**连 tab 一并销毁**（随后 `evaluate` 报 `session has no tab`）。PS 侧 `-TimeoutSec` 设再大也无法让慢站通过，只能靠重试。
 
 ## 后台运行（不弹前台）
 

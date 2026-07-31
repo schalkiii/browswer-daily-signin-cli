@@ -39,3 +39,7 @@ signin-report-*.html
 
 # 临时诊断脚本
 diag-*.ps1
+
+# Python 运行缓存
+__pycache__/
+*.pyc

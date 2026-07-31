@@ -258,66 +258,70 @@ function Open-SiteTab {
     #    若各站用独立 session，close_session 只清自己 → 上一站 tab 永不关 → 泄漏重现。signin-batch.ps1 的 $session="pt$idx" 死变量即此陷阱，已删。
     try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
 
-    # v4.13.7: 根治 daemon navigate 死等 load → 30s 超时 + tab 被销毁 → 重试无限开 tab（用户 07-26 复现的根因）。
-    #   实测关键事实：daemon 的 navigate **完全忽略 waitUntil 参数**，永远死等 `load` 事件；而多数 PT 站
-    #   （CF 挑战 / 慢子资源 / 长连接 / 后台折叠窗口）的 `load` 在 30s 内不触发 → 超时 → daemon 直接销毁 tab。
-    #   v4.13.4 的 waitUntil=domcontentloaded 方案（及本次前所有尝试）均因此无效——baidu 偶成功只是其 load 碰巧快。
-    #   新方案（v4.13.7 起，v4.13.8 修正）：先用本地 data: URL 作 seed 瞬时建一个"活"tab（navigate 对本地 data: 秒回，
-    #   零网络/代理依赖），再走 evaluate 在 seed tab 自身上下文执行 location.href=url 跳到真目标
-    #   （**跳转与读 DOM 必同一 tab、非阻塞、不等 load、不杀 tab**；v4.13.7 原用 cdp Page.navigate，
-    #   批量残留 tab 时 cdp 与 evaluate 可能命中不同 tab 导致 Detect 读到 seed，v4.13.8 改为 evaluate 跳转从根消除）。
-    #   验证：seed(data:) → evaluate location.href=<url> → location.href 变、body 为真实 DOM。
-    $seedOk = $false
-    try {
-        $seed = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = 'data:text/html,<html><body>seed</body></html>'; newTab = $true } -Session $Session -TimeoutSec 20
-        $seedOk = ($null -ne $seed -and $seed.success)
-    } catch { $seedOk = $false }
-    if (-not $seedOk) {
-        # 退化兜底：用本机 daemon 端口（仍本地、秒回）
+    # 直接 newTab 打开目标站点：navigate 自带 newTab=true 一步到位建 tab 并跳转。
+    #
+    # 关于曾经的 "seed tab" 方案（data: 种子页 → evaluate location.href 跳转）为何被移除：
+    #   该方案基于"daemon navigate 会死等 load、超时即销毁 tab"的判断，但 HTTP 层实测结论相反——
+    #   navigate + newTab 打开真实站点约 9s 返回 success，daemon 并不会无限等 load。
+    #   而 seed 方案自身有三处硬伤，正是现场三个症状的来源：
+    #     1) 地址栏/页面停留在 data:text/html,...seed —— 后续 evaluate 跳转失败时无从恢复，用户直接看到种子页；
+    #     2) seed 失败兜底会把 http://127.0.0.1:10086（daemon 自身端口）开进浏览器，页面显示 daemon 响应；
+    #     3) 对**已存在的 tab** 做 navigate 需 daemon 走另一条慢路径，实测 20.43s，
+    #        恰好超过此处写死的 20s 超时 → 每站刷 "HttpClient.Timeout of 20 seconds elapsing" 报错。
+    #   去掉中转后，跳转与读 DOM 天然同属 newTab 建出的同一个 tab，v4.13.8 想解决的
+    #   "cdp 与 evaluate 命中不同 tab" 问题也不复存在。
+    #
+    # 超时取 $NavTimeoutSec（默认 60s）而非固定 20s：写死 20s 是上述第 3 个症状的直接成因。
+    #   注意 $NavTimeoutSec 只是 PS 侧 HTTP 等待上限，真正的硬约束在扩展内部——
+    #   扩展对每次 navigate 有自己的 30s 页面加载超时，超时会回 extension_error 且**连 tab 一并销毁**
+    #   （实测 zhihu：30.6s 后报 "navigate: page load timeout (30s)"，随后 evaluate 报 "session has no tab"）。
+    #   因此 PS 侧超时设再大也无法让慢站通过，只能靠重试。
+    #
+    # 慢站重试：扩展的 30s 是"每次尝试"独立计时，首次尝试已完成 DNS / TCP / TLS 握手并预热连接与缓存，
+    #   重试时首屏通常能在 30s 内触发 load。这里最多再试 2 次（合计 3 次）。
+    #   不使用 about:blank / data: 作中转跳板：实测 about:blank 的 navigate 同样 20s+ 不返回
+    #   （扩展等不到 load 事件），data: 则会把种子页留在地址栏——即被移除的旧方案的原始症状。
+    $navOk = $false
+    $navErr = ""
+    $maxNavAttempts = 3
+    for ($attempt = 1; $attempt -le $maxNavAttempts; $attempt++) {
         try {
-            $seed = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = 'http://127.0.0.1:10086'; newTab = $true } -Session $Session -TimeoutSec 20
-            $seedOk = ($null -ne $seed -and $seed.success)
-        } catch { $seedOk = $false }
-    }
-    if (-not $seedOk) {
-        Write-Host "  [WebBridge] Open-SiteTab: seed tab 创建失败（daemon/extension 不可用）" -ForegroundColor Red
-        return @{ success = $false; error = "seed_tab_failed" }
-    }
+            $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true } -Session $Session -TimeoutSec $NavTimeoutSec
+            $navOk = ($null -ne $nav -and $nav.success)
+        } catch {
+            $navOk = $false
+            $navErr = "$_"
+        }
+        if ($navOk) { break }
 
-    # v4.13.8: 用 evaluate 在 seed tab 自身上下文执行 location.href=url 跳转（替代旧 cdp Page.navigate）。
-    #   现场复现：cdp Page.navigate 与后续 evaluate(DOM 读取) 在 daemon 里各自解析"当前 tab"，
-    #   批量运行时若上一站 tab 未被 close_session 完全清掉，二者可能命中不同 tab → Detect 始终读到
-    #   seed 页，表现为"各站都停在 seed、无法判断是否签到成功"。evaluate 跳转使"跳转"与"读 DOM"必
-    #   然同一 tab。HTTP 层已验证：seed(data:) → evaluate location.href=<url> → href 变、body 为真实 DOM。
-    $navJs = "try{ window.location.href = " + ($Url | ConvertTo-Json -Compress) + "; 'nav_issued'; }catch(e){ 'nav_err:' + e.message; }"
-    try {
-        $nr = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $navJs } -Session $Session -TimeoutSec 15
-        $navOk = ($null -ne $nr -and $nr.value -and "$($nr.value)" -notlike "nav_err*")
-    } catch { $navOk = $false }
-
-    # 导航后校验：轮询 location.href 是否离开 seed；未离开则补发 evaluate 跳转重试（最多 2 次）。
-    #   仍卡 seed 直接返回失败，交由 Test-WebBridgeSignIn 重试 Open-SiteTab（重开 seed 再跳），
-    #   避免静默停在种子页导致"不知是否签到成功"。
-    $leftSeed = $false
-    for ($v = 0; $v -lt 5; $v++) {
-        Start-Sleep -Seconds 1
+        # navigate 报错不等于没到达：扩展可能只是等不到 load 事件，而 DOM 早已可用。
+        # 只要 tab 还在且已离开空白页，就按成功继续，避免白白重开浪费一轮 30s。
         try {
             $cur = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = "location.href" } -Session $Session -TimeoutSec 8
             $curHref = if ($cur -and $cur.value) { "$($cur.value)" } elseif ($cur) { "$cur" } else { "" }
-            if ($curHref -and $curHref -notlike "data:text/html*" -and $curHref -notlike "about:blank*" -and $curHref -notlike "http://127.0.0.1:10086") {
-                $leftSeed = $true; break
+            if ($curHref -and $curHref -notlike "about:blank*" -and $curHref -notlike "chrome://*") {
+                $navOk = $true
+                break
             }
         } catch {}
-        if (-not $navOk) {
-            try { $null = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $navJs } -Session $Session -TimeoutSec 15 } catch {}
+
+        if ($attempt -lt $maxNavAttempts) {
+            Write-Host "  [WebBridge] Open-SiteTab: 第 $attempt 次 navigate 未成功，重试（连接已预热）..." -ForegroundColor Yellow
+            # 上一轮超时的 tab 可能已被扩展销毁，也可能残留；清场保证"任意时刻本会话 ≤ 1 tab"
+            try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
+            Start-Sleep -Seconds 2
         }
     }
-    if (-not $leftSeed) {
-        Write-Host "  [WebBridge] Open-SiteTab: 导航后仍未离开 seed（location.href 仍停在种子页）" -ForegroundColor Red
-        return @{ success = $false; error = "stuck_on_seed" }
+    if (-not $navOk) {
+        if ($navErr) {
+            Write-Host "  [WebBridge] Open-SiteTab: navigate 失败（已重试 $maxNavAttempts 次）- $navErr" -ForegroundColor Red
+        } else {
+            Write-Host "  [WebBridge] Open-SiteTab: navigate 未成功（已重试 $maxNavAttempts 次）" -ForegroundColor Red
+        }
+        return @{ success = $false; error = "navigate_failed" }
     }
 
-    # 确认 tab 仍存活（seed 已建、evaluate 跳转不至销毁）；否则视为失败触发上层重试
+    # 确认 tab 仍存活；否则视为失败触发上层重试
     $alive = $false
     try {
         $chk = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
@@ -338,7 +342,7 @@ function Open-SiteTab {
     }
 
     # 合成成功对象，使调用方走正常 Detect / Wait 流程（就绪判定交给 Wait-PageReady 轮询，不再依赖 load 事件）
-    return @{ success = $true; method = "evaluate-location.href"; url = $Url }
+    return @{ success = $true; method = "navigate-newTab"; url = $Url }
 }
 
 function Test-WebBridgeSignIn {
