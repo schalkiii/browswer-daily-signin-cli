@@ -258,7 +258,8 @@ function Open-SiteTab {
     #    若各站用独立 session，close_session 只清自己 → 上一站 tab 永不关 → 泄漏重现。signin-batch.ps1 的 $session="pt$idx" 死变量即此陷阱，已删。
     try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
 
-    # 直接 newTab 打开目标站点：navigate 自带 newTab=true 一步到位建 tab 并跳转。
+    # 打开目标站点：navigate（waitUntil=domcontentloaded）。同一会话内优先复用已有 tab，
+    # 不携带 newTab，避免"页面还在加载就又 newTab"导致重复 tab 累积（musopia 抖动时曾一次开 6+ 个）。
     #
     # 关于曾经的 "seed tab" 方案（data: 种子页 → evaluate location.href 跳转）为何被移除：
     #   该方案基于"daemon navigate 会死等 load、超时即销毁 tab"的判断，但 HTTP 层实测结论相反——
@@ -268,43 +269,45 @@ function Open-SiteTab {
     #     2) seed 失败兜底会把 http://127.0.0.1:10086（daemon 自身端口）开进浏览器，页面显示 daemon 响应；
     #     3) 对**已存在的 tab** 做 navigate 需 daemon 走另一条慢路径，实测 20.43s，
     #        恰好超过此处写死的 20s 超时 → 每站刷 "HttpClient.Timeout of 20 seconds elapsing" 报错。
-    #   去掉中转后，跳转与读 DOM 天然同属 newTab 建出的同一个 tab，v4.13.8 想解决的
+    #   去掉中转后，跳转与读 DOM 天然同属同一个 tab，v4.13.8 想解决的
     #   "cdp 与 evaluate 命中不同 tab" 问题也不复存在。
     #
-    # 重复 tab / "has no tab" 风暴根治（v4.13.10）：
-    #   旧逻辑每轮都 newTab=true 且失败时不清场，外层 Test-WebBridgeSignIn 又包 re-navigate 重试，
-    #   嵌套重试 × newTab 累积出十几个 tab；且扩展 30s load 超时销毁 tab 后仍去 evaluate，刷一堆 "has no tab"。
+    # 重复 tab / "has no tab" 风暴根治（v4.13.10 → v4.13.11）：
     #   根因是 navigate 默认死等 `load` 事件——CF 盾 / 慢子资源 / 长连接 / 折叠后台窗口的 `load` 在 30s 内
     #   不触发 → 扩展回 extension_error 且**连 tab 一并销毁**。实测关键：daemon navigate **支持 waitUntil 参数**，
     #   传 `domcontentloaded` 即只等 DOMContentLoaded（CF 盾站 DOM 几秒内就绪），zhihu 由"30.6s 超时销毁 tab"
     #   变为 11.5s 返回 ok=True 且 tab 存活、evaluate 拿到真实 DOM（bodyLen=1169），不再超时、不再 "has no tab"。
-    #   故本版单次 navigate 即带 waitUntil=domcontentloaded，无需重试；失败兜底仍清场，杜绝遗留 tab 叠加。
+    #   v4.13.11 进一步修正：v4.13.10 的内层"兜底再 navigate newTab 一次"在网络抖动站（musopia）
+    #   会叠加出 6+ tab——因为首个超时 tab 还没被 daemon 销毁就又 newTab。本版改为：
+    #     • 进入时 Close-SiteTabs-Verified 清场 → 开工前 0 tab；
+    #     • 仅一次 navigate，且**不带 newTab**（复用当前 tab），只有 list_tabs 确认无任何 tab 才 newTab；
+    #     • 失败即返回，交上层 re-navigate 统一重试——重试前 Close-SiteTabs-Verified 已清场，不会累积；
+    #     • 删除内层"兜底再 newTab"分支，从根消除"加载未完又开新 tab"。
     #   不使用 about:blank / data: 作中转跳板：实测 about:blank 同样 20s+ 不返回（扩展等不到 load）。
     $navOk = $false
     $navErr = ""
-    # 进入即清场（上方函数头已 Close-SiteTabs-Verified 清上一站；此处双重保险，保证开工前 ≤ 0 tab）
+    # 进入即清场（函数头已 Close-SiteTabs-Verified 清上一站；此处双重保险，保证开工前 ≤ 0 tab）
     try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
+
+    # 决定 newTab：仅当会话内确实没有任何 tab 时才 newTab（复用优先，避免重复 tab）
+    $needNewTab = $true
     try {
-        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true; waitUntil = "domcontentloaded" } -Session $Session -TimeoutSec $NavTimeoutSec
+        $existing = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
+        if ($existing -and $existing.tabs -and $existing.tabs.Count -ge 1) { $needNewTab = $false }
+    } catch { $needNewTab = $true }
+
+    try {
+        $navArgs = @{ url = $Url; waitUntil = "domcontentloaded" }
+        if ($needNewTab) { $navArgs.newTab = $true }
+        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs $navArgs -Session $Session -TimeoutSec $NavTimeoutSec
         $navOk = ($null -ne $nav -and $nav.success)
     } catch {
         $navOk = $false
         $navErr = "$_"
     }
     if (-not $navOk) {
-        # domcontentloaded 仍失败：可能是 extension 未连 / daemon 异常 / 极端慢站。
-        # 先清场（navigate 可能已建了半截 tab），再尝试一次以兼容瞬时抖动；仍失败则交上层 re-navigate。
-        try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
-        try {
-            $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs @{ url = $Url; newTab = $true; waitUntil = "domcontentloaded" } -Session $Session -TimeoutSec $NavTimeoutSec
-            $navOk = ($null -ne $nav -and $nav.success)
-        } catch {
-            $navOk = $false
-            if (-not $navErr) { $navErr = "$_" }
-        }
-    }
-    if (-not $navOk) {
-        # 最终失败：清场兜底，确保不留遗留 tab 被上层 re-navigate 叠加成十几个
+        # domcontentloaded 失败（extension 未连 / daemon 异常 / 极端慢站 / 网络抖动）：
+        # 清场后直接返回失败，交上层 re-navigate 重试——不再此处二次 newTab（防重复 tab 累积）。
         try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
         if ($navErr) {
             Write-Host "  [WebBridge] Open-SiteTab: navigate 失败（domcontentloaded）- $navErr" -ForegroundColor Red
@@ -393,11 +396,15 @@ function Test-WebBridgeSignIn {
             }
                 if (-not $nav -or -not $nav.success) {
                     # v4.12.7: daemon 内部 30s 硬编码导航超时（lesson 36）多为服务端慢/瞬时；
-                    # 重试导航 2 次以对抗偶发超时，仍失败才判 NAV_FAIL
+                    # 重试导航 2 次以对抗偶发超时，仍失败才判 NAV_FAIL。
+                    # v4.13.11: 重试前先清场（Open-SiteTab 进入虽也清，但此处显式清能保证
+                    #   daemon 已完成上一轮超时 tab 的销毁，避免"上一个还卡在加载就又开新 tab"），
+                    #   且间隔拉长到 12s 给 daemon 销毁超时 tab 的时间；不再内层二次 newTab。
                     $navRetries = 0
                     while ((-not $nav -or -not $nav.success) -and $navRetries -lt 2) {
                         Write-Host "  [WebBridge] $SiteName : NAV_FAIL, re-navigate retry $($navRetries+1)/2..."
-                        Start-Sleep -Seconds 8
+                        Start-Sleep -Seconds 12
+                        try { $null = Close-SiteTabs-Verified -Session $session } catch {}
                         $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
                         $navRetries++
                     }

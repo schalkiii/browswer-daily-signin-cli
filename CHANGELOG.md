@@ -18,6 +18,19 @@
 
 > ⚠️ v4.13.9 的「最多 3 次重试 + 失败不立即清场」在真实批量中暴露新问题（见 v4.13.10），已在 v4.13.10 用 `waitUntil=domcontentloaded` 取代重试。
 
+## [v4.13.11] - 2026-08-02
+
+### 根治"页面没加载完就反复开新 tab"导致单站累积 6+ tab（接 v4.13.10）
+
+用户现场反馈：musopia 等网络抖动站（偶发 `chrome-error: connection closed`）一次运行开了七八个 tab，且全程刷 `navigate: page load timeout (30s)` / `session has no tab`。
+
+- **根因**：v4.13.10 的 `Open-SiteTab` 在 `navigate` 超时失败后**又 `navigate newTab` 兜底重试一次**（line 299），而首个超时 tab 还没被 daemon 销毁就开了第二个；外层 `Test-WebBridgeSignIn` 再包 `re-navigate retry 2 次`，于是 外层 3 次 × 内层 ~2 次 = 多轮 `newTab`。daemon 对这些"卡在加载中/连接抖动"的 tab 的 `close_session` 清场偶发漏关（Close-SiteTabs-Verified 自身带"残留"告警），累积成七八个。
+- **修复**：
+  - `Open-SiteTab` 进入先 `Close-SiteTabs-Verified` 清场，再 `list_tabs` 探测：**会话内已有 tab 则不带 `newTab`（复用现有 tab 导航），仅确认无任何 tab 才 newTab**——从根消除"加载未完又开新 tab"；
+  - **删除内层"兜底再 newTab"分支**，失败直接返回，交外层 `re-navigate` 统一重试；
+  - 外层 `re-navigate` 重试前显式 `Close-SiteTabs-Verified` 清场，且间隔由 8s 拉长到 12s，给 daemon 销毁上一轮超时 tab 的时间，避免新 tab 在旧 tab 销毁前叠加。
+- **验证（真实 PS 代码路径）**：连续 3 次同站调用 `Open-SiteTab` + 切换站点调用，全程 `list_tabs=1` 无重复 tab；无 `has no tab` 噪声。pwsh7 解析 0 错误、0 lint。
+
 ## [v4.13.10] - 2026-07-31
 
 ### 根治重复 tab（十几个）+ `session has no tab` 风暴（接 v4.13.9）

@@ -44,6 +44,8 @@
 
 **为什么 `waitUntil=domcontentloaded` 是根治重复 tab / "has no tab" 的关键**：扩展内部对每次 navigate 有独立的 **30s `load` 事件超时**，超时回 `extension_error` 且**连 tab 一并销毁**。CF 盾 / 慢子资源 / 长连接 / 折叠后台窗口的 `load` 在 30s 内不触发 → 旧版每轮都 `newTab` + 失败时不清场，外层 `Test-WebBridgeSignIn` 又包 re-navigate 重试，嵌套 × newTab 累积出十几个 tab，且 tab 被销毁后还去 `evaluate` 刷一堆 `session has no tab`。实测 daemon `navigate` **支持 `waitUntil` 参数**：传 `domcontentloaded` 只等 DOMContentLoaded（CF 盾站 DOM 几秒内就绪），zhihu 由「30.6s 超时销毁 tab」变为 **11–14s 返回 `ok=True` 且 tab 存活、`evaluate` 拿到真实 DOM**，不再超时、不再 `has no tab`。
 
+**复用优先，杜绝「加载未完又开新 tab」**：`Open-SiteTab` 进入时先 `Close-SiteTabs-Verified` 清场，再 `list_tabs` 探测——**会话内已有 tab 就不带 `newTab`（复用现有 tab 导航），仅确认无任何 tab 才 newTab**。且不设内层「兜底再 newTab」分支（v4.13.10 该分支在网络抖动站会叠加出 6+ tab：首个超时 tab 还没被 daemon 销毁就又 newTab）。失败直接返回，交外层 `re-navigate` 统一重试（重试前显式清场 + 间隔 12s 给 daemon 销毁超时 tab 的时间）。实测连续 3 次同站 + 切站调用，全程 `list_tabs=1` 无重复。
+
 ### ⚠️ 两个已被实测推翻的旧方案，勿再引入
 
 - **`data:` seed 中转页**（v4.13.7/8）：先开 `data:text/html,...seed` 再 `evaluate` 跳转。实际是 07-31 三个现场故障的根源——地址栏停在 `data:text/html,<html><body>seed</body></html>`、兜底把 `http://127.0.0.1:10086`（daemon 自身端口）开进浏览器、以及对**已存在 tab** 做 navigate 走 daemon 慢路径实测 **20.43s** 恰好撞破写死的 20s 超时 → 每站刷 `HttpClient.Timeout of 20 seconds elapsing`。其立论「daemon navigate 死等 load」也不成立：直接 `navigate + newTab` 打开真实站点实测约 9s 正常返回。
