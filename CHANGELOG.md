@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.13.15] - 2026-08-04
+
+### 架构文档重构（去历史化 + 一致性校对）
+
+- 整体重写 `pt-signin-skill-cn.md` / `pt-signin-skill.md`：以代码为事实源，删除全部版本号（v4.x.x）与新旧对比/迭代变更叙述（统一由 CHANGELOG 承载）；重构为「设计概览 → 站点分类与策略 → 模块划分 → 导航与 tab 生命周期 → 检测策略 → 验证绕过 → JSON BOM → 目录清理 → 设计决策」的统一结构，中英文版结构对称、事实一致。
+- 修正文档与代码的不一致：
+  - 旧文档描述「双后端 opencli / webbridge + 路由矩阵 + 策略 0~7 数字」，与当前代码（统一 kimi-webbridge 单后端）严重不符 → 全部按单后端重写；
+  - 旧文档「站点分类矩阵」数字（01~10）与 `sites.json` 实际 `strategy` 值（`webbridge`/`visit-only`/`web-read`/`manual`）不符 → 改为按实际字符串枚举；
+  - README「复用优先：有 tab 就复用不 newTab」与代码（入口总是整会话强关后 newTab）矛盾 → 修正为「整会话强关 + 关后校验，再开唯一 tab」；
+  - README「navigate 失败仅重试 1 次」与代码（最多 2 次）不符 → 修正为 2 次；
+  - 删除 README「data:/about:blank 旧方案勿引入」历史段落（属迭代叙述，应由 CHANGELOG 承载）。
+- README 导航小节同步去历史化、补充 120s 导航超时说明，与 skill 文档统一。
+
 ## [v4.13.14] - 2026-08-04
 
 ### 代码质量优化（可读性 / 一致性 / 死代码清理）

@@ -28,32 +28,24 @@
 
 ## 标签页去重（重要不变量）
 
-`Open-SiteTab` 每次导航前先 **整会话 daemon 级强关 + 关后 `list_tabs` 校验 + 重试 + 逐 id 退路**
-（`Close-SiteTabs-Verified`，v4.12.25），再开唯一一个 tab。由此：
+`Open-SiteTab` 每次导航前先 **整会话 daemon 级强关 + 关后 `list_tabs` 校验**（`Close-SiteTabs-Verified`），再开唯一一个 tab。由此：
 
 - 任意时刻本会话 **≤ 1 个 tab**，且**即便重试也先关旧 tab 再开新的**。
 - **所有站点必须共用同一会话 `"daily-signin"`**——`close_session` 靠清掉「上一站点」的 tab 工作；若各站用独立 session，`close_session` 只清自己 → 上一站 tab 永不关 → 泄漏重现。
 - 若 daemon 仍漏关，`Close-SiteTabs-Verified` 会打印 `⚠️ close_session 后仍有 N 个 tab 残留` 告警（不再静默累积）。
 
-## 导航实现（v4.13.10 起：navigate + waitUntil=domcontentloaded，单次直达）
+## 导航实现：navigate + waitUntil=domcontentloaded，单次直达
 
 `Open-SiteTab` 用一次 `navigate`（`newTab=true` + `waitUntil=domcontentloaded`）直达目标站，随后：
 
-1. 仅当本次 navigate 仍失败才重试 **1 次**（兼容 extension 瞬时抖动），每次动手前 `Close-SiteTabs-Verified` 清场，保证任意时刻本会话 ≤ 1 tab；
+1. 仅当本次 navigate 仍失败才重试最多 **2 次**（兼容服务端慢/瞬时抖动），每次动手前 `Close-SiteTabs-Verified` 清场，保证任意时刻本会话 ≤ 1 tab；
 2. 页面就绪完全交给 `Wait-PageReady` 每 2s 轮询 DOM（body 文本足够长且无盾关键词即就绪）。
 
-**为什么 `waitUntil=domcontentloaded` 是根治重复 tab / "has no tab" 的关键**：扩展内部对每次 navigate 有独立的 **30s `load` 事件超时**，超时回 `extension_error` 且**连 tab 一并销毁**。CF 盾 / 慢子资源 / 长连接 / 折叠后台窗口的 `load` 在 30s 内不触发 → 旧版每轮都 `newTab` + 失败时不清场，外层 `Test-WebBridgeSignIn` 又包 re-navigate 重试，嵌套 × newTab 累积出十几个 tab，且 tab 被销毁后还去 `evaluate` 刷一堆 `session has no tab`。实测 daemon `navigate` **支持 `waitUntil` 参数**：传 `domcontentloaded` 只等 DOMContentLoaded（CF 盾站 DOM 几秒内就绪），zhihu 由「30.6s 超时销毁 tab」变为 **11–14s 返回 `ok=True` 且 tab 存活、`evaluate` 拿到真实 DOM**，不再超时、不再 `has no tab`。
+**为什么 `waitUntil=domcontentloaded`**：扩展内部对每次 navigate 有独立的 **30s `load` 事件超时**，超时回 `extension_error` 且**连 tab 一并销毁**。CF 盾 / 慢子资源 / 长连接 / 折叠后台窗口的 `load` 在 30s 内不触发 → 每轮都 `newTab` + 失败时不清场会累积出大量 tab，且 tab 被销毁后 `evaluate` 刷 `session has no tab`。改用 `domcontentloaded`（只等 DOMContentLoaded，CF 盾站 DOM 通常数秒内就绪）后，慢站不再超时、也不再 `has no tab`。
 
-**复用优先，杜绝「加载未完又开新 tab」**：`Open-SiteTab` 进入时先 `Close-SiteTabs-Verified` 清场，再 `list_tabs` 探测——**会话内已有 tab 就不带 `newTab`（复用现有 tab 导航），仅确认无任何 tab 才 newTab**。且不设内层「兜底再 newTab」分支（v4.13.10 该分支在网络抖动站会叠加出 6+ tab：首个超时 tab 还没被 daemon 销毁就又 newTab）。失败直接返回，交外层 `re-navigate` 统一重试（重试前显式清场 + 间隔 12s 给 daemon 销毁超时 tab 的时间）。实测连续 3 次同站 + 切站调用，全程 `list_tabs=1` 无重复。
+**`visit-only` 慢站特例**：`visit-only` 站点（无 `DetectEval`）只需「打开页面」即达成目的，但 DOMContentLoaded 可能长时间不触发（tab 一直转圈）。此时 `Open-SiteTab` 的 `-VisitOnly` 开关生效：`navigate` 即便 `domcontentloaded` 超时，只要命令已提交、`list_tabs` 确认 tab 已建立（仍在加载也行）即判成功，**不再进入外层重试**（避免反复清场重开 tab）；同时跳过 `Wait-PostNavigate`（无需等 DOM 就绪）。非 visit-only 站点逻辑不变，仍要求 `domcontentloaded` 成功。
 
-**`visit-only` 慢站特例（v4.13.12）**：kufirc 这类 `visit-only` 站点（无 `DetectEval`）只需「打开页面」即达成目的，但 DOMContentLoaded 30s 内不触发（tab 一直转圈）。旧逻辑把 `domcontentloaded` 成功当 `Open-SiteTab` 唯一成功标准 → 失败后外层 `re-navigate` + 外层 `RETRY` 共 6 次 `navigate`、每次清场重开新 tab → 窗口里一堆 tab 在转圈。`Open-SiteTab` 新增 `-VisitOnly` 开关：visit-only 模式下 `navigate` 即便 `domcontentloaded` 超时，只要命令已提交、`list_tabs` 确认 tab 已建立（仍在加载也行）即判成功，不再进入外层重试；同时跳过 `Wait-PostNavigate`（无需等 DOM 就绪，避免干等 45s）。非 visit-only 站点逻辑不变。
-
-### ⚠️ 两个已被实测推翻的旧方案，勿再引入
-
-- **`data:` seed 中转页**（v4.13.7/8）：先开 `data:text/html,...seed` 再 `evaluate` 跳转。实际是 07-31 三个现场故障的根源——地址栏停在 `data:text/html,<html><body>seed</body></html>`、兜底把 `http://127.0.0.1:10086`（daemon 自身端口）开进浏览器、以及对**已存在 tab** 做 navigate 走 daemon 慢路径实测 **20.43s** 恰好撞破写死的 20s 超时 → 每站刷 `HttpClient.Timeout of 20 seconds elapsing`。其立论「daemon navigate 死等 load」也不成立：直接 `navigate + newTab` 打开真实站点实测约 9s 正常返回。
-- **`about:blank` 作跳板**：实测其 `navigate` 同样 20s+ 不返回（扩展等不到 `load`），比 `data:` 更差。
-
-**真正的硬约束**在扩展内部：每次 navigate 有独立的 30s 页面加载超时，超时回 `extension_error` 且**连 tab 一并销毁**（随后 `evaluate` 报 `session has no tab`）。PS 侧 `-TimeoutSec` 设再大也无法让慢站通过，只能靠重试。
+**导航超时上限**：`NavTimeoutSec` 默认 **120s**（2 分钟），是 PS 侧给 daemon 的请求超时，须足够大才能覆盖慢站而不被 PS 自己先砍断。站点可用 `$cfg.NavTimeoutSec` 单独覆盖。
 
 ## 后台运行（不弹前台）
 
