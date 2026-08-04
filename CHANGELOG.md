@@ -1,5 +1,13 @@
 # Changelog
 
+## [工具] - 2026-08-04
+
+### 新增 `setup-daily-task.ps1`：一键注册每日 02:00 自动签到计划任务
+
+- 用 `Register-ScheduledTask`（ScheduledTask cmdlet，比 schtasks 字符串拼接更可靠）创建任务 `DailySigninBatch`：每日 02:00、用本机 `pwsh.exe`（PowerShell 7）`-File signin-batch.ps1`、当前交互登录用户运行、错过开机补跑、电池/插电都跑。
+- 脚本**动态解析 `Get-Command pwsh` 路径**，升级 PowerShell 7 后重跑即恢复（无需手改路径）；支持 `-Uninstall` 卸载。
+- README 新增「定时任务」小节记录用法与注意事项（必须用户登录、路径失效重注册）。
+
 ## [v4.13.9] - 2026-07-31
 
 ### 回退 seed 中转方案，根治「地址栏停在 seed 页 / 打开 127.0.0.1:10086 / 刷 20s 超时报错」三连

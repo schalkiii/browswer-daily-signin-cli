@@ -61,5 +61,35 @@ daemon 的 `navigate newTab=true` 本身不抬窗口；唯一会抢焦点的是 
 
 ## 调试
 
-- `signin-single.ps1 -SiteName <名> -SaveDebugSnapshot`：把各阶段页面快照存到 `debug-snapshots/<Site>_<stage>_<时间戳>.json`（含 body 文本/HTML、CF iframe、关键词片段），用于诊断 `CF_CHALLENGE` / `SLIDER` / `BODY_NULL` 等失败。
+- `signin-single.ps1 -SiteName <名> -SaveDebugSnapshot`：把各阶段页面快照存到 `debug-snapshots/<Site>_<stage>_<时间戳>.json（含 body 文本/HTML、CF iframe、关键词片段），用于诊断 `CF_CHALLENGE` / `SLIDER` / `BODY_NULL` 等失败。
 - 命令行参数：`signin-batch.ps1 -SaveDebugSnapshot`（全量存快照）、`-FeishuWebhook <url>` / `-FeishuChatId <id>`（覆盖 config.json 的飞书配置）。
+
+## 定时任务（每日自动签到）
+
+`setup-daily-task.ps1` 一键注册 Windows 计划任务 **`DailySigninBatch`**：
+
+| 项目 | 配置 |
+|------|------|
+| 触发器 | 每日 `02:00` |
+| 操作 | 本机 `pwsh.exe`（**PowerShell 7**）`-File signin-batch.ps1` |
+| 运行身份 | 当前交互登录用户（`InteractiveToken`）——脚本需开浏览器，必须用户已登录 |
+| 设置 | 错过开机也补跑（`StartWhenAvailable`）、插电/电池都运行 |
+
+用法：
+
+```powershell
+# 注册 / 更新（任务已存在则覆盖）
+pwsh -File .\setup-daily-task.ps1
+
+# 卸载
+pwsh -File .\setup-daily-task.ps1 -Uninstall
+```
+
+脚本通过 `Get-Command pwsh` **动态解析当前 pwsh 路径**，因此升级 PowerShell 7 后只需重跑一次即可（无需手动改路径）。验证：
+
+```powershell
+schtasks /Query /TN "DailySigninBatch"
+```
+
+> ⚠️ **必须用户登录**：kimi-webbridge 依赖已登录用户浏览器里的扩展，`InteractiveToken` 任务只在你的账户登录时运行。若需锁屏/未登录也跑，需改用服务账户 + 无头浏览器方案，当前不支持。
+> ⚠️ 若任务某天突然不执行，先检查 pwsh 是否被升级导致路径失效——重跑 `setup-daily-task.ps1` 即可恢复。
