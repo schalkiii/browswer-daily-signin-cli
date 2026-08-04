@@ -65,17 +65,17 @@ foreach ($site in $targets) {
         continue
     }
     Write-Output "=== [$site] start $(Get-Date -Format 'HH:mm:ss') ==="
-    $r = $null
+    $signResult = $null
     try {
-        $r = Invoke-WebSignIn -SiteName $site -SaveDebugSnapshot:$SaveDebugSnapshot -DebugDir $debugDir -NoFocus:$true
+        $signResult = Invoke-WebSignIn -SiteName $site -SaveDebugSnapshot:$SaveDebugSnapshot -DebugDir $debugDir -NoFocus:$true
     } catch {
-        $r = "EXCEPTION:$($_.Exception.Message)"
+        $signResult = "EXCEPTION:$($_.Exception.Message)"
     }
-    Write-Output "=== [$site] result=$r ==="
+    Write-Output "=== [$site] result=$signResult ==="
     # 更新或追加
     $existing = $cum | Where-Object { $_.name -eq $site } | Select-Object -First 1
     if ($existing) {
-        $existing.signal = $r
+        $existing.signal = $signResult
         $existing.time = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
     } else {
         $cum += [PSCustomObject]@{

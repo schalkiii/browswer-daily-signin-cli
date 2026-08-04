@@ -133,8 +133,25 @@ function Get-ResultSignal {
     param($Result)
     if ($null -eq $Result) { return $null }
     if ($Result -is [string]) { return $Result }
-    if ($Result.value) { return "$($Result.value)" }
+        if ($Result.value) { return "$($Result.value)" }
     return "$Result"
+}
+
+# 查询会话当前存活的 tab 列表（list_tabs 轻量探测）。
+# 返回 daemon 的 tabs 响应对象；extension 未连接 / 探测失败时返回 $null。
+# 统一此处可消除各函数里散落的 "Invoke-WebBridgeCommand -Action list_tabs" 样板。
+function Get-WebBridgeTabs {
+    param([string]$Session = "daily-signin", [int]$TimeoutSec = 5)
+    try {
+        return (Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec $TimeoutSec)
+    } catch { return $null }
+}
+
+# 判定会话内是否仍有存活 tab（用于"tab 是否已建立/存活"判定）。
+function Test-HasActiveTab {
+    param([string]$Session = "daily-signin", [int]$TimeoutSec = 5)
+    $resp = Get-WebBridgeTabs -Session $Session -TimeoutSec $TimeoutSec
+    return ($null -ne $resp -and $resp.tabs -and $resp.tabs.Count -ge 1)
 }
 
 # 循环关闭 session 下所有 tab，避免标签累积泄漏
@@ -150,7 +167,7 @@ function Clear-WebBridgeTabs {
     $closedCount = 0
     for ($i = 0; $i -lt $MaxClose; $i++) {
         try {
-            $listResp = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
+            $listResp = Get-WebBridgeTabs -Session $Session -TimeoutSec 5
             if ($null -eq $listResp) {
                 # extension 未连接 / 无法列出 tab → 返回 -1 让调用方区分"0 残留"与"探测失败"
                 return -1
@@ -191,8 +208,8 @@ function Clear-WebBridgeTabs {
 function Close-WebBridgeSession {
     param([string]$Session = "daily-signin")
     try {
-        $r = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $Session -TimeoutSec 8
-        return ($null -ne $r)
+        $response = Invoke-WebBridgeCommand -Action "close_session" -CmdArgs @{} -Session $Session -TimeoutSec 8
+        return ($null -ne $response)
     } catch { return $false }
 }
 
@@ -213,7 +230,7 @@ function Close-SiteTabs-Verified {
     try { $null = Clear-WebBridgeTabs -Session $Session } catch {}
     # 校验
     try {
-        $chk = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec $VerifyTimeoutSec
+        $chk = Get-WebBridgeTabs -Session $Session -TimeoutSec $VerifyTimeoutSec
         if ($chk -and $chk.tabs -and $chk.tabs.Count -gt 0) {
             $leaked = $chk.tabs.Count
             # 第三关：再强关 + 再逐 id 关（应对偶发漏关）
@@ -221,7 +238,7 @@ function Close-SiteTabs-Verified {
             try { $null = Clear-WebBridgeTabs -Session $Session } catch {}
             # 末次校验
             try {
-                $chk2 = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec $VerifyTimeoutSec
+                $chk2 = Get-WebBridgeTabs -Session $Session -TimeoutSec $VerifyTimeoutSec
                 if ($chk2 -and $chk2.tabs) { $leaked = $chk2.tabs.Count }
             } catch { $leaked = -1 }
         }
@@ -232,24 +249,16 @@ function Close-SiteTabs-Verified {
     return ($leaked -eq 0)
 }
 
-# v4.12.24: 结构性单 tab —— 根治重复开 tab（v4.12.22/23 的"先关后开"仍漏关、重复 tab 反而更多）
-#   根因复盘：
-#     • v4.12.22 改为"每次都 newTab=true + 关旧 tab"，打开次数比旧版(尽量复用)多，泄漏随 close 失败复利放大；
-#     • 关旧 tab 依赖 list_tabs(抖动误报) + close_tab(折叠后台 window active=False 难命中) → 不可靠；
-#     • v4.12.23 用 $script: 记忆单 tabId 关旧 tab，仍受 close_tab/list_tabs 不可靠牵连。
-#   本版不再依赖 list_tabs / 单 tabId 记忆，直接 Close-WebBridgeSession(daemon 级强关，
-#   即使 extension 抖动或断开也生效——见 v4.12.19) 整会话清空，再 newTab=true 开唯一一个。
-#   任意时刻本会话 ≤ 1 个 tab，且与 list_tabs 是否误报、close_tab 是否命中无关；
-#   首次 / NAV_FAIL 重试 / extension 就绪重试 / evaluate 丢 tab 重试 / CF 重试 / SLIDER 重开 / 点击后重开
-#   全部走本函数 → 每次必定先整会话强关再开新，满足"即便重试也先关旧 tab 再开新的"。
+# 结构性单 tab —— 根治重复开 tab / tab 泄漏的核心约束：
+#   • 不再依赖 list_tabs 探测 + close_tab 按 id 关（折叠后台窗口中 active=False 的 tab 难命中，曾导致累积泄漏）；
+#   • 改为 Close-WebBridgeSession（daemon 级强关，即使 extension 抖动/断开也生效）整会话清空，再开唯一一个。
+#   任意时刻本会话 ≤ 1 个 tab；所有重试路径（NAV_FAIL / extension 就绪 / evaluate 丢 tab / CF / SLIDER / 点击后）
+#   都走本函数 → 每次必先进场清场再开新，满足"即便重试也先关旧 tab 再开新"。
 function Open-SiteTab {
     param(
         [string]$Url,
         [string]$Session = "daily-signin",
         [int]$NavTimeoutSec = 120,
-        # v4.13.6: 必须是 [switch]——调用点均为裸开关式 `-ForceNew`，[bool] 会报
-        #   "Missing an argument for parameter 'ForceNew'"（该隐患随重试路径增多现形，HDKYL 实测触发）
-        [switch]$ForceNew,
         [bool]$ForceLayoutViewport = $false,
         # v4.13.12: visit-only 站点（无 DetectEval）只需"打开页面"即达成目的，
         #   不关心 DOMContentLoaded 是否完成。对 kufirc 这类慢站（30s 内 DOM 不就绪、tab 一直转圈），
@@ -258,10 +267,10 @@ function Open-SiteTab {
         #   不再进入外层 re-navigate 重试（避免重复开 tab）。
         [switch]$VisitOnly
     )
-    # 结构性清场：整会话 daemon 级强关 + 关后校验（v4.12.25 Close-SiteTabs-Verified）。
-    # 不依赖 extension / list_tabs 状态，且若 daemon 漏关会在日志告警（不再静默累积）。
-    # ⚠️ 所有站点必须共用同一 $Session（"daily-signin"）：本函数靠 close_session 清掉"上一站点"的 tab，
-    #    若各站用独立 session，close_session 只清自己 → 上一站 tab 永不关 → 泄漏重现。signin-batch.ps1 的 $session="pt$idx" 死变量即此陷阱，已删。
+    # 结构性清场：整会话 daemon 级强关 + 关后校验（Close-SiteTabs-Verified）。
+    # 不依赖 extension / list_tabs 状态，若 daemon 漏关会在日志告警（不再静默累积）。
+    # ⚠️ 不变量：所有站点必须共用同一 $Session（"daily-signin"）——本函数靠 close_session 清掉"上一站点"的 tab；
+    #    若各站用独立 session，close_session 只清自己 → 上一站 tab 永不关 → 泄漏重现（signin-batch.ps1 曾有的 $session="pt$idx" 死变量即此陷阱）。
     try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
 
     # 打开目标站点：navigate（waitUntil=domcontentloaded）。同一会话内优先复用已有 tab，
@@ -292,15 +301,10 @@ function Open-SiteTab {
     #   不使用 about:blank / data: 作中转跳板：实测 about:blank 同样 20s+ 不返回（扩展等不到 load）。
     $navOk = $false
     $navErr = ""
-    # 进入即清场（函数头已 Close-SiteTabs-Verified 清上一站；此处双重保险，保证开工前 ≤ 0 tab）
-    try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
 
     # 决定 newTab：仅当会话内确实没有任何 tab 时才 newTab（复用优先，避免重复 tab）
     $needNewTab = $true
-    try {
-        $existing = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
-        if ($existing -and $existing.tabs -and $existing.tabs.Count -ge 1) { $needNewTab = $false }
-    } catch { $needNewTab = $true }
+    if (Test-HasActiveTab -Session $Session) { $needNewTab = $false }
 
     try {
         $navArgs = @{ url = $Url; waitUntil = "domcontentloaded" }
@@ -315,12 +319,7 @@ function Open-SiteTab {
         # v4.13.12: visit-only 慢站特例——navigate 命令已发出、tab 已建立（页面仍在转圈也视为"已打开"），
         #   即达"访问"目的。不再清场重试，避免反复开 tab。仅当 tab 确实未建立才判失败。
         if ($VisitOnly) {
-            $voAlive = $false
-            try {
-                $voChk = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
-                if ($voChk -and $voChk.tabs -and $voChk.tabs.Count -ge 1) { $voAlive = $true }
-            } catch {}
-            if ($voAlive) {
+            if (Test-HasActiveTab -Session $Session) {
                 Write-Host "  [WebBridge] Open-SiteTab: visit-only 慢站，tab 已建立（仍在加载中）即判访问成功" -ForegroundColor Green
                 return @{ success = $true; method = "navigate-visitOnly"; url = $Url }
             }
@@ -339,12 +338,7 @@ function Open-SiteTab {
     }
 
     # 确认 tab 仍存活；否则视为失败触发上层重试（返回前清场，避免遗留）
-    $alive = $false
-    try {
-        $chk = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
-        if ($chk -and $chk.tabs -and $chk.tabs.Count -ge 1) { $alive = $true }
-    } catch {}
-    if (-not $alive) {
+    if (-not (Test-HasActiveTab -Session $Session)) {
         try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
         Write-Host "  [WebBridge] Open-SiteTab: 导航后 tab 丢失" -ForegroundColor Red
         return @{ success = $false; error = "tab_lost_after_nav" }
@@ -407,12 +401,12 @@ function Test-WebBridgeSignIn {
         # v4.12.3: extension 冷启动等待 — daemon 启动后 extension 需要几秒才连接
         # 首个站点可能 navigate 失败，等待 extension 就绪后重试
         if (-not $nav -or -not $nav.success) {
-            $listCheck = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $session -TimeoutSec 5
+            $listCheck = Get-WebBridgeTabs -Session $session -TimeoutSec 5
             if (-not $listCheck) {
                 Write-Host "  [WebBridge] $SiteName : extension 未就绪，等待重试..." -ForegroundColor Yellow
                 for ($extRetry = 0; $extRetry -lt 3; $extRetry++) {
                     Start-Sleep -Seconds 5
-                    $listCheck = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $session -TimeoutSec 5
+                    $listCheck = Get-WebBridgeTabs -Session $session -TimeoutSec 5
                     if ($listCheck) {
                         Write-Host "  [WebBridge] $SiteName : extension 已就绪（重试 $($extRetry+1)/3）" -ForegroundColor Green
                         $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport -VisitOnly:$isVisitOnly
@@ -496,7 +490,7 @@ function Test-WebBridgeSignIn {
             # evaluate 失败常见于 tab 丢失（webbridge daemon bug: navigate 返回 success 但 tab 在等待期间消失）
             # 修复：清理所有残留 tab 后重新 navigate + evaluate 一次
             Write-Host "  [WebBridge] $SiteName : evaluate failed (tab may be lost), retrying navigate..."
-            $navRetry = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceNew -ForceLayoutViewport $ForceLayoutViewport
+            $navRetry = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
             if ($navRetry -and $navRetry.success) {
                 Wait-PostNavigate -Session $session -SiteName $SiteName -WaitMs $WaitMs -LoadWaitSec $LoadWaitSec -ReadyEval $ReadyEval
                 $detect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
@@ -698,7 +692,7 @@ function Test-WebBridgeSignIn {
             # 修复 xloli 等站点：点击返回 CLICKED 但复检报 "tab was closed"，信号变空（实则可能已签）
             if (-not $recheck -or [string]::IsNullOrEmpty($recheckSig)) {
                 Write-Host "  [WebBridge] $SiteName : re-check tab lost (navigated), re-navigating to confirm..."
-                $navRe = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceNew -ForceLayoutViewport $ForceLayoutViewport
+                $navRe = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
                 if ($navRe -and $navRe.success) {
                     Wait-PostNavigate -Session $session -SiteName $SiteName -WaitMs $WaitMs -LoadWaitSec $LoadWaitSec -ReadyEval $ReadyEval
                     $recheck = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
@@ -781,9 +775,8 @@ function Get-CfWidgetViewportRect {
 })()
 '@
     try {
-        $res = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10
-        if ($res -is [string]) { return ($res | ConvertFrom-Json -ErrorAction SilentlyContinue) }
-        if ($res -and $res.value) { return ($res.value | ConvertFrom-Json -ErrorAction SilentlyContinue) }
+        $raw = Get-ResultSignal (Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10)
+        if ($raw) { return ($raw | ConvertFrom-Json -ErrorAction SilentlyContinue) }
     } catch {}
     return $null
 }
@@ -849,8 +842,8 @@ function Wait-PageReady {
         $ready = $false
         try {
             if ($ReadyEval) {
-                $r = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $ReadyEval } -Session $Session -TimeoutSec 10
-                $sig = Get-ResultSignal $r
+                $response = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $ReadyEval } -Session $Session -TimeoutSec 10
+                $sig = Get-ResultSignal $response
                 if ($sig -eq 'true' -or $sig -eq '1') { $ready = $true }
                 else { try { $o = $sig | ConvertFrom-Json -ErrorAction SilentlyContinue; if ($o -and ($o.ready -eq $true -or $o.ready -eq 1)) { $ready = $true } } catch {} }
             } else {
@@ -864,8 +857,8 @@ function Wait-PageReady {
   return 1;
 })()
 "@
-                $r = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10
-                $sig = Get-ResultSignal $r
+                $response = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10
+                $sig = Get-ResultSignal $response
                 if ($sig -eq '1') { $ready = $true }
             }
         } catch {}
@@ -907,9 +900,11 @@ function Test-AltchaVerified {
 })()
 '@
     try {
-        $r = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10
-        if ($r -is [string]) { $o = $r | ConvertFrom-Json -ErrorAction SilentlyContinue; if ($o) { return $o.verified } }
-        if ($r -and $r.value) { $o = $r.value | ConvertFrom-Json -ErrorAction SilentlyContinue; if ($o) { return $o.verified } }
+        $raw = Get-ResultSignal (Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10)
+        if ($raw) {
+            $o = $raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+            if ($o) { return $o.verified }
+        }
     } catch {}
     return $false
 }
@@ -941,9 +936,8 @@ function Test-CfTurnstilePassed {
 })()
 '@
     try {
-        $result = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $checkJS } -Session $Session -TimeoutSec 10
-        if ($result -is [string]) { return $result }
-        if ($result.value) { return $result.value }
+        $raw = Get-ResultSignal (Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $checkJS } -Session $Session -TimeoutSec 10)
+        if ($raw) { return $raw }
     } catch {}
     return "check-failed"
 }
@@ -974,8 +968,8 @@ function Invoke-SlideBypass {
 })()
 '@
     try {
-        $r = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 20
-        $s = Get-ResultSignal $r
+        $response = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 20
+        $s = Get-ResultSignal $response
         Write-Host "  [WebBridge] $SiteName : slide-bypass: $s"
         return ($s -match "^bypassed:")
     } catch { return $false }

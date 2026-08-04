@@ -278,7 +278,7 @@ foreach ($site in $config.sites) {
     #   这是 Open-SiteTab(Close-SiteTabs-Verified) 能"关掉上一站点 tab"的前提；若改传独立 session，
     #   close_session 只清自己 → 上一站 tab 永不关 → 泄漏重现。Test-WebBridgeSignIn 内 $session 硬编码 "daily-signin"。
     $start = Get-Date
-    $r = @{ index = $idx; name = $site.name; url = $site.url; strategy = $site.strategy; status = "UNKNOWN"; signal = ""; elapsed = "" }
+    $siteResult = @{ index = $idx; name = $site.name; url = $site.url; strategy = $site.strategy; status = "UNKNOWN"; signal = ""; elapsed = "" }
 
     Write-Output "[$idx/$total] $($site.name) [$($site.strategy)]"
 
@@ -287,48 +287,48 @@ foreach ($site in $config.sites) {
         # browser-eval/browser-eval-click/browser-visit，由 default 分支兜底）
         switch ($site.strategy) {
             "manual" {
-                $r.status = "SKIPPED"; $r.signal = $site.reason
+                $siteResult.status = "SKIPPED"; $siteResult.signal = $site.reason
                 $signals.skip_sites += $site.name; Write-Output "  => SKIPPED"
             }
             default {
                 if (-not $script:webbridgeAvailable) {
-                    $r.status = "SKIPPED"; $r.signal = "DAEMON_DOWN"
+                    $siteResult.status = "SKIPPED"; $siteResult.signal = "DAEMON_DOWN"
                     $signals.skip_sites += $site.name; Write-Output "  => SKIPPED (webbridge daemon 不可用)"
                 } else {
                     # v4.12.24: 批处理全程后台，绝不弹前台（用户明确要求）。
                     #   单独站点调试可用 signin-single.ps1（其已硬编码 -NoFocus:$true）。
                     $wbResult = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$true
-                    $r.signal = $wbResult
+                    $siteResult.signal = $wbResult
                     switch -Wildcard ($wbResult) {
-                        "SIGN_OK"       { $r.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
-                        "ALREADY_SIGNED"{ $r.status = "ALREADY_DONE"; $signals.ok_sites += $site.name; Write-Output "  => ALREADY_DONE (今日已签到，非本次点击)" }
-                        "VISITED"       { $r.status = "VISITED"; $signals.ok_sites += $site.name; Write-Output "  => VISITED (visit-only)" }
-                        "LOGIN_REQUIRED"{ $r.status = "NO_LOGIN"; $signals.login_expired += $site.name; Write-Output "  => NO_LOGIN" }
-                        "CF_CHALLENGE"  { $r.status = "CF_BLOCKED"; $signals.fail_sites += $site.name; Write-Output "  => CF_BLOCKED" }
-                        "SLIDER"        { $r.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL" }
-                        "NAV_FAIL"      { $r.status = "TIMEOUT"; $signals.fail_sites += $site.name; Write-Output "  => TIMEOUT" }
-                        "NO_CONFIG"     { $r.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => NO_CONFIG" }
-                        "BODY_NULL"     { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (body null)" }
-                        "REDIRECTING"   { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => REDIRECTING" }
-                        "SERVER_ERROR"  { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (server/network error)" }
-                        "EVAL_FAIL"     { $r.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (evaluate failed)" }
-                        default         { $r.status = "NO_DETECT"; $signals.fail_sites += $site.name; Write-Output "  => $wbResult (webbridge)" }
+                        "SIGN_OK"       { $siteResult.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
+                        "ALREADY_SIGNED"{ $siteResult.status = "ALREADY_DONE"; $signals.ok_sites += $site.name; Write-Output "  => ALREADY_DONE (今日已签到，非本次点击)" }
+                        "VISITED"       { $siteResult.status = "VISITED"; $signals.ok_sites += $site.name; Write-Output "  => VISITED (visit-only)" }
+                        "LOGIN_REQUIRED"{ $siteResult.status = "NO_LOGIN"; $signals.login_expired += $site.name; Write-Output "  => NO_LOGIN" }
+                        "CF_CHALLENGE"  { $siteResult.status = "CF_BLOCKED"; $signals.fail_sites += $site.name; Write-Output "  => CF_BLOCKED" }
+                        "SLIDER"        { $siteResult.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL" }
+                        "NAV_FAIL"      { $siteResult.status = "TIMEOUT"; $signals.fail_sites += $site.name; Write-Output "  => TIMEOUT" }
+                        "NO_CONFIG"     { $siteResult.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => NO_CONFIG" }
+                        "BODY_NULL"     { $siteResult.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (body null)" }
+                        "REDIRECTING"   { $siteResult.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => REDIRECTING" }
+                        "SERVER_ERROR"  { $siteResult.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (server/network error)" }
+                        "EVAL_FAIL"     { $siteResult.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (evaluate failed)" }
+                        default         { $siteResult.status = "NO_DETECT"; $signals.fail_sites += $site.name; Write-Output "  => $wbResult (webbridge)" }
                     }
                     # 失败重试：CF_BLOCKED / SLIDER_FAIL / PAGE_ERROR / NO_DETECT / TIMEOUT 最多重试 2 次
                     $retryable = @("CF_BLOCKED", "SLIDER_FAIL", "PAGE_ERROR", "NO_DETECT", "TIMEOUT")
-                    if ($r.status -in $retryable) {
+                    if ($siteResult.status -in $retryable) {
                         for ($retry = 1; $retry -le 2; $retry++) {
                             Write-Output "  [RETRY $retry/2] $($site.name) - waiting 10s..."
                             Start-Sleep -Seconds 10
                             $wbResult2 = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$true
-                            $r.signal = $wbResult2
+                            $siteResult.signal = $wbResult2
                             if ($wbResult2 -eq "SIGN_OK" -or $wbResult2 -eq "VISITED" -or $wbResult2 -eq "ALREADY_SIGNED") {
                                 if ($wbResult2 -eq "VISITED") {
-                                    $r.status = "VISITED"
+                                    $siteResult.status = "VISITED"
                                 } elseif ($wbResult2 -eq "ALREADY_SIGNED") {
-                                    $r.status = "ALREADY_DONE"
+                                    $siteResult.status = "ALREADY_DONE"
                                 } else {
-                                    $r.status = "SUCCESS"
+                                    $siteResult.status = "SUCCESS"
                                 }
                                 $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $site.name })
                                 $signals.ok_sites += $site.name
@@ -339,22 +339,22 @@ foreach ($site in $config.sites) {
                         }
                     }
                     # ⚠️  禁止自动添加 manual：失败站点仅记入需人工审核列表，不改策略
-                    if ($r.status -eq "CF_BLOCKED" -or $r.status -eq "SLIDER_FAIL") {
-                        $tracking.needs_manual_review += "$($site.name)($($r.status))"
-                        Write-Output "  [REVIEW] 需人工审核: $($site.name) - $($r.status)（不会自动改为 manual）"
+                    if ($siteResult.status -eq "CF_BLOCKED" -or $siteResult.status -eq "SLIDER_FAIL") {
+                        $tracking.needs_manual_review += "$($site.name)($($siteResult.status))"
+                        Write-Output "  [REVIEW] 需人工审核: $($site.name) - $($siteResult.status)（不会自动改为 manual）"
                     }
                 }
             }
         }
     } catch {
-        $r.status = "ERROR"; $r.signal = $_.Exception.Message
+        $siteResult.status = "ERROR"; $siteResult.signal = $_.Exception.Message
         $signals.fail_sites += $site.name; Write-Output "  => ERROR"
     }
 
-    Track-Baseline $site.name $r.status
+    Track-Baseline $site.name $siteResult.status
 
-    $r.elapsed = "$([math]::Round(((Get-Date)-$start).TotalSeconds,1))s"
-    $results += $r
+    $siteResult.elapsed = "$([math]::Round(((Get-Date)-$start).TotalSeconds,1))s"
+    $results += $siteResult
     # v4.12.17: 增量落盘 —— 后台任务跨 turn 可能被回收，逐站写 log 保证可调试
     $partialSummary = @{
         timestamp     = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
@@ -486,12 +486,12 @@ function Send-FeishuSummary {
 
     # ===== Classify failures by reason =====
     $capSites = @(); $deadSites = @(); $nodetectSites = @(); $otherSites = @()
-    foreach ($r in $results) {
-        if ($r.status -ne "SUCCESS" -and $r.status -ne "ALREADY_DONE" -and $r.status -ne "SKIPPED" -and $r.status -ne "VISITED") {
-            switch ($r.status) {
-                "CF_BLOCKED"  { $capSites += $r.name }
-                "NO_DETECT"   { $nodetectSites += $r.name }
-                default       { $otherSites += $r.name }
+    foreach ($entry in $results) {
+        if ($entry.status -ne "SUCCESS" -and $entry.status -ne "ALREADY_DONE" -and $entry.status -ne "SKIPPED" -and $entry.status -ne "VISITED") {
+            switch ($entry.status) {
+                "CF_BLOCKED"  { $capSites += $entry.name }
+                "NO_DETECT"   { $nodetectSites += $entry.name }
+                default       { $otherSites += $entry.name }
             }
         }
     }

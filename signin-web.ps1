@@ -79,6 +79,32 @@ $NexusPHPCfSignInClick = @'
 })()
 '@
 
+# NexusPHP attendance.php 通用"收紧匹配"点击（精确文本 + 叶子节点过滤，避免误点导航栏容器）。
+# OurBits / GGPT / HDDolby / HDHome 的 Click 完全一致，抽出共享以避免 4 份重复维护。
+$NexusPHPExactClick = @'
+(function(){
+  // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
+  var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
+  for(var i=0;i<candidates.length;i++){
+    var el = candidates[i];
+    if(el.children.length>1) continue;
+    var v = (el.textContent||el.value||'').trim();
+    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'){
+      el.click(); return 'CLICKED_EXACT:'+v;
+    }
+  }
+  for(var j=0;j<candidates.length;j++){
+    var el2 = candidates[j];
+    if(el2.children.length>1) continue;
+    var v2 = (el2.textContent||el2.value||'').trim();
+    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)){
+      el2.click(); return 'CLICKED_PREFIX:'+v2;
+    }
+  }
+  return 'NO_BTN';
+})()
+'@
+
 # SPA 控制台/资料页通用检测：登录态保持即视为成功（API 控制台类站点）
 $SPASignInDetect = @'
 (function(){
@@ -273,29 +299,7 @@ $WebSignInConfigs = @{
         PostClickMs = 5000
         # v4.12.6: 复用 NexusPHPSignInDetect（含 cfTokenPassed 修复，避免"安全验证"文本误判）
         Detect = $NexusPHPSignInDetect
-        Click = @'
-(function(){
-  // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
-  var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
-  for(var i=0;i<candidates.length;i++){
-    var el = candidates[i];
-    if(el.children.length>1) continue;
-    var v = (el.textContent||el.value||'').trim();
-    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'){
-      el.click(); return 'CLICKED_EXACT:'+v;
-    }
-  }
-  for(var j=0;j<candidates.length;j++){
-    var el2 = candidates[j];
-    if(el2.children.length>1) continue;
-    var v2 = (el2.textContent||el2.value||'').trim();
-    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)){
-      el2.click(); return 'CLICKED_PREFIX:'+v2;
-    }
-  }
-  return 'NO_BTN';
-})()
-'@
+        Click = $NexusPHPExactClick
     }
     "OurBits" = @{
         Url = "https://ourbits.club/attendance.php"
@@ -304,58 +308,14 @@ $WebSignInConfigs = @{
         # v4.13.6: CF Turnstile 坐标点击站——必须导航后即固定 1280x800 视口（默认已改为自然分辨率）
         ForceLayoutViewport = $true
         Detect = $NexusPHPSignInDetect
-        Click = @'
-(function(){
-  // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
-  var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
-  for(var i=0;i<candidates.length;i++){
-    var el = candidates[i];
-    if(el.children.length>1) continue;
-    var v = (el.textContent||el.value||'').trim();
-    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'){
-      el.click(); return 'CLICKED_EXACT:'+v;
-    }
-  }
-  for(var j=0;j<candidates.length;j++){
-    var el2 = candidates[j];
-    if(el2.children.length>1) continue;
-    var v2 = (el2.textContent||el2.value||'').trim();
-    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)){
-      el2.click(); return 'CLICKED_PREFIX:'+v2;
-    }
-  }
-  return 'NO_BTN';
-})()
-'@
+        Click = $NexusPHPExactClick
     }
     "GGPT" = @{
         Url = "https://www.gamegamept.com/attendance.php"
         WaitMs = 12000
         PostClickMs = 5000
         Detect = $NexusPHPSignInDetect
-        Click = @'
-(function(){
-  // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
-  var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
-  for(var i=0;i<candidates.length;i++){
-    var el = candidates[i];
-    if(el.children.length>1) continue;
-    var v = (el.textContent||el.value||'').trim();
-    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'){
-      el.click(); return 'CLICKED_EXACT:'+v;
-    }
-  }
-  for(var j=0;j<candidates.length;j++){
-    var el2 = candidates[j];
-    if(el2.children.length>1) continue;
-    var v2 = (el2.textContent||el2.value||'').trim();
-    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)){
-      el2.click(); return 'CLICKED_PREFIX:'+v2;
-    }
-  }
-  return 'NO_BTN';
-})()
-'@
+        Click = $NexusPHPExactClick
     }
 
     "HDDolby" = @{
@@ -363,29 +323,7 @@ $WebSignInConfigs = @{
         WaitMs = 12000
         PostClickMs = 5000
         Detect = $NexusPHPSignInDetect
-        Click = @'
-(function(){
-  // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
-  var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
-  for(var i=0;i<candidates.length;i++){
-    var el = candidates[i];
-    if(el.children.length>1) continue;
-    var v = (el.textContent||el.value||'').trim();
-    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'){
-      el.click(); return 'CLICKED_EXACT:'+v;
-    }
-  }
-  for(var j=0;j<candidates.length;j++){
-    var el2 = candidates[j];
-    if(el2.children.length>1) continue;
-    var v2 = (el2.textContent||el2.value||'').trim();
-    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)){
-      el2.click(); return 'CLICKED_PREFIX:'+v2;
-    }
-  }
-  return 'NO_BTN';
-})()
-'@
+        Click = $NexusPHPExactClick
     }
 
     "HDHome" = @{
@@ -393,29 +331,7 @@ $WebSignInConfigs = @{
         WaitMs = 12000
         PostClickMs = 5000
         Detect = $NexusPHPSignInDetect
-        Click = @'
-(function(){
-  // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
-  var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
-  for(var i=0;i<candidates.length;i++){
-    var el = candidates[i];
-    if(el.children.length>1) continue;
-    var v = (el.textContent||el.value||'').trim();
-    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'){
-      el.click(); return 'CLICKED_EXACT:'+v;
-    }
-  }
-  for(var j=0;j<candidates.length;j++){
-    var el2 = candidates[j];
-    if(el2.children.length>1) continue;
-    var v2 = (el2.textContent||el2.value||'').trim();
-    if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)){
-      el2.click(); return 'CLICKED_PREFIX:'+v2;
-    }
-  }
-  return 'NO_BTN';
-})()
-'@
+        Click = $NexusPHPExactClick
     }
 
 

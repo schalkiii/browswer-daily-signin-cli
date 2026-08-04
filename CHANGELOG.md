@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.13.14] - 2026-08-04
+
+### 代码质量优化（可读性 / 一致性 / 死代码清理）
+
+- **提取复用助手**：新增 `Get-WebBridgeTabs` / `Test-HasActiveTab`，消除 `kimi-webbridge.ps1` 中 8 处散落的 `Invoke-WebBridgeCommand -Action "list_tabs"` 探测样板；`Get-ResultSignal` 提取逻辑在 `Get-CfWidgetViewportRect` / `Test-AltchaVerified` / `Test-CfTurnstilePassed` 三处手写重复，统一改为调用 `Get-ResultSignal` 后 `ConvertFrom-Json`。
+- **去重站点 Click JS**：`signin-web.ps1` 中 OurBits / GGPT / HDDolby / HDHome / HHCLUB 完全相同的「收紧匹配」Click 块（5 份）提取为共享变量 `$NexusPHPExactClick`，配置引用统一指向它（配置一致性校验 0 issues，5 站复用生效）。
+- **死代码清理**：删除 `Open-SiteTab` 从未使用的 `[switch]$ForceNew` 死参数及其 2 处调用点；移除 `Open-SiteTab` 入口重复的双 `Close-SiteTabs-Verified` 清场（首行已是强关+校验，第二处为冗余 daemon 往返）。
+- **信号/变量命名规范化**：单字母局部变量 `$r` / `$res` 重命名为 `$response` / `$rawResult` / `$siteResult` / `$signResult` / `$entry` 等，覆盖 kimi-webbridge / signin-batch / push-cumulative / rerun-remaining，提升跨文件一致性。
+- **注释浓缩**：`Open-SiteTab` 上方逐版本（v4.12.22/23）流水账注释浓缩为"为什么"约束（单会话不变量、daemon 级强关优先于 list_tabs/close_tab），保留关键硬约束说明，去掉复述历史的冗余。
+
 ## [v4.13.13] - 2026-08-04
 
 ### 导航超时上限提升到 2 分钟

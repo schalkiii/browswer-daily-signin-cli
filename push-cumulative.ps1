@@ -69,9 +69,9 @@ $e_stats = "$([System.Char]::ConvertFromUtf32(0x1F4CA))"
 # ===== 分类 =====
 $successSignals = @("SIGN_OK", "ALREADY_SIGNED", "VISITED")
 $success = @(); $failures = @()
-foreach ($r in $cum) {
-    if ($successSignals -contains $r.signal) { $success += $r }
-    else { $failures += $r }
+foreach ($entry in $cum) {
+    if ($successSignals -contains $entry.signal) { $success += $entry }
+    else { $failures += $entry }
 }
 $total = $cum.Count
 $successCount = $success.Count
@@ -85,11 +85,11 @@ $reasonMap = @{
     "SERVER_ERROR" = @{ label = "连接被关闭(ERR_CONNECTION_CLOSED)"; icon = $e_cross }
 }
 $grouped = @{}
-foreach ($r in $failures) {
-    $rm = $reasonMap[$r.signal]
-    $label = if ($rm) { $rm.label } else { $r.signal }
+foreach ($entry in $failures) {
+    $rm = $reasonMap[$entry.signal]
+    $label = if ($rm) { $rm.label } else { $entry.signal }
     if (-not $grouped.ContainsKey($label)) { $grouped[$label] = @() }
-    $grouped[$label] += $r.name
+    $grouped[$label] += $entry.name
 }
 
 # 运行日期（取最新一条的时间）
