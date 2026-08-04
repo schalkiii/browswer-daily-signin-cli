@@ -1024,6 +1024,9 @@ function Invoke-WebSignIn {
         [string]$SiteName,
         [bool]$SaveDebugSnapshot = $false,
         [string]$DebugDir = "",
+        # 站点 strategy（来自 sites.json）。显式用于路由 visit-only：仅 strategy=='visit-only' 才按
+        #   "仅打开不检测"处理。缺省为空时回退到 DetectEval 是否为空推断（兼容 signin-single 等未传 strategy 的调用方）。
+        [string]$Strategy = "",
         # v4.12.25: 默认后台（不弹前台）。前台(opt-in) 仅 CF Turnstile 站偶尔需要焦点才渲染，
         #   但用户明确优先级是"不弹前台"，故默认 $true；若要前台调试 CF，显式传 -NoFocus:$false。
         [bool]$NoFocus = $true
@@ -1033,6 +1036,10 @@ function Invoke-WebSignIn {
         Write-Output "  [WebSignIn] $SiteName : no config, skip"
         return "NO_CONFIG"
     }
+
+    # visit-only 路由：以 sites.json 的 strategy 为准（不再依赖 DetectEval 为空隐式推断，
+    #   避免 web-read/无 Detect 站被误判为 visit-only）。仅 strategy=='visit-only' 才走"仅打开"分支。
+    $isVisitOnly = ($Strategy -eq 'visit-only')
 
     $params = @{
         SiteName = $SiteName
@@ -1044,6 +1051,7 @@ function Invoke-WebSignIn {
         SaveDebugSnapshot = $SaveDebugSnapshot
         DebugDir = $DebugDir
         NoFocus = $NoFocus
+        VisitOnly = $isVisitOnly
     }
     if ($cfg.NavTimeoutSec) { $params.NavTimeoutSec = $cfg.NavTimeoutSec }
     if ($cfg.CfRetryCount) { $params.CfRetryCount = $cfg.CfRetryCount }

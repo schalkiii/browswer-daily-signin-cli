@@ -38,7 +38,7 @@ Each site in `sites.json` declares a `strategy` that decides how the batch treat
 | ---------------- | ------------------------------------------------------------------------------ | -------------------- | ---------- |
 | `webbridge`      | Open page → detect sign-in state → click/bypass if needed                      | `SIGN_OK` / `ALREADY_SIGNED` | ✅ Yes     |
 | `visit-only`     | Open page only, **no detect / no click** (keep-alive sites, e.g. Kufirc / AsianDVDClub) | `VISITED`            | ❌ Visit only |
-| `web-read`       | Legacy alias, currently equivalent to `webbridge` (unified WebBridge detection flow) | `SIGN_OK` / `ALREADY_SIGNED` | ✅ Yes     |
+| `web-read`       | Deprecated legacy alias, equivalent to `webbridge`; configs have been normalized to `webbridge`, kept only for backward-compatible parsing | `SIGN_OK` / `ALREADY_SIGNED` | ✅ Yes     |
 | `manual`         | Not auto-processed; skipped and recorded into the Feishu "needs human" list (captcha / policy sites) | — (SKIPPED)          | ❌ Human   |
 
 > To make a site "open but don't sign in": set `strategy` to `visit-only` (no `$WebSignInConfigs` change needed; visit-only is auto-detected from an empty `DetectEval`).

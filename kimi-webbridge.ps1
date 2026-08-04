@@ -383,8 +383,9 @@ function Test-WebBridgeSignIn {
         [bool]$ForceLayoutViewport = $false
     )
     $session = "daily-signin"
-    # v4.13.12: visit-only 站点只需"打开页面"即达成目的（详见 Open-SiteTab 的 -VisitOnly 说明）。
-    $isVisitOnly = (-not $DetectEval -or $DetectEval.Trim() -eq "")
+    # visit-only 路由：优先以调用方显式传入的 -VisitOnly 开关为准（由 Invoke-WebSignIn 按 sites.json 的
+    #   strategy=='visit-only' 推导）；DetectEval 为空作为兜底推断，兼容未传 strategy 的直调用法。
+    $isVisitOnly = $VisitOnly -or (-not $DetectEval -or $DetectEval.Trim() -eq "")
 
     # v4.13.6: 站点开工前连接自检——daemon/extension 断连时自动重启自愈（每次运行至多一次）
     if (-not (Ensure-WebBridgeHealthy)) {

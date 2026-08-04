@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.13.16] - 2026-08-04
+
+### 修复 visit-only 路由 bug + web-read 归一化为 webbridge
+
+- **visit-only 路由修复**：原 `Invoke-WebSignIn` 对所有非 `manual` 站点统一走 `Test-WebBridgeSignIn`，且未显式传 `-VisitOnly`，导致 visit-only 判定**依赖 `$DetectEval` 为空隐式推断**——`web-read`/无 Detect 站点（如 UBits、daxiangjiao）会被**误判为 visit-only**，只返回 `VISITED` 而不执行点击签到。
+  - `Invoke-WebSignIn` 新增 `-Strategy` 参数，`signin-batch.ps1` 两处调用均传入 `$site.strategy`；`visit-only` 以 `sites.json` 的 `strategy=='visit-only'` 为准显式推导并传给 `Test-WebBridgeSignIn -VisitOnly`。
+  - `Test-WebBridgeSignIn` 改为：显式传入的 `-VisitOnly` 开关优先，`DetectEval` 为空仅作兜底（兼容 `signin-single` 等未传 strategy 的直调用法）。
+  - 效果：仅 AsianDVDClub / Kufirc 两站走 visit-only（打开即 VISITED），其余 webbridge 站正常检测+点击。
+- **web-read 归一化**：`sites.json` 中 UBits、daxiangjiao 两处 `web-read` 改为 `webbridge`（用户确认 web-read 等同于 webbridge）。配置一致性校验 0 issues，strategy 分布变为 manual=5 / webbridge=45 / visit-only=2 / web-read=0。
+- 文档同步：`pt-signin-skill-cn.md` / `pt-signin-skill.md` 的 `web-read` 行标注为「已废弃旧值，仅保留向后兼容解析」。
+
 ## [v4.13.15] - 2026-08-04
 
 ### 架构文档重构（去历史化 + 一致性校对）

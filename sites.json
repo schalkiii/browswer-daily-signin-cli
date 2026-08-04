@@ -43,7 +43,7 @@
     {
       "name": "UBits",
       "url": "https://ubits.club/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "note": "2026-07-09: 用户确认可自动签到，从 manual 移出；CF Turnstile 站点，走标准 CF 验证流程"
     },
     {
@@ -312,7 +312,7 @@
     {
       "name": "daxiangjiao",
       "url": "https://pt.daxiangjiao.org/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "display_name": "DaXiangJiao :: 签到 - Powered by NexusPHP",
       "note": "auto: 书签同步新增"
     },

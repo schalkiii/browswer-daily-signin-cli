@@ -297,7 +297,7 @@ foreach ($site in $config.sites) {
                 } else {
                     # v4.12.24: 批处理全程后台，绝不弹前台（用户明确要求）。
                     #   单独站点调试可用 signin-single.ps1（其已硬编码 -NoFocus:$true）。
-                    $wbResult = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$true
+                    $wbResult = Invoke-WebSignIn -SiteName $site.name -Strategy $site.strategy -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$true
                     $siteResult.signal = $wbResult
                     switch -Wildcard ($wbResult) {
                         "SIGN_OK"       { $siteResult.status = "SUCCESS"; $signals.ok_sites += $site.name; Write-Output "  => SIGN_OK (webbridge)" }
@@ -320,7 +320,7 @@ foreach ($site in $config.sites) {
                         for ($retry = 1; $retry -le 2; $retry++) {
                             Write-Output "  [RETRY $retry/2] $($site.name) - waiting 10s..."
                             Start-Sleep -Seconds 10
-                            $wbResult2 = Invoke-WebSignIn -SiteName $site.name -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$true
+                            $wbResult2 = Invoke-WebSignIn -SiteName $site.name -Strategy $site.strategy -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$true
                             $siteResult.signal = $wbResult2
                             if ($wbResult2 -eq "SIGN_OK" -or $wbResult2 -eq "VISITED" -or $wbResult2 -eq "ALREADY_SIGNED") {
                                 if ($wbResult2 -eq "VISITED") {

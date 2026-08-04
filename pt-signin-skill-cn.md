@@ -42,7 +42,7 @@ cd d:\workspace\browswer-daily-signin-cli
 | ---------------- | ------------------------------------------------------------ | ----------------------- | ------ |
 | `webbridge`      | 打开网页 → 检测签到状态 → 必要时点击/绕过验证                | `SIGN_OK` / `ALREADY_SIGNED` | ✅ 自动 |
 | `visit-only`     | 仅打开网页，**不检测不点击**（保活类站点，如 Kufirc / AsianDVDClub） | `VISITED`                | ❌ 仅访问 |
-| `web-read`       | 兼容旧值，当前与 `webbridge` 等价（统一走 WebBridge 检测流）  | `SIGN_OK` / `ALREADY_SIGNED` | ✅ 自动 |
+| `web-read`       | 已废弃的旧值，等价 `webbridge`；配置中已统一改为 `webbridge`，仅保留向后兼容解析 | `SIGN_OK` / `ALREADY_SIGNED` | ✅ 自动 |
 | `manual`         | 不自动处理，跳过并记入飞书「需人工」列表（验证码/政策原因站） | —（SKIPPED）             | ❌ 人工 |
 
 > 将某站改为「仅打开不签到」：把 `strategy` 改成 `visit-only` 即可（无需改 `$WebSignInConfigs`；visit-only 依据 `DetectEval` 为空自动判定）。
