@@ -246,7 +246,7 @@ function Open-SiteTab {
     param(
         [string]$Url,
         [string]$Session = "daily-signin",
-        [int]$NavTimeoutSec = 60,
+        [int]$NavTimeoutSec = 120,
         # v4.13.6: 必须是 [switch]——调用点均为裸开关式 `-ForceNew`，[bool] 会报
         #   "Missing an argument for parameter 'ForceNew'"（该隐患随重试路径增多现形，HDKYL 实测触发）
         [switch]$ForceNew,
@@ -371,7 +371,11 @@ function Test-WebBridgeSignIn {
         [string]$ClickEval,
         [int]$WaitMs = 5000,
         [int]$PostClickWaitMs = 3000,
-        [int]$NavTimeoutSec = 60,
+        # v4.13.13: 导航超时上限由 60s 提升到 120s（2 分钟）。
+        #   PS 侧 -TimeoutSec 是给 daemon 的请求超时，须足够大才能覆盖慢站（CF 盾 / 长 DOM 构建 / 折叠后台窗口）。
+        #   注意：PS 侧超时只决定"PS 何时把请求判失败"，真正硬约束在扩展内部 30s load 超时——
+        #   但 domcontentloaded 模式下门槛是 DOMContentLoaded（慢站通常数秒内就绪），故 120s 足以包容绝大多数慢站而不被 PS 抢先砍断。
+        [int]$NavTimeoutSec = 120,
         [int]$CfRetryCount = 3,
         [int]$CfRetryWaitMs = 10000,
         [bool]$SaveDebugSnapshot = $false,

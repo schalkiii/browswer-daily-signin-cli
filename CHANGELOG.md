@@ -1,5 +1,11 @@
 # Changelog
 
+## [v4.13.13] - 2026-08-04
+
+### 导航超时上限提升到 2 分钟
+
+`Test-WebBridgeSignIn` / `Open-SiteTab` 的 `NavTimeoutSec` 默认由 60s 提升到 120s（2 分钟）。PS 侧 `-TimeoutSec` 是给 daemon 的请求超时，须足够大才能覆盖慢站（CF 盾 / 长 DOM 构建 / 折叠后台窗口），避免 PS 比 daemon 更早把请求判失败。注：真正硬约束仍在扩展内部 30s `load` 超时，但 `domcontentloaded` 模式门槛是 DOMContentLoaded（慢站通常数秒内就绪），故 120s 足以包容绝大多数慢站。站点仍可用 `$cfg.LoadWaitSec` 单独覆盖动态轮询上限。
+
 ## [v4.13.12] - 2026-08-04
 
 ### 根治 visit-only 慢站（kufirc）「反复开 tab 转圈」
