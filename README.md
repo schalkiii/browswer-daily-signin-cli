@@ -46,6 +46,8 @@
 
 **复用优先，杜绝「加载未完又开新 tab」**：`Open-SiteTab` 进入时先 `Close-SiteTabs-Verified` 清场，再 `list_tabs` 探测——**会话内已有 tab 就不带 `newTab`（复用现有 tab 导航），仅确认无任何 tab 才 newTab**。且不设内层「兜底再 newTab」分支（v4.13.10 该分支在网络抖动站会叠加出 6+ tab：首个超时 tab 还没被 daemon 销毁就又 newTab）。失败直接返回，交外层 `re-navigate` 统一重试（重试前显式清场 + 间隔 12s 给 daemon 销毁超时 tab 的时间）。实测连续 3 次同站 + 切站调用，全程 `list_tabs=1` 无重复。
 
+**`visit-only` 慢站特例（v4.13.12）**：kufirc 这类 `visit-only` 站点（无 `DetectEval`）只需「打开页面」即达成目的，但 DOMContentLoaded 30s 内不触发（tab 一直转圈）。旧逻辑把 `domcontentloaded` 成功当 `Open-SiteTab` 唯一成功标准 → 失败后外层 `re-navigate` + 外层 `RETRY` 共 6 次 `navigate`、每次清场重开新 tab → 窗口里一堆 tab 在转圈。`Open-SiteTab` 新增 `-VisitOnly` 开关：visit-only 模式下 `navigate` 即便 `domcontentloaded` 超时，只要命令已提交、`list_tabs` 确认 tab 已建立（仍在加载也行）即判成功，不再进入外层重试；同时跳过 `Wait-PostNavigate`（无需等 DOM 就绪，避免干等 45s）。非 visit-only 站点逻辑不变。
+
 ### ⚠️ 两个已被实测推翻的旧方案，勿再引入
 
 - **`data:` seed 中转页**（v4.13.7/8）：先开 `data:text/html,...seed` 再 `evaluate` 跳转。实际是 07-31 三个现场故障的根源——地址栏停在 `data:text/html,<html><body>seed</body></html>`、兜底把 `http://127.0.0.1:10086`（daemon 自身端口）开进浏览器、以及对**已存在 tab** 做 navigate 走 daemon 慢路径实测 **20.43s** 恰好撞破写死的 20s 超时 → 每站刷 `HttpClient.Timeout of 20 seconds elapsing`。其立论「daemon navigate 死等 load」也不成立：直接 `navigate + newTab` 打开真实站点实测约 9s 正常返回。

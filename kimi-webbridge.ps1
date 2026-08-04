@@ -250,7 +250,13 @@ function Open-SiteTab {
         # v4.13.6: 必须是 [switch]——调用点均为裸开关式 `-ForceNew`，[bool] 会报
         #   "Missing an argument for parameter 'ForceNew'"（该隐患随重试路径增多现形，HDKYL 实测触发）
         [switch]$ForceNew,
-        [bool]$ForceLayoutViewport = $false
+        [bool]$ForceLayoutViewport = $false,
+        # v4.13.12: visit-only 站点（无 DetectEval）只需"打开页面"即达成目的，
+        #   不关心 DOMContentLoaded 是否完成。对 kufirc 这类慢站（30s 内 DOM 不就绪、tab 一直转圈），
+        #   把 domcontentloaded 当硬门槛会触发反复清场重开 → 窗口里一堆 tab 在转圈。
+        #   开启后：navigate 命令已提交、list_tabs 确认 tab 已建立（即便仍在加载）即判成功，
+        #   不再进入外层 re-navigate 重试（避免重复开 tab）。
+        [switch]$VisitOnly
     )
     # 结构性清场：整会话 daemon 级强关 + 关后校验（v4.12.25 Close-SiteTabs-Verified）。
     # 不依赖 extension / list_tabs 状态，且若 daemon 漏关会在日志告警（不再静默累积）。
@@ -306,6 +312,21 @@ function Open-SiteTab {
         $navErr = "$_"
     }
     if (-not $navOk) {
+        # v4.13.12: visit-only 慢站特例——navigate 命令已发出、tab 已建立（页面仍在转圈也视为"已打开"），
+        #   即达"访问"目的。不再清场重试，避免反复开 tab。仅当 tab 确实未建立才判失败。
+        if ($VisitOnly) {
+            $voAlive = $false
+            try {
+                $voChk = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $Session -TimeoutSec 5
+                if ($voChk -and $voChk.tabs -and $voChk.tabs.Count -ge 1) { $voAlive = $true }
+            } catch {}
+            if ($voAlive) {
+                Write-Host "  [WebBridge] Open-SiteTab: visit-only 慢站，tab 已建立（仍在加载中）即判访问成功" -ForegroundColor Green
+                return @{ success = $true; method = "navigate-visitOnly"; url = $Url }
+            }
+            Write-Host "  [WebBridge] Open-SiteTab: visit-only 但 tab 未建立 -> 失败" -ForegroundColor Red
+            return @{ success = $false; error = "navigate_failed" }
+        }
         # domcontentloaded 失败（extension 未连 / daemon 异常 / 极端慢站 / 网络抖动）：
         # 清场后直接返回失败，交上层 re-navigate 重试——不再此处二次 newTab（防重复 tab 累积）。
         try { $null = Close-SiteTabs-Verified -Session $Session } catch {}
@@ -364,6 +385,8 @@ function Test-WebBridgeSignIn {
         [bool]$ForceLayoutViewport = $false
     )
     $session = "daily-signin"
+    # v4.13.12: visit-only 站点只需"打开页面"即达成目的（详见 Open-SiteTab 的 -VisitOnly 说明）。
+    $isVisitOnly = (-not $DetectEval -or $DetectEval.Trim() -eq "")
 
     # v4.13.6: 站点开工前连接自检——daemon/extension 断连时自动重启自愈（每次运行至多一次）
     if (-not (Ensure-WebBridgeHealthy)) {
@@ -376,7 +399,7 @@ function Test-WebBridgeSignIn {
 
     try {
         Write-Host "  [WebBridge] $SiteName : navigate -> $Url"
-        $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
+        $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport -VisitOnly:$isVisitOnly
         # v4.12.3: extension 冷启动等待 — daemon 启动后 extension 需要几秒才连接
         # 首个站点可能 navigate 失败，等待 extension 就绪后重试
         if (-not $nav -or -not $nav.success) {
@@ -388,7 +411,7 @@ function Test-WebBridgeSignIn {
                     $listCheck = Invoke-WebBridgeCommand -Action "list_tabs" -CmdArgs @{} -Session $session -TimeoutSec 5
                     if ($listCheck) {
                         Write-Host "  [WebBridge] $SiteName : extension 已就绪（重试 $($extRetry+1)/3）" -ForegroundColor Green
-                        $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
+                        $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport -VisitOnly:$isVisitOnly
                         break
                     }
                     Write-Host "  [WebBridge] $SiteName : extension 重试 $($extRetry+1)/3 仍未就绪" -ForegroundColor Yellow
@@ -405,7 +428,7 @@ function Test-WebBridgeSignIn {
                         Write-Host "  [WebBridge] $SiteName : NAV_FAIL, re-navigate retry $($navRetries+1)/2..."
                         Start-Sleep -Seconds 12
                         try { $null = Close-SiteTabs-Verified -Session $session } catch {}
-                        $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
+                        $nav = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport -VisitOnly:$isVisitOnly
                         $navRetries++
                     }
                     if (-not $nav -or -not $nav.success) {
@@ -425,7 +448,12 @@ function Test-WebBridgeSignIn {
         # v4.12.25: 布局视口覆盖已收进 Open-SiteTab（每次 navigate 成功后立即启用），
         #   此处不再重复启用，避免函数内重开 tab(272/306/475) 后视口丢失导致 CF/ALTCHA 坐标点击失效。
 
-        Wait-PostNavigate -Session $session -SiteName $SiteName -WaitMs $WaitMs -LoadWaitSec $LoadWaitSec -ReadyEval $ReadyEval
+        # v4.13.12: visit-only 站点（无 DetectEval）只需"打开页面"即达成目的，无需等待 DOM 就绪——
+        #   慢站 Wait-PageReady 会干等 LoadWaitSec（默认 45s），纯属浪费；且此时 tab 可能仍在加载、evaluate
+        #   易失败，对 visit-only 无检测意义。故 visit-only 跳过 Wait-PostNavigate，直接返回 VISITED。
+        if (-not $isVisitOnly) {
+            Wait-PostNavigate -Session $session -SiteName $SiteName -WaitMs $WaitMs -LoadWaitSec $LoadWaitSec -ReadyEval $ReadyEval
+        }
 
         # visit-only 模式：无 DetectEval 时仅访问，不检测签到
         if (-not $DetectEval -or $DetectEval.Trim() -eq "") {

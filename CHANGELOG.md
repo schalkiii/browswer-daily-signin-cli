@@ -1,5 +1,14 @@
 # Changelog
 
+## [v4.13.12] - 2026-08-04
+
+### 根治 visit-only 慢站（kufirc）「反复开 tab 转圈」
+
+visit-only 站点（无 `DetectEval`）只需"打开页面"即达成目的，`Test-WebBridgeSignIn` 在 `Open-SiteTab` 成功后立刻 `return "VISITED"`，本不关心页面是否加载完。但旧逻辑把 `domcontentloaded` 成功当作 `Open-SiteTab` 唯一成功标准：
+
+- **根因**：kufirc 这类慢站 DOMContentLoaded 30s 内不触发（tab 一直转圈）→ `domcontentloaded` 超时 → `Open-SiteTab` 返回失败 → 外层 `re-navigate retry 1/2、2/2` + 外层 `RETRY 1/2、2/2` 共 6 次 `navigate`，每次都 `Close-SiteTabs-Verified` 清场 + 重开新 tab → 窗口里一堆 tab 在转圈、重复开。
+- **修复**：`Open-SiteTab` 新增 `-VisitOnly` 开关。visit-only 模式下，`navigate` 即便 `domcontentloaded` 超时，只要命令已提交、list_tabs 确认 tab 已建立（仍在加载也行）即判成功，不再进入外层重试；同时跳过 `Wait-PostNavigate`（无需等 DOM 就绪，避免干等 45s）。非 visit-only 站点逻辑不变。
+
 ## [工具] - 2026-08-04
 
 ### 新增 `setup-daily-task.ps1`：一键注册每日 02:00 自动签到计划任务
