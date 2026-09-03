@@ -5,7 +5,7 @@ description: |
   Covers NexusPHP attendance.php sites, Cloudflare Turnstile bypass, click-to-sign pages,
   SPA console sites, and manual-only sites. Use when user asks to sign in to PT sites, checkin to
   tracker/forum sites, or automate daily attendance for private trackers.
-updated: 2026-08-04
+updated: 2026-09-03
 ---
 
 # PT Site Sign-in Automation
@@ -69,8 +69,9 @@ Use the baseline (`baseline.json`) as a reference for which sites _should_ succe
 | `PostClickMs`         | Fixed wait (ms) after click                                                          |
 | `LoadWaitSec`         | Max seconds to dynamically poll for page readiness (default 45, see global params)   |
 | `ReadyEval`           | Custom page-ready JS (replaces default body-length + shield-keyword check)           |
-| `ForceLayoutViewport` | Coordinate-click sites (CF Turnstile / ALTCHA / SLIDER) set `$true` to enable layout viewport |
+| `ForceLayoutViewport` | Coordinate-click sites (CF Turnstile / SLIDER) set `$true` to enable layout viewport. ALTCHA (Yemapt) is now solved by a direct JS `.click()` on the checkbox (no shadow DOM); `ForceLayoutViewport` is kept only for its CDP fallback. |
 | `NavTimeoutSec`       | Per-site navigation timeout seconds (default 120)                                    |
+| `BringToFront`       | Some popups only render when the tab is focused (e.g. pting's calendar popup). Set `$true` so the framework calls `Page.bringToFront` to grab focus transiently (also used by CF Turnstile). |
 | `CfRetryCount` / `CfRetryWaitMs` | CF bypass retry count / interval                                       |
 
 ---
@@ -164,10 +165,10 @@ Some NexusPHP sites (the `NexusPHPCfSignInClick` family) need CF Turnstile clear
 
 ### ALTCHA / SLIDER
 
-- **ALTCHA** (e.g. Yemapt): two-phase `ClickEval` — solve ALTCHA then click sign-in, verified by `Test-AltchaVerified`.
+- **ALTCHA** (e.g. Yemapt): `ClickEval` solves ALTCHA first, then clicks sign-in. The primary solver does a direct JS `.click()` on the `input[type=checkbox]` (the widget has **no shadow DOM**); CDP coordinate-click stays only as a fallback when the checkbox isn't directly reachable. Verification reuses `Test-AltchaVerified`.
 - **SLIDER**: coordinate-click the slider with `ForceLayoutViewport=$true`; failure ⇒ `SLIDER_FAIL` enters batch retry.
 
-> Focus & `-NoFocus`: `navigate newTab=true` alone doesn't raise the window; the only focus grabber is `Page.bringToFront` (needed by CF). Background batch defaults to `-NoFocus:$true` globally (no focus grab); CF handling borrows focus transiently.
+> Focus & `-NoFocus`: `navigate newTab=true` alone doesn't raise the window; the focus grabber is `Page.bringToFront`, needed by CF Turnstile **and by sites whose popup only renders when focused** (e.g. pting). Background batch defaults to `-NoFocus:$true` globally; focus is borrowed transiently per-site when `BringToFront=$true`.
 
 ---
 

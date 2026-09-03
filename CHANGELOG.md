@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.13.22] - 2026-09-03
+
+### 知识收尾（neat-freak）：同步文档与注释，消除与 v4.13.21 实现的事实偏差
+
+- **修正 ALTCHA 文档/注释对实现的偏差**：v4.13.21 已将 Yemapt 的 ALTCHA 改为**直接 JS `.click()` 复选框**（无 shadow DOM），CDP 坐标点击降为兜底；但 `signin-web.ps1` 的 Yemapt `Click` 头部注释、`pt-signin-skill.md/cn.md` 的「坐标点击站（CF Turnstile / ALTCHA / SLIDER）」分组、ALTCHA 段落仍按旧"shadow DOM + CDP 坐标点击"描述。现已统一为现役实现。
+- **补充 `BringToFront` 配置字段文档**：`pt-signin-skill.md/cn.md` 的 `$WebSignInConfigs` 字段表新增 `BringToFront`（部分站点弹窗需聚焦才渲染，如 pting 日历弹窗；框架据此调 `Page.bringToFront` 瞬时借焦点）；并从"坐标点击站"分组移除 ALTCHA。
+- **修正 README 后台运行章节**：`Page.bringToFront` 不再仅限 CF Turnstile，亦用于 pting 等弹窗需聚焦的站点。
+- **新增 `AGENTS.md`**：极简"下次会话恢复入口"，指针式指向 `pt-signin-skill-*.md` / `README.md` / `CHANGELOG.md`，避免第二套真相；不重复实现细节。
+- 无代码行为变更；`signin-web.ps1` 通过 PowerShell 语法解析校验，无 lint 错误。
+
 ## [v4.13.21] - 2026-09-03
 
 ### 适配蜂巢(pting)改版 + 修复野马(Yemapt)ALTCHA 失效 + 新增海胆(haidan)签到

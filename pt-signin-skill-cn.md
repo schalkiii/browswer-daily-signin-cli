@@ -5,7 +5,7 @@ description: |
   涵盖 NexusPHP attendance.php 站点、Cloudflare Turnstile 绕过、点击签到页面、
   SPA 控制台站点和人工站点。当用户要求 PT 站点签到、论坛签到、
   或自动化私人种子站每日签到时使用此技能。
-updated: 2026-08-04
+updated: 2026-09-03
 ---
 
 # PT 站点签到自动化
@@ -73,8 +73,9 @@ cd d:\workspace\browswer-daily-signin-cli
 | `PostClickMs`       | 点击后的固定等待毫秒数                                                     |
 | `LoadWaitSec`       | 动态轮询页面就绪的最长秒数（默认 45，见全局参数）                          |
 | `ReadyEval`         | 自定义页面就绪判定 JS（替代默认 body 文本长度 + 盾关键词判定）              |
-| `ForceLayoutViewport` | 坐标点击站（CF Turnstile / ALTCHA / SLIDER）声明 `$true`，启用布局视口     |
+| `ForceLayoutViewport` | 坐标点击站（CF Turnstile / SLIDER）声明 `$true`，启用布局视口。ALTCHA（Yemapt）已改为直接 JS 点击复选框（无 shadow DOM），`ForceLayoutViewport` 仅其 CDP 兜底保留。 |
 | `NavTimeoutSec`     | 该站导航超时秒数（默认 120）                                               |
+| `BringToFront`     | 部分站点弹窗需标签页聚焦才渲染（如 pting 日历弹窗）。声明 `$true`，框架调用 `Page.bringToFront` 瞬时抢焦点（CF Turnstile 同理）。 |
 | `CfRetryCount` / `CfRetryWaitMs` | CF 绕过重试次数 / 间隔                                                  |
 
 ---
@@ -168,10 +169,10 @@ PowerShell 侧按信号映射到 `SUCCESS` / `ALREADY_DONE` / `NO_DETECT` / `CF_
 
 ### ALTCHA / SLIDER
 
-- **ALTCHA**（如 Yemapt）：两阶段 `ClickEval`——先解 ALTCHA 再点击签到，`Test-AltchaVerified` 校验。
+- **ALTCHA**（如 Yemapt）：`ClickEval` 先解 ALTCHA 再点击签到。主路径直接对 `input[type=checkbox]` 执行 JS `.click()`（该 widget **无 shadow DOM**）；仅当复选框取不到时才退回 CDP 坐标点击兜底。校验复用 `Test-AltchaVerified`。
 - **SLIDER**：坐标点击滑块，`ForceLayoutViewport=$true`，失败归 `SLIDER_FAIL` 进入批处理重试。
 
-> 焦点与 `-NoFocus`：`navigate newTab=true` 本身不抬窗口；唯一抢焦点的是 `Page.bringToFront`（CF 站需要）。后台批处理默认 `-NoFocus:$true` 全局不抢焦点，仅 CF 处理瞬时借焦点。
+> 焦点与 `-NoFocus`：`navigate newTab=true` 本身不抬窗口；抢焦点的是 `Page.bringToFront`，除 CF 站外，部分站点弹窗需聚焦才渲染（如 pting 日历弹窗）也需要。后台批处理默认 `-NoFocus:$true` 全局不抢焦点；仅当站点声明 `BringToFront=$true` 时瞬时借焦点。
 
 ---
 

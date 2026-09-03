@@ -771,10 +771,10 @@ $WebSignInConfigs = @{
 '@
         Click = @'
 (function(){
-  // v4.12.7: Yemapt 使用 ALTCHA（<altcha-widget> web component，proof-of-work）
-  // 诊断证实：真实复选框在 closed Shadow DOM 内，JS .click() 与宿主点击都无法触发验证；
-  // 改为返回 widget 视口坐标，交由 PowerShell 用 CDP 受信任鼠标点击（真实坐标可命中 shadow 内复选框），
-  // 再用异步轮询检测验证完成（aria-checked / JWT 隐藏字段）后点击「立即签到」
+  // v4.13.21: Yemapt 使用 ALTCHA（<altcha-widget> web component，proof-of-work）。
+  // 现场实测该站 ALTCHA 无 shadow DOM，真实复选框即 light DOM 的 input[type=checkbox]，
+  // 直接 JS .click() 即可触发 PoW 验证（CDP 坐标点击会被复选框上层 svg 图标拦截，已降级为兜底）。
+  // 验证完成（隐藏 JWT 字段 / aria-checked）后点击「立即签到」。
   function collect(){
     var docs = [document];
     var frames = document.querySelectorAll('iframe');

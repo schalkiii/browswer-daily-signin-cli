@@ -50,8 +50,8 @@
 ## 后台运行（不弹前台）
 
 所有入口脚本默认 `-NoFocus:$true`，`Invoke-WebSignIn` 的 `NoFocus` 默认也是 `$true`。
-daemon 的 `navigate newTab=true` 本身不抬窗口；唯一会抢焦点的是 `Page.bringToFront`（CF Turnstile 需要焦点才渲染 iframe），已由 `-NoFocus` 跳过。
-代价：CF Turnstile 站（OurBits / audiences）可能因无焦点不渲染验证 iframe——与「不弹前台」的用户诉求相比优先级更低。
+daemon 的 `navigate newTab=true` 本身不抬窗口；抢焦点的是 `Page.bringToFront`——除 CF Turnstile（验证 iframe 需焦点）外，部分站点弹窗也需聚焦才渲染（如 pting 日历弹窗），对应站点在 `$WebSignInConfigs` 声明 `BringToFront=$true`，框架会瞬时借焦点，不弹前台。
+代价：依赖焦点的站（CF Turnstile / pting 弹窗等）后台下可能不渲染——与「不弹前台」诉求相比优先级更低；已声明 `BringToFront` 的站会瞬时抢焦点规避。
 
 ## 调试
 
