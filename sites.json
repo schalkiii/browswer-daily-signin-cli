@@ -1,6 +1,6 @@
 {
   "version": "v4.12.0",
-  "total": 52,
+  "total": 53,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -207,12 +207,6 @@
       "note": "2026-07-06: v4.12.4 改回 webbridge（v4.12.3 已修复 extension 冷启动+tab 清理，配合 CF 重试改进重试）"
     },
     {
-      "name": "YHPP",
-      "url": "https://www.yhpp.cc/attendance.php",
-      "strategy": "webbridge",
-      "note": "书签同步: YHPP签到"
-    },
-    {
       "name": "远景论坛",
       "url": "https://bbs.pcbeta.com/forum-win11-1.html",
       "strategy": "webbridge",
@@ -331,11 +325,25 @@
       "note": "auto: 书签同步新增"
     },
     {
-      "name": "cdy",
-      "url": "https://pt.cdy.pics/attendance.php",
+      "name": "linuxsb",
+      "url": "https://linux.sb/daily_checkin",
       "strategy": "webbridge",
-      "display_name": "传道院·PT :: 签到 - Powered by NexusPHP",
+      "display_name": "Linux.SB 烧饼社区",
+      "note": "v4.13.18: 真实签到适配 — /daily_checkin 插件，.daily-checkin-btn 提交表单；已签后按钮变「已完成」/「今天已签到」"
+    },
+    {
+      "name": "1ctrl",
+      "url": "https://pt.1ctrl.cn/attendance.php",
+      "strategy": "web-read",
+      "display_name": "修道院 :: 签到 - Powered by NexusPHP",
       "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "haidan",
+      "url": "https://www.haidan.cc/mybonus.php",
+      "strategy": "webbridge",
+      "display_name": "海胆之家 - 每日打卡",
+      "note": "v4.13.21: 真实签到适配 — attendance.php 返回 404，签到入口在 mybonus.php 的「每日打卡」(#modalBtn)；已签按钮值变「已经打卡」"
     }
   ],
   "batch": {

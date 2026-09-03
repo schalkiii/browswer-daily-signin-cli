@@ -306,16 +306,35 @@ function Open-SiteTab {
     $needNewTab = $true
     if (Test-HasActiveTab -Session $Session) { $needNewTab = $false }
 
+    # v4.13.x: navigate 的 PS HTTP 超时与"页面实际就绪"解耦。
+    #   domcontentloaded 通常数秒内就绪；即便偶发慢站，也无需让终端干等 NavTimeoutSec(默认120s)才报超时。
+    #   给 navigate 请求一个较紧的 PS 超时(≤45s)，超时/失败不立即判失败——只要 tab 还活着就在下方耐心轮询，
+    #   避免"页面还在转圈就被砍掉、然后又开相同 tab"的循环。
+    $navPsTimeout = [Math]::Min($NavTimeoutSec, 45)
     try {
         $navArgs = @{ url = $Url; waitUntil = "domcontentloaded" }
         if ($needNewTab) { $navArgs.newTab = $true }
-        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs $navArgs -Session $Session -TimeoutSec $NavTimeoutSec
+        $nav = Invoke-WebBridgeCommand -Action "navigate" -CmdArgs $navArgs -Session $Session -TimeoutSec $navPsTimeout
         $navOk = ($null -ne $nav -and $nav.success)
     } catch {
         $navOk = $false
         $navErr = "$_"
     }
     if (-not $navOk) {
+        # v4.13.x: 导航命令超时/失败，但 tab 可能仍在后台加载（后台窗口节流 / 慢 DNS / 长 DOM 构建）。
+        #   此时 tab 仍存活 → 耐心轮询"页面就绪"(body 文本充足且无盾关键词)至剩余预算耗尽，就绪即视为成功，
+        #   不再立即交上层重开相同 tab（根治"转圈被砍又重开"循环）。
+        if (-not $VisitOnly -and (Test-HasActiveTab -Session $Session)) {
+            $patientBudget = [Math]::Max(0, $NavTimeoutSec - $navPsTimeout)
+            if ($patientBudget -gt 0) {
+                Write-Host "  [WebBridge] Open-SiteTab: navigate 未即时返回，耐心轮询 tab 就绪（≤${patientBudget}s）..." -ForegroundColor Yellow
+                $ready = Wait-PageReady -Session $Session -MaxWaitSec $patientBudget -PollMs 2000 -MinBodyLen 20
+                if ($ready -and (Test-HasActiveTab -Session $Session)) {
+                    Write-Host "  [WebBridge] Open-SiteTab: 轮询命中页面就绪，视为导航成功" -ForegroundColor Green
+                    return @{ success = $true; method = "navigate-patient"; url = $Url }
+                }
+            }
+        }
         # v4.13.12: visit-only 慢站特例——navigate 命令已发出、tab 已建立（页面仍在转圈也视为"已打开"），
         #   即达"访问"目的。不再清场重试，避免反复开 tab。仅当 tab 确实未建立才判失败。
         if ($VisitOnly) {
@@ -380,7 +399,10 @@ function Test-WebBridgeSignIn {
         #   过盾/慢站最多等 45s。站点可用 $cfg.LoadWaitSec 覆盖（HDKYL=60）；显式 0 退回固定 WaitMs。
         [int]$LoadWaitSec = 45,
         [string]$ReadyEval = "",
-        [bool]$ForceLayoutViewport = $false
+        [bool]$ForceLayoutViewport = $false,
+        # v4.13.20: 每站点强制聚焦（覆盖全局 NoFocus）。pting 的日历弹窗仅当标签页可见/聚焦时才渲染打开，
+        #   常规 -NoFocus 后台模式下弹窗打不开，故 pting 需显式置 $true 以在点击前 Page.bringToFront。
+        [bool]$BringToFront = $false
     )
     $session = "daily-signin"
     # visit-only 路由：优先以调用方显式传入的 -VisitOnly 开关为准（由 Invoke-WebSignIn 按 sites.json 的
@@ -437,8 +459,9 @@ function Test-WebBridgeSignIn {
         }
 
         # v4.12.6: navigate 后让标签页获得焦点（CF Turnstile 需要页面有焦点才渲染 iframe）
-        # -NoFocus 模式（后台运行）下跳过，避免浏览器窗口抢焦点弹出，破坏用户当前工作
-        if (-not $NoFocus) {
+        # -NoFocus 模式（后台运行）下跳过，避免浏览器窗口抢焦点弹出，破坏用户当前工作。
+        # v4.13.20: 每站点 BringToFront 可覆盖 NoFocus（如 pting 日历弹窗需聚焦才打开）。
+        if (-not $NoFocus -or $BringToFront) {
             try {
                 $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{method="Page.bringToFront"; params=@{}} -Session $session -TimeoutSec 5
             } catch {}

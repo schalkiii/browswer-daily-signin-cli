@@ -263,6 +263,54 @@ $WebSignInConfigs = @{
 })()
 '@
     }
+
+    # v4.13.21: haidan（海胆之家）真实签到适配 —— 经 daemon 现场实测确认。
+    #   ⚠️ 该站虽为 NexusPHP，但 attendance.php 返回 404（nginx），无标准签到页；
+    #      签到入口在 mybonus.php 的「每日打卡」—— id=modalBtn 的 submit 按钮（不在 form 内，JS 驱动）。
+    #   ✅ 判定依据是按钮 value 的变化：未签=「每日打卡」，已签=「已经打卡」
+    #      （实测：点击后魔力值 6,202,548.6 → 6,202,558.6，+10，按钮值同步变为「已经打卡」）。
+    #   ⚠️ 页面里「恭喜您,获得了10魔力值奖励!」等文案是静态模板，点击前后均 display:block 可见，
+    #      不能作为成功判定依据（实测确认会误判）。
+    "haidan" = @{
+        Url = "https://www.haidan.cc/mybonus.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var b = document.getElementById('modalBtn');
+  if(!b){
+    var ins = document.querySelectorAll('input');
+    for(var i=0;i<ins.length;i++){
+      if((ins[i].value||'').indexOf('打卡')>-1){ b = ins[i]; break; }
+    }
+  }
+  if(!b){
+    var t0 = document.body.innerText||'';
+    if(t0.indexOf('请登录')>-1||t0.indexOf('未登录')>-1) return 'LOGIN_REQUIRED';
+    return 'UNKNOWN';
+  }
+  var v = (b.value||'').trim();
+  if(v.indexOf('已经打卡')>-1||v.indexOf('已打卡')>-1) return 'ALREADY_SIGNED';
+  if(v.indexOf('每日打卡')>-1) return 'NEED_SIGN';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  var b = document.getElementById('modalBtn');
+  if(!b){
+    var ins = document.querySelectorAll('input');
+    for(var i=0;i<ins.length;i++){
+      if((ins[i].value||'').indexOf('每日打卡')>-1){ b = ins[i]; break; }
+    }
+  }
+  if(!b) return 'NO_BTN';
+  b.click();
+  return 'CLICKED';
+})()
+'@
+    }
     "invites" = @{
         Url = "https://www.invites.fun/?sort=newest"
         WaitMs = 10000
@@ -695,12 +743,26 @@ $WebSignInConfigs = @{
   // CF Turnstile 检测（CF iframe 优先匹配）
   if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],iframe[src*="turnstile"],#challenge-stage')) return 'CF_CHALLENGE';
   if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
-  // 登录态
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||(t.indexOf('登录')>-1&&t.indexOf('注册')>-1)) return 'LOGIN_REQUIRED';
-  // 已签到明确标志
+  // 已签到明确标志（优先于登录判定）
   if(t.indexOf('已签到')>-1||t.indexOf('今日已签')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
+  // v4.13.21: 登录态正信号优先判定——出现「签到中心/当前积分/连续签到/立即签到/尚未签到」
+  //   即表示已完成鉴权渲染。旧逻辑把宽松的「登录&&注册」匹配放在这些正信号之前，
+  //   SPA 水合前页头常驻「登录/注册」会被误判 LOGIN_REQUIRED（实测用户已登录仍误报）。
+  var tc = document.body.textContent||'';
+  var authed = tc.indexOf('签到中心')>-1 || tc.indexOf('当前积分')>-1 || tc.indexOf('连续签到')>-1;
+  var hasSignBtn = false;
+  var els = document.querySelectorAll('button,a,input,span,div');
+  for(var i=0;i<els.length;i++){
+    if(els[i].children.length>1) continue;
+    var v=(els[i].textContent||els[i].value||'').trim();
+    if(v==='立即签到'){ hasSignBtn = true; break; }
+  }
   // 尚未签到 / 待验证 → 需要点击
   if(t.indexOf('尚未签到')>-1||t.indexOf('请先进行验证')>-1) return 'NEED_SIGN';
+  if(hasSignBtn) return 'NEED_SIGN';
+  if(authed) return 'SIGN_OK';
+  // 无任一登录正信号时才判登录失效（此时宽松匹配才是安全的）
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||(t.indexOf('登录')>-1&&t.indexOf('注册')>-1)) return 'LOGIN_REQUIRED';
   // 页面已无"尚未签到"且含签到相关词 → 视为已签（避免复检误判 NEED_SIGN）
   if(t.indexOf('签到')>-1||t.indexOf('打卡')>-1) return 'SIGN_OK';
   if(t.length<50) return 'BODY_NULL';
@@ -719,12 +781,19 @@ $WebSignInConfigs = @{
     for(var f=0; f<frames.length; f++){
       try { var fd = frames[f].contentDocument; if(fd) docs.push(fd); } catch(e){}
     }
-    var signBtn=null, widget=null, field=null;
+    var signBtn=null, widget=null, field=null, checkbox=null;
     for(var d=0; d<docs.length; d++){
       var doc = docs[d];
       if(!widget){
         var w = doc.querySelector('altcha-widget, .altcha-checkbox-wrap, [class*="altcha"]');
         if(w) widget = w;
+      }
+      // v4.13.21: 现场实测该站 ALTCHA 未使用 shadow DOM（hasShadowRoot=false），
+      //   复选框就是 light DOM 里的 input[type=checkbox]，可被 JS 直接 click 触发 PoW。
+      if(!checkbox){
+        checkbox = doc.querySelector('altcha-widget input[type=checkbox]')
+                || doc.querySelector('.altcha-checkbox input[type=checkbox]')
+                || doc.querySelector('.altcha-checkbox-wrap input[type=checkbox]');
       }
       // ALTCHA 验证完成后会把 JWT（eyJ 开头）写入隐藏字段，name 多为 altcha
       var af = doc.querySelector('input[name="altcha"], input[name*="altcha"], input[value^="eyJ"]');
@@ -745,7 +814,7 @@ $WebSignInConfigs = @{
         if(widget.className && ((''+widget.className).indexOf('verified')>-1)) verified = true;
       } catch(e){}
     }
-    return {signBtn:signBtn, widget:widget, field:field, verified:verified};
+    return {signBtn:signBtn, widget:widget, field:field, checkbox:checkbox, verified:verified};
   }
   function fireClick(el){
     try { el.click(); } catch(e){}
@@ -757,20 +826,37 @@ $WebSignInConfigs = @{
     if(found.signBtn){ found.signBtn.click(); return 'ALTCHA_DONE_CLICKED'; }
     return 'ALTCHA_DONE_NO_BTN';
   }
-  // ALTCHA 复选框在 closed Shadow DOM 内，JS .click() 无法触发；返回 widget 视口坐标，
-  // 交由 PowerShell 用 CDP 受信任鼠标点击（真实坐标点击可命中 shadow 内复选框）
-  // v4.12.8: 诊断确认 ALTCHA 复选框位于 widget 左上区域（约左 24px、顶部 30% 处），
-  //          而非几何中心；返回完整 rect 供 PowerShell 多候选点重试。
-  if(found.widget){
-    var r = found.widget.getBoundingClientRect();
-    var cx = Math.round(r.x + Math.min(26, r.width * 0.05));
-    var cy = Math.round(r.y + r.height * 0.30);
+  // v4.13.21: 首选直接 JS 点击复选框 —— 该站 ALTCHA 无 shadow DOM，实测 JS .click() 可立即触发
+  //   PoW 并验证成功；而 CDP 坐标点击（含复选框几何中心 353,528 与 label 中心 414,528）实测均失败
+  //   （复选框上方覆盖 11x11 的 svg 打勾图标，会拦截真实鼠标事件）。
+  //   验证完成后轮询点到「立即签到」，500ms 粒度以便尽快在 PostClickWaitMs 内完成。
+  if(found.checkbox){
+    found.checkbox.click();
     var start = Date.now();
     var poll = setInterval(function(){
       var f2 = collect();
-      if(f2.verified || (Date.now()-start) > 18000){
+      if(f2.verified || (Date.now()-start) > 20000){
         clearInterval(poll);
         if(f2.signBtn){ f2.signBtn.click(); window.__yemapt = 'CLICKED'; }
+        else { window.__yemapt = 'NO_BTN'; }
+      }
+    }, 500);
+    return 'ALTCHA_JS_CLICKED';
+  }
+  // 兜底：复选框取不到（站点改回 shadow DOM 版本）时，退回 widget 视口坐标交 PowerShell 做 CDP 点击
+  if(found.widget){
+    var r = found.widget.getBoundingClientRect();
+    // v4.13.21: 坐标校准 —— 复选框在 widget 左侧约 22px、垂直居中（0.5h）。
+    //   旧值 (x+26, y+0.30h) 在 widget h=73 时算出 y=524，比复选框中心(≈538)高约 14px → 点击打空，
+    //   PoW 永不完成（实测主点+3 个候选点各长轮询 30~42s 全部 miss，站点始终"未签到"）。
+    var cx = Math.round(r.x + Math.min(22, r.width * 0.04));
+    var cy = Math.round(r.y + r.height * 0.5);
+    var start2 = Date.now();
+    var poll2 = setInterval(function(){
+      var f3 = collect();
+      if(f3.verified || (Date.now()-start2) > 18000){
+        clearInterval(poll2);
+        if(f3.signBtn){ f3.signBtn.click(); window.__yemapt = 'CLICKED'; }
         else { window.__yemapt = 'NO_BTN'; }
       }
     }, 1000);
@@ -846,22 +932,98 @@ $WebSignInConfigs = @{
 })()
 '@
     }
+    # v4.13.21: pting（蜂巢）真实签到适配 —— 站点于 2026-09 改版后重新实测修正。
+    #   站点为 Next.js SPA，侧边栏签到控件三态：未签=按钮「去签到」，已签=按钮/侧边栏文本「已签到」。
+    #   点「去签到」弹出日历弹窗（Radix portal），弹窗内出现第二个按钮「签到」，点它才真正签到。
+    #   ⚠️ v4.13.20 按文本「签到」找按钮，而改版后首屏只有「去签到」→ Detect 恒 UNKNOWN（279s 超时）。
+    #   ✅ 签到状态可真实观测：侧边栏出现「已签到」文本。必须限定侧边栏范围——
+    #      正文帖子标题也含「签到」（如「无法签到？不知道如何排查？」）会误命中。
+    #   弹窗仅在标签页可见/聚焦时渲染（-NoFocus 后台打不开），故 BringToFront=$true。
     "pting" = @{
         Url = "https://pting.club/?sort=newest"
-        WaitMs = 12000
-        PostClickMs = 3000
+        WaitMs = 14000
+        PostClickMs = 4000
         Detect = @'
 (function(){
-  var b = document.getElementById('checkInButton');
+  var btns = Array.from(document.querySelectorAll('button'));
+  var hasSigned = false, hasGo = false, hasSign = false;
+  for (var i = 0; i < btns.length; i++) {
+    var t = (btns[i].innerText || btns[i].textContent || '').trim();
+    if (t.indexOf('已签到') > -1) hasSigned = true;
+    else if (t === '去签到') hasGo = true;
+    else if (t === '签到') hasSign = true;
+  }
+  // 已签到：按钮文本，或侧边栏文本（限定侧边栏，避免正文帖子标题误命中）
+  if (hasSigned) return 'ALREADY_SIGNED';
+  var box = document.querySelector('[class*="mobile-sidebar-section"]');
+  if (box && (box.textContent || '').indexOf('已签到') > -1) return 'ALREADY_SIGNED';
+  // 兜底：本次已成功点击弹窗内签到按钮，但侧边栏尚未刷新出「已签到」
+  if (window.__ptingSigned === true) return 'SIGN_OK';
+  if (hasGo || hasSign) return 'NEED_SIGN';
+  return 'UNKNOWN';
+})()
+'@
+        # v4.13.21: 两步签到 —— 点「去签到」仅弹出日历弹窗，需再点弹窗内的第二个「签到」按钮才真正签到。
+        #   v4.13.21 改版后：触发器按钮文本为「去签到」（非「签到」），弹窗内第二个按钮才是「签到」。
+        #   整段在单次 evaluate 内 async 轮询完成（框架只调一次 Click），上限 4s 避免超出 15s evaluate 超时。
+        Click = @'
+(async function(){
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  function btn(txt){
+    var a = Array.from(document.querySelectorAll('button'));
+    for (var i = 0; i < a.length; i++) {
+      if (((a[i].innerText || a[i].textContent || '').trim()) === txt) return a[i];
+    }
+    return null;
+  }
+  // 已签则无需点击
+  if (btn('已签到')) return 'ALREADY';
+  // 弹窗已开（存在第 2 个「签到」按钮）→ 直接点它
+  var inner = btn('签到');
+  if (inner) { inner.click(); window.__ptingSigned = true; return 'CLICKED_INNER'; }
+  // 否则点「去签到」开弹窗，轮询等弹窗内「签到」出现并点击
+  var go = btn('去签到');
+  if (!go) return 'NO_BTN';
+  go.click();
+  for (var k = 0; k < 20; k++) {
+    await sleep(200);
+    var s = btn('签到');
+    if (s) { s.click(); window.__ptingSigned = true; return 'CLICKED_INNER'; }
+  }
+  // 弹窗未出现第二个按钮（站点可能再次改版）：不置标志位，交由复检的真实「已签到」判定
+  return 'CLICKED_GO_ONLY';
+})()
+'@
+        # pting 日历弹窗仅当标签页可见/聚焦时才渲染打开（-NoFocus 后台模式下打不开），需强制聚焦
+        BringToFront = $true
+    }
+
+    # v4.13.18: linux.sb（烧饼社区）真实签到适配 —— 经 daemon 上线后现场 DOM 核验。
+    #   每日签到页 /daily_checkin 由插件渲染：未签时 <form action="/daily_checkin" method="post">
+    #   内含 <button type="submit" class="daily-checkin-btn">签到</button>；点击即提交表单完成签到。
+    #   已签后该按钮被移除、动作区显示「已完成」，统计区出现「今天已签到 N」（今天待签到消失）。
+    #   v4.13.19: ALREADY_SIGNED 改用 textContent 扫描——kimi-webbridge 在折叠后台窗口运行时，
+    #   document.body.innerText 会返回空串（pting 实证），导致 innerText 判「已签到」失效；
+    #   textContent 不依赖布局/可见性，后台窗口下同样可靠。
+    "linuxsb" = @{
+        Url = "https://linux.sb/daily_checkin"
+        WaitMs = 10000
+        PostClickMs = 4000
+        Detect = @'
+(function(){
+  // 未签：存在 .daily-checkin-btn（文本「签到」）
+  var b = document.querySelector('.daily-checkin-btn');
   if (b) return 'NEED_SIGN';
-  var full = document.body.innerText || '';
-  if (full.indexOf('已签到') > -1) return 'ALREADY_SIGNED';
+  // 已签：按钮被移除、动作区显示「已完成」，统计区出现「今天已签到」
+  // 用 textContent 避免后台窗口 innerText 返回空串导致漏判
+  var full = document.body.textContent || '';
+  if (full.indexOf('今天已签到') > -1 || full.indexOf('已完成') > -1 || full.indexOf('已签到') > -1) return 'ALREADY_SIGNED';
   return 'UNKNOWN';
 })()
 '@
         Click = @'
 (function(){
-  var b = document.getElementById('checkInButton');
+  var b = document.querySelector('.daily-checkin-btn');
   if (b) { b.click(); return 'CLICKED'; }
   return 'NO_BTN';
 })()
@@ -1062,5 +1224,7 @@ function Invoke-WebSignIn {
     if ($cfg.ReadyEval) { $params.ReadyEval = $cfg.ReadyEval }
     # v4.13.6: 默认自然分辨率；仅坐标点击站（CF Turnstile/ALTCHA/SLIDER）声明 ForceLayoutViewport=$true
     if ($cfg.ForceLayoutViewport) { $params.ForceLayoutViewport = $cfg.ForceLayoutViewport }
+    # v4.13.20: 每站点强制聚焦（pting 日历弹窗需聚焦才打开，覆盖全局 NoFocus）
+    if ($cfg.ContainsKey('BringToFront')) { $params.BringToFront = $cfg.BringToFront }
     return Test-WebBridgeSignIn @params
 }

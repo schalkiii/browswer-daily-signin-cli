@@ -1,5 +1,73 @@
 # Changelog
 
+## [v4.13.21] - 2026-09-03
+
+### 适配蜂巢(pting)改版 + 修复野马(Yemapt)ALTCHA 失效 + 新增海胆(haidan)签到
+
+- **蜂巢 pting（`UNKNOWN` + 耗时 279s）**
+  - **根因**：站点于 2026-09 改版，签到触发器按钮文本由「签到」变为「**去签到**」；旧 Detect 按文本「签到」找按钮，首屏只有「去签到」→ 恒 `UNKNOWN`，再叠加 UNKNOWN 重试与 45s 动态等待，单次耗时达 279s。
+  - **修复**：Detect 改为三态识别——「已签到」→`ALREADY_SIGNED`、「去签到」/「签到」→`NEED_SIGN`；Click 改为两段式（点「去签到」开日历弹窗 → 轮询点弹窗内第二个「签到」按钮）。
+  - **关键改进（判定依据升级）**：签到状态改为观测**真实 DOM 信号**——侧边栏出现「已签到」文本（此前依赖 `window.__ptingSigned` 标志位，属"点过就算成功"的弱判定）。已签判定**必须限定侧边栏范围**，因正文帖子标题也含「签到」（如「无法签到？不知道如何排查？」）会误命中。标志位降级为兜底。
+  - 验证：`signin-single pting` → `ALREADY_SIGNED`（修复前为 `UNKNOWN`）。
+
+- **野马 Yemapt（`LOGIN_REQUIRED` 误报 + ALTCHA 实际未通过）**
+  - **误报根因**：Detect 中宽松匹配「登录 && 注册」的登录判定**排在签到正信号之前**；SPA 水合前页头常驻「登录/注册」即被误判。实测用户已登录（用户名、积分均可见）。
+  - **误报修复**：登录判定移到「已签到 / 尚未签到 / 立即签到按钮 / 签到中心+当前积分+连续签到」等正信号**之后**，且仅在无任一登录正信号时才生效。
+  - **ALTCHA 失效根因**：v4.12.7 假设 ALTCHA 复选框在 closed shadow DOM 内、必须用 CDP 坐标点击。实测该站 `hasShadowRoot=false`——**完全没有 shadow DOM**，复选框就是 light DOM 的 `input[type=checkbox]`；而 CDP 坐标点击会被复选框上层 11×11 的 svg 打勾图标拦截（实测点复选框几何中心 353,528 与 label 中心 414,528 **均失败**）。
+  - **ALTCHA 修复**：ClickEval 改为**直接 JS `.click()` 复选框**（实测立即触发 PoW 并验证成功），验证后 500ms 粒度轮询点「立即签到」；CDP 坐标方案降为兜底（仅当复选框取不到时启用）。顺带校准兜底坐标（旧式 `x+26, y+0.30h` → `x+22, y+0.5h`）。
+  - 验证：`signin-single Yemapt` → `SIGN_OK`（真实签到成功）；复跑 → `ALREADY_SIGNED`。
+
+- **海胆 haidan（此前 `SKIPPED` / `no config`，策略为 `browser-open`）**
+  - **排查**：该站虽为 NexusPHP，但 `attendance.php` 返回 **404 Not Found (nginx)**，无标准签到页；首页也无任何「签到」字样。
+  - **定位**：签到入口在 **`mybonus.php` 的「每日打卡」**——`<input type="submit" id="modalBtn" value="每日打卡">`（不在 form 内，JS 驱动）。
+  - **判定依据**：按钮 **value 的变化**——未签「每日打卡」，已签「**已经打卡**」。实测点击后魔力值 `6,202,548.6 → 6,202,558.6`（**+10**），按钮值同步变化。
+  - ⚠️ 页面里「恭喜您,获得了10魔力值奖励!」等文案是**静态模板**（点击前后均 `display:block` 可见），**不能**作为成功判定依据。
+  - **改动**：新增 `$WebSignInConfigs["haidan"]`；`sites.json` 中 url 改为 `https://www.haidan.cc/mybonus.php`、strategy 由 `browser-open` 改为 `webbridge`。
+  - 验证：`signin-single haidan` → `ALREADY_SIGNED`；配置一致性校验的 haidan 告警已消除。
+
+- 收尾：清理 19 个临时调试脚本；`signin-web.ps1` / `kimi-webbridge.ps1` 无 lint 错误。
+
+## [v4.13.20] - 2026-08-16
+
+### 修正 pting 两步签到 + 新增每站点强制聚焦（BringToFront）
+
+- **根因（上版 v4.13.19 误判）**：原以为 pting 主「签到」按钮点击即完成签到，实测用户反馈"并未签到"。现场核验确认 pting 签到为**两步**：点主「签到」按钮仅**弹出日历弹窗**（Radix 类 portal），须再点弹窗内**第二个「签到」按钮**才真正签到。两个按钮同 class（`group/button inline-flex ...`）、同为文本「签到」，仅靠文本无法区分。
+- **弹窗只在聚焦后打开**：所有 CLI 入口默认 `-NoFocus:$true`（后台不弹前台），而 pting 日历弹窗**仅当标签页可见/聚焦时才渲染打开**（synthetic `.click()` 在无焦点后台模式下不触发弹窗）。实测 `Page.bringToFront` 后弹窗正常打开。
+- **修复**：
+  - `kimi-webbridge.ps1` 的 `Test-WebBridgeSignIn` 新增每站点 `$BringToFront` 参数；聚焦条件由 `if (-not $NoFocus)` 改为 `if (-not $NoFocus -or $BringToFront)`，使单站点可覆盖全局 NoFocus。
+  - `Invoke-WebSignIn` 透传 `$cfg.BringToFront`。
+  - pting `Click` 改为两段式：单次 `evaluate` 内 async 轮询——点主按钮开弹窗 → 待第 2 个「签到」button 出现 → 点最后一个（弹窗内）完成签到；成功置 `window.__ptingSigned`，Detect 据此判 `SIGN_OK`（兼容框架点击后复检）。pting 配置加 `BringToFront = $true`。
+- 验证：bringToFront + 两段式点击端到端探针确认 `NEED_SIGN → CLICKED_INNER → SIGN_OK`。无 lint 错误，已清理 16 个临时探针。
+
+## [v4.13.19] - 2026-08-16
+
+### 修正 pting 签到适配（Next.js SPA，按钮无 id）+ 后台窗口 innerText 漏判加固
+
+- **pting 原配置失效**：旧 `signin-web.ps1` 用 `getElementById('checkInButton')`，但现场核验 pting（蜂巢）实为 **Next.js SPA**（非 Flarum），签到按钮无 id、class 为 Tailwind 组（`group/button inline-flex ...`）、文本「签到」。旧 Detect 永远 `UNKNOWN`/`NO_BTN` → 站点始终签不上。
+- **pting 签到状态不可见**：点击为 AJAX 签到（不导航/不刷新），且签后按钮文本/class/`disabled` 均不变，全文 `textContent` 也无可判的「已签到/连续签到」信号，无法用 DOM 文本可靠区分已签/未签。
+- **pting 修复**：`Click` 点击后置 `window.__ptingSigned=true` 标志；`Detect` 已置位即判 `SIGN_OK`（框架据此判本次点击成功返回 `SIGN_OK`），按钮存在且未置位→`NEED_SIGN`，按钮禁用→`ALREADY_SIGNED`。当天二次运行再点为幂等（API 静默去重）。
+- **后台窗口 innerText 漏判加固**：kimi-webbridge 在折叠后台窗口运行时 `document.body.innerText` 返回空串（pting 实证），导致 `linux.sb` 的 `ALREADY_SIGNED` 用 `innerText` 判「已签到」会漏判。**统一改用 `textContent`**（不依赖布局/可见性）。`Wait-PageReady` 等既有 `innerText` 判据未作改动（其余站点实测正常，避免扩大改动面）。
+- 验证：端到端探针确认 pting 逻辑链 `NEED_SIGN → CLICKED → SIGN_OK`；linux.sb 导航后 `DETECT → ALREADY_SIGNED`（`textContent` 版）。无 lint 错误，已清理 12 个临时探针脚本。
+
+## [v4.13.18] - 2026-08-16
+
+### 新增 linux.sb（烧饼社区）真实签到适配
+
+- 书签扫描得真实 URL `https://linux.sb/daily_checkin`；`sites.json` 新增 `linuxsb` 条目（webbridge 策略，total 50→51）。
+- `signin-web.ps1` 新增 `linuxsb` 配置（经 daemon 上线后现场 DOM 核验）：每日签到页由插件渲染，未签时 `<form action="/daily_checkin" method="post">` 内含 `<button type="submit" class="daily-checkin-btn">签到</button>`；点击提交表单完成签到。已签后按钮被移除、动作区「已完成」、统计区「今天已签到 N」。
+- Detect/Click：`NEED_SIGN`=存在 `.daily-checkin-btn`；`ALREADY_SIGNED`=按钮消失且 body 含「今天已签到」/「已完成」/「已签到」；Click=`.daily-checkin-btn.click()`。
+
+## [v4.13.17] - 2026-08-12
+
+### 修复 navigate 超时导致"转圈被砍又重开相同 tab"循环
+
+- **根因**：`Open-SiteTab` 用 `waitUntil=domcontentloaded` 且 PS 侧 `TimeoutSec=$NavTimeoutSec`(默认120s)。慢站 / 后台窗口节流导致 DOMContentLoaded 迟迟不触发时，PS 在 120s 抛超时 → 判失败返回 → 上层 `Test-WebBridgeSignIn` 清场后重新 `Open-SiteTab`，即"页面还在转圈就被砍掉、又开相同 tab"。
+- **修复**：将 navigate 的 HTTP 超时与"页面实际就绪"解耦。
+  - navigate 请求收紧 PS 超时至 `min(NavTimeoutSec, 45s)`，终端不再干等 120s 才报超时。
+  - navigate 超时/失败但 tab 仍存活时，不立即判失败：用既有 `Wait-PageReady` 耐心轮询"页面就绪"(body 文本充足且无盾关键词)到剩余预算(`NavTimeoutSec - navPsTimeout`)耗尽；命中即视为导航成功(`method=navigate-patient`)，根治重开循环。
+  - 仅当 tab 已销毁 / 始终不就绪才返回失败交上层重试（既保留兜底又不误伤慢站）。
+- 验证：`Open-SiteTab` 内 `Wait-PageReady` 同文件定义（852 行），运行时解析无碍；无 lint 错误。
+
 ## [v4.13.16] - 2026-08-04
 
 ### 修复 visit-only 路由 bug + web-read 归一化为 webbridge
