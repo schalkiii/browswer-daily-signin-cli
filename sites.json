@@ -357,7 +357,7 @@
       "url": "https://fcloudpan.com/cloud",
       "strategy": "webbridge",
       "display_name": "F-Cloudpan 云盘",
-      "note": "v4.13.23: 真实签到适配 — 先点右上角头像(aria-label=打开云盘个人菜单)展开 Base UI 下拉，再点面板内「标准签到」(fcloud-standard-check-in，固定+5)；下拉仅聚焦时渲染故 BringToFront=$true; 已签判定依据=签到按钮被置 disabled",
+      "note": "v4.13.23 适配 / v4.13.24 改走幸运签到：先点右上角头像(aria-label=打开云盘个人菜单)展开 Base UI 下拉，再点面板内「幸运签到」(fcloud-las-vegas-check-in，1~20)；下拉仅聚焦时渲染故 BringToFront=$true；已签判定依据=签到按钮被置 disabled 或面板出现「今日已签到」",
     }
   ],
   "batch": {

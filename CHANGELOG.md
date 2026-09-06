@@ -1,5 +1,22 @@
 # Changelog
 
+## [v4.13.24] - 2026-09-06
+
+### fcloudpan 改走「幸运签到」
+
+- **改动**：Click 的点击目标由 `fcloud-standard-check-in`（标准签到，固定 +5）改为
+  `fcloud-las-vegas-check-in`（**幸运签到，1~20**）——期望值 ≈10.5，高于固定 +5。
+- **确认逻辑同步调整**：新增 `isDone()` 谓词（任一签到按钮被置 `disabled` **或**面板出现「今日已签到」），
+  不再只盯标准签到按钮。原因：幸运签到**奖励随机**，不能按固定 +5 校验——面板底部文案为
+  「今日已签到 · **+N** 网盘积分」。
+- **⚠️ 验证边界（诚实说明）**：本站每日仅可签一次，改版时今日已签，故**本次无法端到端验证幸运签到的实际领取**。
+  已完成的核验：① `signin-single` → `ALREADY_SIGNED`（改动后文件可解析、Detect 正常）；
+  ② 用与 Click **完全一致**的选择器实地探测，确认 `fcloud-las-vegas-check-in` 能命中
+  （`luckyFound=true`，文本「幸运签到拉斯维加斯 · 1～20」）。实际领取金额需明日批量运行时确认。
+- **另记（非阻塞）**：核验过程中遇到一次 `chrome-error → SERVER_ERROR` 与一次 SPA 水合慢于 8s 导致
+  `NO_PANEL`，均为站点/网络侧瞬时抖动；`signin-single` 重试即通过，Detect 的轮询重试已能覆盖。
+- 想改回确定收益：把 Click 里的 `data-slot` 换回 `fcloud-standard-check-in` 即可。
+
 ## [v4.13.23] - 2026-09-06
 
 ### 新增 F-Cloudpan 云盘（fcloudpan）签到适配

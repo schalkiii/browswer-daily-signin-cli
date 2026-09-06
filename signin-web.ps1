@@ -1147,11 +1147,12 @@ $WebSignInConfigs = @{
     #      故必须 BringToFront=$true（与 pting 日历弹窗同一类问题、同一处理方式）。
     #   判定依据（真实 DOM 信号，均经现场核验）：面板内两个签到按钮 fcloud-standard-check-in（固定 +5）
     #      与 fcloud-las-vegas-check-in（1~20）在签到后被置 disabled（样式含 disabled:opacity-45）；
-    #      同时面板底部由「每日二选一 · 当前 N 网盘积分」变为「今日已签到 · +5 网盘积分」。
-    #      实测：签到前「连续 1 天 · 累计 1 天 / 当前 11 积分 / 两按钮 enabled」→
+    #      同时面板底部由「每日二选一 · 当前 N 网盘积分」变为「今日已签到 · +N 网盘积分」（N 为实得奖励）。
+    #      实测（v4.13.23，当时走标准签到）：签到前「连续 1 天 · 累计 1 天 / 当前 11 积分 / 两按钮 enabled」→
     #            签到后「连续 2 天 · 累计 2 天 / 今日已签到 · +5 网盘积分 / 两按钮 disabled」。
-    #   每日二选一：默认走「标准签到」（确定 +5、结果可核验）；如需搏上限，把 Click 里的
-    #      data-slot 换成 fcloud-las-vegas-check-in 即可。
+    #   每日二选一：v4.13.24 起走「幸运签到」（1~20，期望值 ≈10.5，高于标准签到的固定 +5）；
+    #      奖励随机，故文案为「今日已签到 · +N 网盘积分」。想改回确定收益，把 Click 里的
+    #      data-slot 换成 fcloud-standard-check-in 即可。
     "fcloudpan" = @{
         Url = "https://fcloudpan.com/cloud"
         WaitMs = 12000
@@ -1221,6 +1222,15 @@ $WebSignInConfigs = @{
       el.dispatchEvent(new MouseEvent('click', o));
     } catch(e){ try { el.click(); } catch(e2){} }
   }
+  // 「已签」判定：与 Detect 同一套真实 DOM 依据——任一签到按钮被置 disabled，
+  //   或面板底部出现「今日已签到」（幸运签到奖励随机 1~20，不能按固定 +5 校验）
+  function isDone(){
+    var s = document.querySelector('[data-slot="fcloud-standard-check-in"]');
+    var l = document.querySelector('[data-slot="fcloud-las-vegas-check-in"]');
+    if ((s && s.disabled) || (l && l.disabled)) return true;
+    var p = document.querySelector('[data-slot="avatar-check-in-panel"]');
+    return !!(p && (p.textContent||'').indexOf('今日已签到') > -1);
+  }
   var trig = document.querySelector('[aria-label="打开云盘个人菜单"]');
   if (!trig) return 'NO_TRIGGER';
   // 同 Detect：触发器是 toggle，已展开则不再点，避免把菜单关掉
@@ -1233,22 +1243,25 @@ $WebSignInConfigs = @{
   }
   if (!panel) panel = document.querySelector('[data-slot="avatar-check-in-panel"]');
   if (!panel) return 'NO_PANEL';
-  var btn = panel.querySelector('[data-slot="fcloud-standard-check-in"]');
+  // v4.13.24: 走「幸运签到」（1~20）；要改回确定收益用 fcloud-standard-check-in
+  var btn = panel.querySelector('[data-slot="fcloud-las-vegas-check-in"]');
   if (!btn) return 'NO_BTN';
   if (btn.disabled) return 'ALREADY';
   fire(btn);
-  // 轮询确认：按钮被置 disabled 才算真的签上（真实 DOM，非"点过就算"）
+  // 轮询确认：按 isDone() 判定真的签上（真实 DOM，非"点过就算"）
   await sleep(2500);
   var reopened = 0;
-  for (var i=0;i<8;i++){
-    var b2 = document.querySelector('[data-slot="fcloud-standard-check-in"]');
-    if (b2 && b2.disabled) return 'CLICKED';
+  // 轮询上限刻意压在 ~5s：连同前面的开菜单(≤6s)与观察窗(2.5s)，
+  //   最坏情况仍低于框架 Click 的 15s evaluate 超时
+  for (var i=0;i<6;i++){
+    if (isDone()) return 'CLICKED';
+    var b2 = document.querySelector('[data-slot="fcloud-las-vegas-check-in"]');
     if (!b2 && reopened < 2){
       reopened++;
       if (trig.getAttribute('aria-expanded') !== 'true'){ fire(trig); await sleep(1200); }
       continue;
     }
-    await sleep(600);
+    await sleep(500);
   }
   return 'CLICKED_UNCONFIRMED';
 })()
