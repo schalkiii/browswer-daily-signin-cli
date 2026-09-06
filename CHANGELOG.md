@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.13.23] - 2026-09-06
+
+### 新增 F-Cloudpan 云盘（fcloudpan）签到适配
+
+- **排查（现场 DOM 核验）**：签到入口不在页面正文——须先点右上角头像按钮（`aria-label="打开云盘个人菜单"`）展开 Base UI 下拉，下拉内的 `[data-slot="avatar-check-in-panel"]` 才是签到面板；面板提供「标准签到」（`fcloud-standard-check-in`，固定 +5）与「幸运签到」（`fcloud-las-vegas-check-in`，1~20）**每日二选一**。
+- **弹窗需焦点**：同 pting，Base UI 下拉在后台 `-NoFocus` 下不渲染（实测 JS `.click()` 后面板为空），故配置 `BringToFront=$true`；且 Base UI 触发器对合成 `click` 不敏感，须补发完整指针事件序列（pointerdown/mousedown/pointerup/mouseup/click）。
+- **判定依据（真实 DOM 信号）**：签到后两个按钮被置 `disabled`（样式含 `disabled:opacity-45`），且面板底部由「每日二选一 · 当前 N 网盘积分」变为「**今日已签到 · +5 网盘积分**」，二者互为佐证。
+  - 实测：签到前「连续 1 天 · 累计 1 天 / 当前 11 积分 / 两按钮 enabled」→ 签到后「连续 2 天 · 累计 2 天 / 今日已签到 · +5 网盘积分 / 两按钮 disabled」。
+- **默认选择**：走「标准签到」（确定 +5、结果可核验）；如需搏上限，把 Click 里的 `data-slot` 换成 `fcloud-las-vegas-check-in` 即可。
+- **踩坑（toggle 竞态）**：头像触发器是 **toggle**，已展开时再点一次会把菜单关掉。初版在「面板未出现」时盲目补点第二下，恰成「开→关」，导致间歇性 `UNKNOWN`/`NO_PANEL`（前 3 次成功、第 4 次失败）。修复：每轮先判 `aria-expanded`，已展开则只等不点。
+- **改动**：`signin-web.ps1` 新增 `$WebSignInConfigs["fcloudpan"]`；`sites.json` 中该站由书签同步新增的 `browser-open` 改为 `webbridge`，并补 display_name / note。
+- 验证：`signin-single fcloudpan` → `NEED_SIGN → CLICKED → SIGN_OK`；复跑 → `ALREADY_SIGNED`（幂等；修复 toggle 竞态后连续 2 次稳定）。无 lint 错误。
+
 ## [v4.13.22] - 2026-09-03
 
 ### 知识收尾（neat-freak）：同步文档与注释，消除与 v4.13.21 实现的事实偏差

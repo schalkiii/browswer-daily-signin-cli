@@ -1139,6 +1139,123 @@ $WebSignInConfigs = @{
         Detect = $SPASignInDetect
         Click = $null
     }
+
+    # v4.13.23: fcloudpan（F-Cloudpan 云盘）真实签到适配 —— 经 daemon 上线后现场 DOM 核验。
+    #   签到入口不在页面正文：须先点右上角头像按钮（aria-label="打开云盘个人菜单"）展开 Base UI 下拉，
+    #   下拉内的 [data-slot="avatar-check-in-panel"] 才是签到面板。
+    #   ⚠️ Base UI 下拉仅在标签页聚焦时才渲染：后台 -NoFocus 下 JS .click() 打不开（实测面板为空），
+    #      故必须 BringToFront=$true（与 pting 日历弹窗同一类问题、同一处理方式）。
+    #   判定依据（真实 DOM 信号，均经现场核验）：面板内两个签到按钮 fcloud-standard-check-in（固定 +5）
+    #      与 fcloud-las-vegas-check-in（1~20）在签到后被置 disabled（样式含 disabled:opacity-45）；
+    #      同时面板底部由「每日二选一 · 当前 N 网盘积分」变为「今日已签到 · +5 网盘积分」。
+    #      实测：签到前「连续 1 天 · 累计 1 天 / 当前 11 积分 / 两按钮 enabled」→
+    #            签到后「连续 2 天 · 累计 2 天 / 今日已签到 · +5 网盘积分 / 两按钮 disabled」。
+    #   每日二选一：默认走「标准签到」（确定 +5、结果可核验）；如需搏上限，把 Click 里的
+    #      data-slot 换成 fcloud-las-vegas-check-in 即可。
+    "fcloudpan" = @{
+        Url = "https://fcloudpan.com/cloud"
+        WaitMs = 12000
+        PostClickMs = 6000
+        Detect = @'
+(async function(){
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  // Base UI 触发器对合成 click 不敏感，补发完整指针事件序列
+  function fire(el){
+    try {
+      var r = el.getBoundingClientRect();
+      var o = {bubbles:true, cancelable:true, view:window, clientX:r.x+r.width/2, clientY:r.y+r.height/2,
+               button:0, buttons:1, pointerId:1, pointerType:'mouse', isPrimary:true};
+      el.dispatchEvent(new PointerEvent('pointerdown', o));
+      el.dispatchEvent(new MouseEvent('mousedown', o));
+      el.dispatchEvent(new PointerEvent('pointerup', o));
+      el.dispatchEvent(new MouseEvent('mouseup', o));
+      el.dispatchEvent(new MouseEvent('click', o));
+    } catch(e){ try { el.click(); } catch(e2){} }
+  }
+  // 头像触发器仅已登录态才渲染，等 SPA 水合
+  var trig = null;
+  for (var i=0;i<12;i++){
+    trig = document.querySelector('[aria-label="打开云盘个人菜单"]');
+    if (trig) break;
+    await sleep(500);
+  }
+  if (!trig){
+    var t = document.body ? (document.body.textContent||'') : '';
+    if (t.indexOf('登录')>-1 || t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
+    return 'UNKNOWN';
+  }
+  // 展开下拉并等面板出现。⚠️ 触发器是 toggle：再点一次会把已展开的菜单关掉。
+  //   故每轮先判 aria-expanded——已展开则只等不点；否则"面板渲染慢于等待"时盲目补点一下
+  //   会把它关掉（曾致间歇性 UNKNOWN：连点两次恰好开→关，面板始终读不到）。
+  var panel = null;
+  for (var k=0;k<5;k++){
+    panel = document.querySelector('[data-slot="avatar-check-in-panel"]');
+    if (panel) break;
+    if (trig.getAttribute('aria-expanded') !== 'true') { fire(trig); }
+    await sleep(1500);
+  }
+  if (!panel) panel = document.querySelector('[data-slot="avatar-check-in-panel"]');
+  if (!panel) return 'UNKNOWN';
+  var std = panel.querySelector('[data-slot="fcloud-standard-check-in"]');
+  var lvs = panel.querySelector('[data-slot="fcloud-las-vegas-check-in"]');
+  if (!std && !lvs) return 'UNKNOWN';
+  // 已签的两种表现（均已现场核验）：签到按钮被置 disabled；面板底部由「每日二选一 · 当前 N」
+  //   变为「今日已签到 · +5 网盘积分」。二者互为佐证，任一命中即判已签。
+  if ((std && std.disabled) || (lvs && lvs.disabled)) return 'ALREADY_SIGNED';
+  if ((panel.textContent || '').indexOf('今日已签到') > -1) return 'ALREADY_SIGNED';
+  return 'NEED_SIGN';
+})()
+'@
+        Click = @'
+(async function(){
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  function fire(el){
+    try {
+      var r = el.getBoundingClientRect();
+      var o = {bubbles:true, cancelable:true, view:window, clientX:r.x+r.width/2, clientY:r.y+r.height/2,
+               button:0, buttons:1, pointerId:1, pointerType:'mouse', isPrimary:true};
+      el.dispatchEvent(new PointerEvent('pointerdown', o));
+      el.dispatchEvent(new MouseEvent('mousedown', o));
+      el.dispatchEvent(new PointerEvent('pointerup', o));
+      el.dispatchEvent(new MouseEvent('mouseup', o));
+      el.dispatchEvent(new MouseEvent('click', o));
+    } catch(e){ try { el.click(); } catch(e2){} }
+  }
+  var trig = document.querySelector('[aria-label="打开云盘个人菜单"]');
+  if (!trig) return 'NO_TRIGGER';
+  // 同 Detect：触发器是 toggle，已展开则不再点，避免把菜单关掉
+  var panel = null;
+  for (var k=0;k<4;k++){
+    panel = document.querySelector('[data-slot="avatar-check-in-panel"]');
+    if (panel) break;
+    if (trig.getAttribute('aria-expanded') !== 'true') { fire(trig); }
+    await sleep(1500);
+  }
+  if (!panel) panel = document.querySelector('[data-slot="avatar-check-in-panel"]');
+  if (!panel) return 'NO_PANEL';
+  var btn = panel.querySelector('[data-slot="fcloud-standard-check-in"]');
+  if (!btn) return 'NO_BTN';
+  if (btn.disabled) return 'ALREADY';
+  fire(btn);
+  // 轮询确认：按钮被置 disabled 才算真的签上（真实 DOM，非"点过就算"）
+  await sleep(2500);
+  var reopened = 0;
+  for (var i=0;i<8;i++){
+    var b2 = document.querySelector('[data-slot="fcloud-standard-check-in"]');
+    if (b2 && b2.disabled) return 'CLICKED';
+    if (!b2 && reopened < 2){
+      reopened++;
+      if (trig.getAttribute('aria-expanded') !== 'true'){ fire(trig); await sleep(1200); }
+      continue;
+    }
+    await sleep(600);
+  }
+  return 'CLICKED_UNCONFIRMED';
+})()
+'@
+        # 头像下拉菜单仅在标签页聚焦时渲染（后台模式下打不开），需强制聚焦
+        BringToFront = $true
+    }
 }
 
 # v4.13.0: 配置一致性校验

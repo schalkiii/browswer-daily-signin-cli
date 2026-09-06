@@ -172,6 +172,15 @@ PowerShell 侧按信号映射到 `SUCCESS` / `ALREADY_DONE` / `NO_DETECT` / `CF_
 - **ALTCHA**（如 Yemapt）：`ClickEval` 先解 ALTCHA 再点击签到。主路径直接对 `input[type=checkbox]` 执行 JS `.click()`（该 widget **无 shadow DOM**）；仅当复选框取不到时才退回 CDP 坐标点击兜底。校验复用 `Test-AltchaVerified`。
 - **SLIDER**：坐标点击滑块，`ForceLayoutViewport=$true`，失败归 `SLIDER_FAIL` 进入批处理重试。
 
+### 头像 / 下拉菜单类两步签到（pting / fcloudpan）
+
+部分站点把签到藏在**头像下拉菜单**或「点触发器才弹出的弹窗」里，需两步：先点触发器展开，再点里面的真正签到控件。
+
+- **需焦点才渲染**：Base UI / Radix 类下拉在后台 `-NoFocus` 下不渲染（实测 JS `.click()` 后菜单为空）。解决：站点声明 `BringToFront=$true`，由框架在 Detect/Click 前调 `Page.bringToFront`。
+- **合成事件要完整**：这类触发器对裸 `click` 不敏感，须补发 `pointerdown → mousedown → pointerup → mouseup → click` 完整指针序列（`clientX/clientY` 取元素 rect 中心）。
+- **⚠️ 触发器是 toggle，别盲目补点**：已展开时再点一次会把菜单**关掉**。等待面板时必须先判 `aria-expanded`——已展开则只等不点；否则「面板渲染慢于等待」时补点第二下恰成「开→关」，表现为**间歇性** `UNKNOWN`（fcloudpan 曾前 3 次成功、第 4 次失败）。
+- **判定依据**：优先读面板内的真实状态（按钮 `disabled`、「今日已签到」等），而非「点过就算成功」的标志位。
+
 > 焦点与 `-NoFocus`：`navigate newTab=true` 本身不抬窗口；抢焦点的是 `Page.bringToFront`，除 CF 站外，部分站点弹窗需聚焦才渲染（如 pting 日历弹窗）也需要。后台批处理默认 `-NoFocus:$true` 全局不抢焦点；仅当站点声明 `BringToFront=$true` 时瞬时借焦点。
 
 ---

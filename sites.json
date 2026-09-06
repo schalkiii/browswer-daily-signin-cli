@@ -1,6 +1,6 @@
 {
   "version": "v4.12.0",
-  "total": 53,
+  "total": 55,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -344,6 +344,20 @@
       "strategy": "webbridge",
       "display_name": "海胆之家 - 每日打卡",
       "note": "v4.13.21: 真实签到适配 — attendance.php 返回 404，签到入口在 mybonus.php 的「每日打卡」(#modalBtn)；已签按钮值变「已经打卡」"
+    },
+    {
+      "name": "t-baozi",
+      "url": "https://p.t-baozi.cc/attendance.php",
+      "strategy": "web-read",
+      "display_name": "baozi :: 签到 @baozi - Powered by NexusPHP",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "fcloudpan",
+      "url": "https://fcloudpan.com/cloud",
+      "strategy": "webbridge",
+      "display_name": "F-Cloudpan 云盘",
+      "note": "v4.13.23: 真实签到适配 — 先点右上角头像(aria-label=打开云盘个人菜单)展开 Base UI 下拉，再点面板内「标准签到」(fcloud-standard-check-in，固定+5)；下拉仅聚焦时渲染故 BringToFront=$true; 已签判定依据=签到按钮被置 disabled",
     }
   ],
   "batch": {

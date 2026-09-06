@@ -168,6 +168,15 @@ Some NexusPHP sites (the `NexusPHPCfSignInClick` family) need CF Turnstile clear
 - **ALTCHA** (e.g. Yemapt): `ClickEval` solves ALTCHA first, then clicks sign-in. The primary solver does a direct JS `.click()` on the `input[type=checkbox]` (the widget has **no shadow DOM**); CDP coordinate-click stays only as a fallback when the checkbox isn't directly reachable. Verification reuses `Test-AltchaVerified`.
 - **SLIDER**: coordinate-click the slider with `ForceLayoutViewport=$true`; failure ⇒ `SLIDER_FAIL` enters batch retry.
 
+### Two-step sign-in behind an avatar / dropdown menu (pting / fcloudpan)
+
+Some sites hide sign-in behind an **avatar dropdown** or a **popup opened by a trigger**: click the trigger first, then click the real sign-in control inside.
+
+- **Needs focus to render**: Base UI / Radix-style dropdowns do not render in a backgrounded `-NoFocus` tab (probing showed an empty menu after JS `.click()`). Fix: declare `BringToFront=$true` so the framework calls `Page.bringToFront` before Detect/Click.
+- **Synthetic events must be complete**: such triggers ignore a bare `click`. Dispatch the full pointer sequence `pointerdown → mousedown → pointerup → mouseup → click` (with `clientX/clientY` from the element's rect).
+- **⚠️ The trigger is a toggle — never blindly re-click**: clicking an already-expanded trigger **closes** the menu. When waiting for the panel, always check `aria-expanded` first; if already expanded, only wait. Otherwise a "panel slower than the wait" retry click turns the menu open→closed, showing up as *intermittent* `UNKNOWN` (fcloudpan passed 3 runs, then failed the 4th).
+- **Signal**: read real state inside the panel (button `disabled`, "今日已签到" text, …) rather than a "clicked ⇒ success" flag.
+
 > Focus & `-NoFocus`: `navigate newTab=true` alone doesn't raise the window; the focus grabber is `Page.bringToFront`, needed by CF Turnstile **and by sites whose popup only renders when focused** (e.g. pting). Background batch defaults to `-NoFocus:$true` globally; focus is borrowed transiently per-site when `BringToFront=$true`.
 
 ---

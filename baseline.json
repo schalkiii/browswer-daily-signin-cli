@@ -59,7 +59,8 @@
     "chybenzun",
     "pting",
     "cdy",
-    "linuxsb"
+    "linuxsb",
+    "haidan"
   ],
   "manual_sites": [
     "北洋园PT",
@@ -71,7 +72,7 @@
     "xt-url",
     "pp"
   ],
-  "auto_total": 58,
+  "auto_total": 59,
   "manual_total": 8,
-  "last_updated": "2026-08-16 04:16:00"
+  "last_updated": "2026-09-04 02:34:43"
 }
