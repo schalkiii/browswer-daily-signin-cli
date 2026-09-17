@@ -1,6 +1,6 @@
 {
   "version": "v4.12.0",
-  "total": 55,
+  "total": 56,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -259,7 +259,7 @@
       "url": "https://pt.vclib.online/attendance.php",
       "strategy": "webbridge",
       "display_name": "VCLib",
-      "note": "v4.12.0: 用户浏览器配备验证码自动输入扩展，改回webbridge + Click JS 等待 imagestring 自动填入后点击提交"
+      "note": "v4.13.27: 站点现改 Cloudflare 盾验证（不再依赖浏览器验证码自动填充扩展）；走框架通用 CF 流程（Detect CF 感知 + 坐标点击 Turnstile），CF 通过后由 NexusPHPCfSignInClick 提交 attendance 表单"
     },
     {
       "name": "521",
@@ -277,10 +277,10 @@
     },
     {
       "name": "huan666",
-      "url": "https://ai.huan666.de/console/personal",
+      "url": "https://ai.huan666.de/dashboard",
       "strategy": "webbridge",
       "display_name": "幻666 AI",
-      "note": "auto: 书签同步新增"
+      "note": "v4.13.26: 站点改版为 SPA 客户端路由，旧 /console/personal 现 404；改用 /dashboard（登录态正常）"
     },
     {
       "name": "xt-url",
@@ -311,13 +311,6 @@
       "note": "auto: 书签同步新增"
     },
     {
-      "name": "chybenzun",
-      "url": "https://dy.chybenzun.top/",
-      "strategy": "webbridge",
-      "display_name": "CHY 公益订阅",
-      "note": "auto: 书签同步新增"
-    },
-    {
       "name": "pting",
       "url": "https://pting.club/?sort=newest",
       "strategy": "webbridge",
@@ -335,7 +328,7 @@
       "name": "1ctrl",
       "url": "https://pt.1ctrl.cn/attendance.php",
       "strategy": "web-read",
-      "display_name": "修道院 :: 签到 - Powered by NexusPHP",
+      "display_name": "修道院PT",
       "note": "auto: 书签同步新增"
     },
     {
@@ -349,7 +342,7 @@
       "name": "t-baozi",
       "url": "https://p.t-baozi.cc/attendance.php",
       "strategy": "web-read",
-      "display_name": "baozi :: 签到 @baozi - Powered by NexusPHP",
+      "display_name": "包子PT",
       "note": "auto: 书签同步新增"
     },
     {
@@ -357,7 +350,21 @@
       "url": "https://fcloudpan.com/cloud",
       "strategy": "webbridge",
       "display_name": "F-Cloudpan 云盘",
-      "note": "v4.13.23 适配 / v4.13.24 改走幸运签到：先点右上角头像(aria-label=打开云盘个人菜单)展开 Base UI 下拉，再点面板内「幸运签到」(fcloud-las-vegas-check-in，1~20)；下拉仅聚焦时渲染故 BringToFront=$true；已签判定依据=签到按钮被置 disabled 或面板出现「今日已签到」",
+      "note": "v4.13.23 适配 / v4.13.24 改走幸运签到：先点右上角头像(aria-label=打开云盘个人菜单)展开 Base UI 下拉，再点面板内「幸运签到」(fcloud-las-vegas-check-in，1~20)；下拉仅聚焦时渲染故 BringToFront=$true；已签判定依据=签到按钮被置 disabled 或面板出现「今日已签到」"
+    },
+    {
+      "name": "lp-bits",
+      "url": "https://lp-bits.com/attendance.php",
+      "strategy": "web-read",
+      "display_name": "LP-Bits",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "muxuege",
+      "url": "https://pt.muxuege.org/attendance.php",
+      "strategy": "web-read",
+      "display_name": "慕雪阁PT",
+      "note": "auto: 书签同步新增"
     }
   ],
   "batch": {

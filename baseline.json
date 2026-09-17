@@ -60,7 +60,8 @@
     "pting",
     "cdy",
     "linuxsb",
-    "haidan"
+    "haidan",
+    "fcloudpan"
   ],
   "manual_sites": [
     "北洋园PT",
@@ -72,7 +73,7 @@
     "xt-url",
     "pp"
   ],
-  "auto_total": 59,
+  "auto_total": 60,
   "manual_total": 8,
-  "last_updated": "2026-09-04 02:34:43"
+  "last_updated": "2026-09-07 02:22:26"
 }

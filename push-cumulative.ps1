@@ -36,7 +36,10 @@ if (Test-Path $SitesFile) {
     $sitesDoc = Get-Content $SitesFile -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($sitesDoc.sites) {
         foreach ($s in $sitesDoc.sites) {
-            $dn = if ($s.display_name) { $s.display_name } else { $s.name }
+            $raw = if ($s.display_name) { $s.display_name } else { $s.name }
+            # 净化展示名：剥离 NexusPHP 站点整页标题常见的噪声后缀；超长（多为书签同步的整页标题）做截断兜底
+            $dn = $raw -replace ' - Powered by NexusPHP$', '' -replace ' - Powered By NexusPHP$', ''
+            if ($dn.Length -gt 22) { $dn = $dn.Substring(0, 20) + "…" }
             $siteInfoMap[$s.name] = @{ url = $s.url; display_name = $dn }
         }
     }

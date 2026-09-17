@@ -1,5 +1,55 @@
 # Changelog
 
+## [v4.13.27] - 2026-09-17
+
+### vclib 适配 Cloudflare 盾验证（移除过期验证码自动填充方案）
+
+- **背景**：vclib（pt.vclib.online）现已改为 Cloudflare 盾验证，**不再依赖浏览器验证码自动填充扩展**（旧 `imagestring` 轮询方案作废）。
+- **改动**（`signin-web.ps1` 的 `$WebSignInConfigs["vclib"]`）：
+  - 删除旧的自定义 `Click`（setInterval 轮询 `imagestring` 等待扩展填入再提交），改为框架通用 **`NexusPHPCfSignInClick`**（CF 通过后提交 attendance 表单）。
+  - 新增 `ForceLayoutViewport = $true`（固定 1280x800 视口，保证 CF Turnstile 坐标点击坐标系一致）与 `CfRetryCount = 6` / `CfRetryWaitMs = 45000`（对齐其它 CF 站点）。
+  - `Detect` 维持 `$NexusPHPSignInDetect`（本身已 CF 感知：`.cf-turnstile` 无 token 或「Just a moment」→ `CF_CHALLENGE`，触发框架 CF 重试循环）。
+  - 结构与其他 3 个 CF NexusPHP 站点完全一致，软/硬 CF 两种状态均能正确处理（软：直达 attendance 页提交；硬：先点 Turnstile 再提交）。
+- `sites.json`：vclib `note` 更新为 CF 盾验证说明。
+- **验证边界（诚实说明）**：本次改动后实跑 `signin-single vclib` 连续 2 次 `NAV_FAIL`（30s 页面加载超时）。对照发现**今日已验证可用、且今日已签过的 haidan 此刻也导航失败**（chrome-error → `SERVER_ERROR`），判定为**全局 daemon/网络瞬时故障**，非本改动所致。CF 流程本身与已验证站点同构，待网络恢复（建议明日批量或手动复测）确认实际签到。
+
+## [v4.13.26] - 2026-09-17
+
+### 修复两处「真失败误判为检测问题」的站点 + 飞书推送名称精简
+
+- **haidan：误判 `UNKNOWN` → 修复为正常签到 `SIGN_OK`**。根因：站点现落在雷池(Safeline) WAF 挑战页——首屏只有标题、`document.body` 为空，约 25s 才解出正文。旧 `WaitMs=12000` 在 WAF 解出前就跑 Detect，找不到 `#modalBtn`/「打卡」→ `UNKNOWN`。对齐同为雷池 WAF 的 PigGo（`WaitMs=30000`）加长等待，正文就绪后再检测。`signin-single haidan` 已验证 `NEED_SIGN → CLICKED → SIGN_OK`。
+- **huan666：`BODY_NULL`（404）→ 修复为 `SIGN_OK`**。根因：站点改版为 SPA 客户端路由，旧 `/console/personal` 现 404（SPA 无法挂载）。现控制台路由为 `/dashboard`（正文 ~82k，登录态正常），`$SPASignInDetect` 只看正文长度判登录态，故指向任一有效的应用内路由即可。已验证 `SIGN_OK`。
+- **其余今日失败站点经排查均为真失败 / 外部环境依赖，非检测缺陷**：
+  - `OurBits` / `ptlao`：`ERR_CONNECTION_CLOSED` / 导航超时（服务器/网络断开，瞬时）；
+  - `UBits`：批量时 `ERR_CONNECTION_CLOSED`，复测已恢复（瞬时网络抖动）；
+  - `vclib` / `521`：页面可达但依赖浏览器验证码**自动填充扩展**在 28s 内填入，扩展未生效则 `NEED_SIGN`（环境依赖，非检测问题）；
+  - `fcloudpan`：源站 `522 Connection timed out`（Cloudflare 连不上源站，瞬时宕机）。
+- **飞书推送名称精简（用户反馈）**：`人工签到`/`失败` 等段落里 4 个 web-read 站点的 `display_name` 是书签同步抓来的整页标题（如「LP-Bits.com 2.0 :: Attendance linkin park|… - Powered by NexusPHP」），过长。
+  - `sites.json`：这 4 个改为精简中文名（修道院PT / 包子PT / LP-Bits / 慕雪阁PT）。
+  - `signin-batch.ps1` / `push-cumulative.ps1` 的 `siteInfoMap` 构建处新增名称净化：剥离 NexusPHP 站点常见的「 - Powered by NexusPHP」噪声后缀，并对超长（>22 字符，多为书签整页标题）做截断兜底，防止未来同步再次引入长名。
+
+## [v4.13.25] - 2026-09-08
+
+### 新增 linuxsb-gacha（Linux.SB 烧饼社区 · 称号抽取）每日免费一抽
+
+- **站点**：`https://linux.sb/gacha`（与既有 `linuxsb` 的 `/daily_checkin` 签到是**两个独立站点条目**，互不干扰）。
+- **页面结构（现场 DOM 核验）**：动作区 `.gacha-actions` 内 3 个 form，均带 `data-no-ajax="1"`（**整页 POST**，非 AJAX）：
+  - `.gacha-pull-1` → `/gacha_pull`（免费档）、`.gacha-pull-10` → `/gacha_pull_10`（90 积分）、`.gacha-pull-100` → `/gacha_pull_100`（800 积分）。
+- **⚠️ 判定依据是 `data-cost`，不是 `disabled`**：免费额用掉后 `.gacha-pull-1` **既不 disabled 也不消失**，
+  只是文本由「今日免费一抽」变为「抽一次 (10 积分)」、`data-cost` 由 `"0"` 变为 `"10"`；
+  页面也不出现任何「已抽 / 明日再来」字样。故 Detect 按 `data-cost === '0'` 或文本含「免费」判 `NEED_SIGN`，
+  否则判 `ALREADY_SIGNED`。按 `disabled` 或「按钮消失」判断会**永远判不出已抽**。
+- **提交后跳转结果页** `/gacha_pull?result=<hash>`（该页**没有** `.gacha-actions`），
+  故 Detect 额外把「当前处于 `/gacha_pull`」也判为已抽，否则点击后的复检会落 `UNKNOWN`。
+- **Click 只点免费档**（校验 `data-cost === '0'`，绝不碰收费的十连/百连），点击后轮询 ≤8s 确认
+  已进入结果页或按钮转为收费态，避免「点过就算」。
+- **⚠️ 验证边界（诚实说明）**：本站免费一抽**每日仅一次**，本次适配已用掉今日额度，
+  故框架内的 `NEED_SIGN → CLICKED → SIGN_OK` 全链路**未能跑通**。已完成的核验：
+  ① 用与 Click 一致的 `.click()` 实地抽了一次，确认跳转 `/gacha_pull?result=...` 且回 `/gacha` 后
+  `data-cost` 由 0 变 10（点击机制与判定信号均经实测）；② `signin-single linuxsb-gacha` → `ALREADY_SIGNED`。
+  完整的「可抽 → 抽中」路径待明日批量运行确认。
+- **改动**：`signin-web.ps1` 新增 `$WebSignInConfigs["linuxsb-gacha"]`；`sites.json` 新增同名 `webbridge` 站点。
+
 ## [v4.13.24] - 2026-09-06
 
 ### fcloudpan 改走「幸运签到」

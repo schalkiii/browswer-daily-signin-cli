@@ -458,7 +458,11 @@ function Send-FeishuSummary {
     # 构建 siteInfoMap: name -> @{ url; display_name }，用于展示名 + 可点击链接
     $siteInfoMap = @{}
     foreach ($s in $config.sites) {
-        $dn = if ($s.display_name) { $s.display_name } else { $s.name }
+        $raw = if ($s.display_name) { $s.display_name } else { $s.name }
+        # 净化展示名：剥离 NexusPHP 站点整页标题常见的噪声后缀；超长（多为书签同步的整页标题）做截断兜底，
+        # 避免「人工签到/失败」等段落出现过长名称（飞书卡片阅读体验）。
+        $dn = $raw -replace ' - Powered by NexusPHP$', '' -replace ' - Powered By NexusPHP$', ''
+        if ($dn.Length -gt 22) { $dn = $dn.Substring(0, 20) + "…" }
         $siteInfoMap[$s.name] = @{ url = $s.url; display_name = $dn }
     }
     # 取展示名（display_name 缺失时回退到 name）

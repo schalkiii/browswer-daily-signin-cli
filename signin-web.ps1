@@ -273,7 +273,10 @@ $WebSignInConfigs = @{
     #      不能作为成功判定依据（实测确认会误判）。
     "haidan" = @{
         Url = "https://www.haidan.cc/mybonus.php"
-        WaitMs = 12000
+        # v4.13.26: Haidan 现落在雷池(Safeline) WAF 挑战页——首屏 body 为空（仅标题），约 25s 才解出正文。
+        #   旧 WaitMs=12000 在 WAF 解出前就跑 Detect → #modalBtn/打卡 找不到 → UNKNOWN。
+        #   对齐 PigGo 的做法（同为雷池 WAF，WaitMs=30000）加长等待，让挑战通过后正文就绪再检测。
+        WaitMs = 30000
         PostClickMs = 5000
         Detect = @'
 (function(){
@@ -644,38 +647,15 @@ $WebSignInConfigs = @{
         Url = "https://pt.vclib.online/attendance.php"
         WaitMs = 15000
         PostClickMs = 30000
+        CfRetryCount = 6
+        CfRetryWaitMs = 45000
+        # v4.13.27: 站点现改为 Cloudflare 盾验证，不再依赖浏览器验证码自动填充扩展。
+        #   走框架通用 CF 流程：Detect 已 CF 感知（cf-turnstile 无 token / "Just a moment" → CF_CHALLENGE），
+        #   坐标点击 Turnstile（ForceLayoutViewport 固定视口，保证 CDP 坐标系一致）；
+        #   CF 通过后 attendance 表单仍需提交，故由 NexusPHPCfSignInClick 点击签到 submit。
+        ForceLayoutViewport = $true
         Detect = $NexusPHPSignInDetect
-        # v4.12.0: 用户浏览器配备验证码自动输入扩展，Click JS 用 setInterval 轮询 imagestring
-        # 字段，待扩展自动填入后点击"立即签到"提交按钮；evaluate 同步返回 CLICK_SCHEDULED，
-        # PostClickMs 期间 setInterval 异步执行
-        # v4.12.1: 轮询窗口从 12 秒扩到 28 秒，PostClickMs 从 15 秒扩到 30 秒，给扩展更长的识别时间
-        Click = @'
-(function(){
-  var form = document.querySelector('form[action*="attendance"]');
-  if(!form) return 'NO_FORM';
-  var input = form.querySelector('input[name="imagestring"]');
-  if(!input) return 'NO_INPUT';
-  var submit = form.querySelector('input[type=submit][value*="签到"]') || form.querySelector('input[type=submit]');
-  if(!submit) return 'NO_SUBMIT';
-  // 立即检查 imagestring 是否已被扩展填入
-  if(input.value && input.value.length > 0){
-    submit.click();
-    return 'CLICKED_NOW:'+input.value;
-  }
-  // 未填入，启动 setInterval 轮询（异步），最多等 28 秒
-  var elapsed = 0;
-  var timer = setInterval(function(){
-    elapsed += 1000;
-    if(input.value && input.value.length > 0){
-      clearInterval(timer);
-      submit.click();
-    } else if(elapsed >= 28000){
-      clearInterval(timer);
-    }
-  }, 1000);
-  return 'CLICK_SCHEDULED';
-})()
-'@
+        Click = $NexusPHPCfSignInClick
     }
     "521" = @{
         Url = "https://pt.521.best/attendance.php"
@@ -1133,7 +1113,10 @@ $WebSignInConfigs = @{
         Click = $null
     }
     "huan666" = @{
-        Url = "https://ai.huan666.de/console/personal"
+        # v4.13.26: 站点改版为 SPA 客户端路由，旧 /console/personal 现 404（SPA 无法挂载）。
+        #   现控制台路由为 /dashboard（bodyLen~82k，登录态正常）。SPA 检测只看正文长度判登录态，
+        #   故 URL 指向任一有效的应用内路由即可，/dashboard 最稳。
+        Url = "https://ai.huan666.de/dashboard"
         WaitMs = 10000
         PostClickMs = 5000
         Detect = $SPASignInDetect
@@ -1268,6 +1251,60 @@ $WebSignInConfigs = @{
 '@
         # 头像下拉菜单仅在标签页聚焦时渲染（后台模式下打不开），需强制聚焦
         BringToFront = $true
+    }
+
+    # v4.13.25: linuxsb-gacha（Linux.SB 烧饼社区 · 称号抽取）真实适配 —— 经 daemon 上线后现场 DOM 核验。
+    #   页面 /gacha 的动作区 .gacha-actions 内含 3 个 form（均 data-no-ajax="1" → 整页 POST，非 AJAX）：
+    #     .gacha-pull-1   → /gacha_pull     免费额内：文本「今日免费一抽」、data-cost="0"
+    #     .gacha-pull-10  → /gacha_pull_10  「十连抽 (90 积分)」  data-cost="90"
+    #     .gacha-pull-100 → /gacha_pull_100 「百连抽 (800 积分)」 data-cost="800"
+    #   ⚠️ 判定依据（唯一可靠信号，实测）：免费额用掉后 .gacha-pull-1 **既不 disabled 也不消失**，
+    #      仅是文本变「抽一次 (10 积分)」、data-cost 由 "0" 变 "10"；页面也不会出现「已抽/明日再来」
+    #      之类字样。故只能按 data-cost（或「免费」文本）判别，不能按 disabled / 按钮消失判断。
+    #   ⚠️ 提交后整页跳转到结果页 /gacha_pull?result=<hash>（该页无 .gacha-actions），
+    #      Detect 必须把「处于结果页」也判为已抽，否则点击后的复检会落 UNKNOWN。
+    "linuxsb-gacha" = @{
+        Url = "https://linux.sb/gacha"
+        WaitMs = 10000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  // 结果页 /gacha_pull?result=<hash>：说明今日免费一抽已消耗（刚抽完或此前已抽）
+  if (location.pathname.indexOf('/gacha_pull') === 0) return 'ALREADY_SIGNED';
+  var b = document.querySelector('.gacha-pull-1');
+  if (!b) {
+    // 未登录时 /gacha 无抽卡按钮，页头常驻 登录/注册
+    var t = document.body ? (document.body.textContent || '') : '';
+    if (t.indexOf('登录') > -1 || t.indexOf('注册') > -1) return 'LOGIN_REQUIRED';
+    return 'UNKNOWN';
+  }
+  var cost = b.getAttribute('data-cost');
+  var txt = (b.textContent || '').trim();
+  // 免费额可用：data-cost="0" 且文本含「免费」
+  if (cost === '0' || txt.indexOf('免费') > -1) return 'NEED_SIGN';
+  // 免费额已用：data-cost 变 "10"、文本「抽一次 (10 积分)」
+  return 'ALREADY_SIGNED';
+})()
+'@
+        Click = @'
+(async function(){
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  var b = document.querySelector('.gacha-pull-1');
+  if (!b) return 'NO_BTN';
+  // 只点免费档（data-cost="0"），绝不碰收费的十连/百连
+  if (b.getAttribute('data-cost') !== '0' && (b.textContent || '').indexOf('免费') === -1) return 'ALREADY';
+  b.click();
+  // 整页 POST 跳转：轮询确认已进入结果页或按钮已转为收费态，避免"点过就算"
+  // 上限 8s（16×500ms），连同后续复检仍远低于框架 Click 的 15s evaluate 超时
+  for (var i = 0; i < 16; i++) {
+    await sleep(500);
+    if (location.pathname.indexOf('/gacha_pull') === 0) return 'CLICKED';
+    var b2 = document.querySelector('.gacha-pull-1');
+    if (b2 && b2.getAttribute('data-cost') !== '0') return 'CLICKED';
+  }
+  return 'CLICKED_UNCONFIRMED';
+})()
+'@
     }
 }
 
