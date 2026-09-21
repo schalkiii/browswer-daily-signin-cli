@@ -105,6 +105,74 @@ $NexusPHPExactClick = @'
 })()
 '@
 
+# v4.13.28: vclib 专属检测——CF 盾必须人工勾选，绝不能返回 CF_CHALLENGE（否则触发框架自动点击
+# 6×45s 重试，PigGo 之外曾实测本站单站耗时 906s）。CF 未过 → CF_PENDING（直接落到自定义 Click
+# 等待人工勾选）。已勾选（token 填充）后按标准 NEED_SIGN / SIGN_OK 判定。
+$VclibCfSignInDetect = @'
+(function(){
+  if(!document.body) return 'UNKNOWN';
+  var t = document.body.innerText||'';
+  if(location.pathname.indexOf('take2fa.php')>-1||t.indexOf('异地登录')>-1||t.indexOf('两步验证')>-1) return 'LOGIN_REQUIRED';
+  // 已签优先（简体 + 繁体）
+  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
+  if(t.indexOf('簽到已得')>-1||t.indexOf('今日已簽到')>-1||t.indexOf('已簽到')>-1||t.indexOf('簽到成功')>-1) return 'SIGN_OK';
+  if(t.indexOf('今日签到')>-1||t.indexOf('得到魔力加成')>-1) return 'SIGN_OK';
+  if(t.indexOf('已领取')>-1||t.indexOf('本次签到获得')>-1) return 'SIGN_OK';
+  // CF 盾判据：widget 在且 token 未填 → CF_PENDING（人工勾选）；"正在检查/Just a moment" 同理
+  var cfWidget = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]') || document.querySelector('#challenge-stage') || document.querySelector('[class*="cf-"]');
+  if (cfWidget) {
+    var ti = document.querySelector('input[name="cf-turnstile-response"]');
+    if(!ti || !ti.value || ti.value.length < 10) return 'CF_PENDING';
+  }
+  if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1) return 'CF_PENDING';
+  if(t.indexOf('安全验证')>-1 && !cfWidget) return 'CF_PENDING';
+  // 待签
+  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到得憨豆')>-1||t.indexOf('签到领取')>-1||t.indexOf('立即签到')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
+  if(t.indexOf('簽到得魔力')>-1||t.indexOf('簽到得鯨幣')>-1||t.indexOf('簽到領取')>-1) return 'NEED_SIGN';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('必须登录')>-1) return 'LOGIN_REQUIRED';
+  if(t.length<20) return 'UNKNOWN';
+  var match = t.match(/签到.{0,20}/);
+  if(match) return 'NEED_SIGN:'+match[0];
+  return 'UNKNOWN';
+})()
+'@
+
+# v4.13.28: vclib 专属 Click——先等人工勾选 CF 盾（异步轮询 cf-turnstile-response token 填充），
+# token 出现后立即点签到 submit；返回同步信号（CF_WAIT_SCHEDULED），真正点击发生在 PostClickMs 窗口内。
+# token 已就绪则立即提交（无需等待）。
+$VclibCfSignInClick = @'
+(function(){
+  function findSubmit(f){
+    return f.querySelector('input[type=submit][value*="签到"]') ||
+           f.querySelector('input[type=submit][value*="簽到"]') ||
+           f.querySelector('input[type=submit]');
+  }
+  function cfReady(){
+    var ti = document.querySelector('input[name="cf-turnstile-response"]');
+    return !!(ti && ti.value && ti.value.length >= 10);
+  }
+  var form = document.querySelector('form[action*="attendance"]') || document.querySelector('form');
+  if(!form) return 'NO_FORM';
+  var submit = findSubmit(form);
+  if(!submit) return 'NO_SUBMIT';
+  if(cfReady()){ submit.click(); return 'CLICKED_NOW'; }
+  // CF 未人工勾选 → 异步轮询等 token 出现后提交（最多 ~100s，配合 PostClickMs 总窗口 ≤ ~50s）
+  var ticks = 0;
+  var timer = setInterval(function(){
+    ticks += 1;
+    if(cfReady()){
+      clearInterval(timer);
+      var f2 = document.querySelector('form[action*="attendance"]') || document.querySelector('form');
+      var s2 = f2 ? findSubmit(f2) : null;
+      if(s2) s2.click();
+    } else if(ticks >= 50){
+      clearInterval(timer);
+    }
+  }, 2000);
+  return 'CF_WAIT_SCHEDULED';
+})()
+'@
+
 # SPA 控制台/资料页通用检测：登录态保持即视为成功（API 控制台类站点）
 $SPASignInDetect = @'
 (function(){
@@ -646,16 +714,14 @@ $WebSignInConfigs = @{
     "vclib" = @{
         Url = "https://pt.vclib.online/attendance.php"
         WaitMs = 15000
-        PostClickMs = 30000
-        CfRetryCount = 6
-        CfRetryWaitMs = 45000
-        # v4.13.27: 站点现改为 Cloudflare 盾验证，不再依赖浏览器验证码自动填充扩展。
-        #   走框架通用 CF 流程：Detect 已 CF 感知（cf-turnstile 无 token / "Just a moment" → CF_CHALLENGE），
-        #   坐标点击 Turnstile（ForceLayoutViewport 固定视口，保证 CDP 坐标系一致）；
-        #   CF 通过后 attendance 表单仍需提交，故由 NexusPHPCfSignInClick 点击签到 submit。
-        ForceLayoutViewport = $true
-        Detect = $NexusPHPSignInDetect
-        Click = $NexusPHPCfSignInClick
+        PostClickMs = 50000
+        # v4.13.28: vclib 的 CF 盾必须由人工在浏览器内勾选（自动/坐标点击无效，v4.13.27 曾使本站
+        #   陷入 6×45s CF 自动重试 → 单站耗时达 906s，把批次重度拖慢）。
+        #   关键：Detect **不能**返回 CF_CHALLENGE（否则进框架自动点击重试），CF 未过一律回 CF_PENDING，
+        #   落入下方自定义 Click：异步轮询等待用户勾选盾牌验证（cf-turnstile-response 出现 → 自动点签到）；
+        #   PostClickMs 即"等人工勾选+提交"的总窗口，超时未过报 CF_PENDING，报告提示人工复核而非无限卡。
+        Detect = $VclibCfSignInDetect
+        Click = $VclibCfSignInClick
     }
     "521" = @{
         Url = "https://pt.521.best/attendance.php"

@@ -339,7 +339,8 @@ foreach ($site in $config.sites) {
                         }
                     }
                     # ⚠️  禁止自动添加 manual：失败站点仅记入需人工审核列表，不改策略
-                    if ($siteResult.status -eq "CF_BLOCKED" -or $siteResult.status -eq "SLIDER_FAIL") {
+                    # v4.13.28: CF_PENDING（vclib 等需人工勾选 CF 盾）同样需人工介入
+                    if ($siteResult.status -eq "CF_BLOCKED" -or $siteResult.status -eq "SLIDER_FAIL" -or $siteResult.status -eq "CF_PENDING") {
                         $tracking.needs_manual_review += "$($site.name)($($siteResult.status))"
                         Write-Output "  [REVIEW] 需人工审核: $($site.name) - $($siteResult.status)（不会自动改为 manual）"
                     }
@@ -494,6 +495,7 @@ function Send-FeishuSummary {
         if ($entry.status -ne "SUCCESS" -and $entry.status -ne "ALREADY_DONE" -and $entry.status -ne "SKIPPED" -and $entry.status -ne "VISITED") {
             switch ($entry.status) {
                 "CF_BLOCKED"  { $capSites += $entry.name }
+                "CF_PENDING"  { $capSites += $entry.name }
                 "NO_DETECT"   { $nodetectSites += $entry.name }
                 default       { $otherSites += $entry.name }
             }

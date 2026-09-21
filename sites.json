@@ -259,7 +259,7 @@
       "url": "https://pt.vclib.online/attendance.php",
       "strategy": "webbridge",
       "display_name": "VCLib",
-      "note": "v4.13.27: 站点现改 Cloudflare 盾验证（不再依赖浏览器验证码自动填充扩展）；走框架通用 CF 流程（Detect CF 感知 + 坐标点击 Turnstile），CF 通过后由 NexusPHPCfSignInClick 提交 attendance 表单"
+      "note": "v4.13.28: Cloudflare 盾需人工在浏览器内勾选（自动点击无效，v4.13.27 曾卡 906s 拖慢批次）；Detect 返回 CF_PENDING 绕过自动重试，Click 异步等人工勾选（cf-turnstile-response 出现）后自动提交签到，窗口约 50s 超时报 CF_PENDING 提示人工复核"
     },
     {
       "name": "521",

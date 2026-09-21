@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.13.28] - 2026-09-22
+
+### 修复 vclib 卡死（15 分钟/单站）——CF 盾改为"人工勾选 → 自动点签到"
+
+- **现象**：v4.13.27 走框架通用 CF 流程后，vclib 单站耗时飙到 **906.7s**（日志实测），把每日批次重度拖慢——框架 CF 自动重试（6×45s）对 vclib 的盾验证无效（该站需**人工勾选**，坐标点击不通过）。
+- **根因**：`$NexusPHPSignInDetect` 检测到 `.cf-turnstile` 无 token 会返回 `CF_CHALLENGE` → 触发框架 6 次 × 45s 自动点击重试，每次未通过还要等满 45s，最终靠用户手动勾选才放行 → 表现为"卡住"。
+- **修复**（`signin-web.ps1`）：
+  - 新增 vclib 专属 `$VclibCfSignInDetect`：**CF 未过一律返回 `CF_PENDING`**（不再返回 `CF_CHALLENGE`/`BODY_NULL`/`REDIRECTING`，彻底绕开框架自动点击重试）；已过（token 填充）则按标准 `NEED_SIGN`/`SIGN_OK` 判定。
+  - 新增 vclib 专属 `$VclibCfSignInClick`：先检查 `cf-turnstile-response` token——已就绪立即提交；未就绪则**异步轮询**（每 2s，上限约 50s）等待用户**在浏览器内人工勾选** CF 盾，token 出现后自动点签到 submit。PostClickMs=50000 即"等人工勾选+提交"总窗口。
+  - 移除 v4.13.27 的 `CfRetryCount/CfRetryWaitMs/ForceLayoutViewport`（不再自动点击 CF，无需坐标点击视口）。
+- **报告归类**（`signin-batch.ps1`）：`CF_PENDING` 与 `CF_BLOCKED`/`SLIDER_FAIL` 一样进"需人工审核"提示，并在失败明细归入 CF 类——不再静默卡死，即时到点未人工勾选也会在合理窗口内结束并明确提示。
+- **验证说明（诚实边界）**：导航层面的全局网络抖动（9-22 上午 haidan 等亦 NAVFAIL/SERVER_ERROR）下未做端到端实签；本次改动核心是**消除长等待路径**，行为已由 parse/lint 与逻辑推演验证。待下次运行观察是否回落正常秒级。
+
 ## [v4.13.27] - 2026-09-17
 
 ### vclib 适配 Cloudflare 盾验证（移除过期验证码自动填充方案）
