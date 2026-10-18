@@ -1,6 +1,6 @@
 {
   "version": "v4.12.0",
-  "total": 56,
+  "total": 57,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -178,7 +178,7 @@
       "name": "TJUPT",
       "url": "https://www.tjupt.org/attendance.php",
       "strategy": "manual",
-      "note": "2026-06-11: 站点启用图片验证码（选择与图片对应的影视名称），无法自动化，改为手动"
+      "note": "2026-06-11: 站点启用图片验证码（选择与图片对应的影视名称），无法自动化，改为手动。2026-10-18 复核：签到页明示「禁止使用任何自动化脚本/程序进行签到」，ban_robot 单选验证码仍在，保留人工"
     },
     {
       "name": "Tokyo",
@@ -214,10 +214,10 @@
     },
     {
       "name": "42w",
-      "url": "https://api.42w.shop/console/personal",
-      "strategy": "manual",
+      "url": "https://api.42x.shop/dashboard",
+      "strategy": "webbridge",
       "display_name": "42w AI控制台",
-      "note": "v4.10.1: URL 返回 404 (页面未找到)，签到入口失效，需人工确认正确URL后改回webbridge"
+      "note": "v4.13.30: 域名已变 api.42w.shop→api.42x.shop，旧 /console/personal 404；真实路由 /dashboard（NewAPI）。需人工一次性登录 /sign-in，之后按 SPA 控制台保活"
     },
     {
       "name": "hdbao",
@@ -231,7 +231,7 @@
       "url": "https://gyapi.zxiaoruan.cn/profile",
       "strategy": "manual",
       "display_name": "小软API",
-      "note": "v4.10.1: 页面重定向到 /sign-in 登录页（LinuxDO OAuth），未登录态无法签到，需人工登录后改回webbridge"
+      "note": "v4.10.1: 页面重定向到 /sign-in 登录页（LinuxDO OAuth），未登录态无法签到，需人工登录后改回webbridge。2026-10-18 复核：站点连接被重置不可达，待恢复后再试"
     },
     {
       "name": "musopia",
@@ -285,16 +285,16 @@
     {
       "name": "xt-url",
       "url": "https://checkin.new-api.xt-url.com/",
-      "strategy": "manual",
+      "strategy": "webbridge",
       "display_name": "NewAPI(xt-url)",
-      "note": "v4.10.1: 页面要求 LinuxDO OAuth 登录后才能签到，未登录态显示登录提示，改为manual"
+      "note": "v4.13.30 接入自动化：LinuxDO OAuth 登录态有效后点「立即签到」。⚠️ OAuth 授权落 connect.linux.do CF 质询（后台无法自动通过），需人工一次性登录；之后每跑自动点签到按钮"
     },
     {
       "name": "pbh-btn",
       "url": "https://bbs.pbh-btn.com/",
-      "strategy": "webbridge",
+      "strategy": "visit-only",
       "display_name": "PBH-BTN论坛",
-      "note": "v4.13.3: Flarum 真实签到（按钮无 id，按 class CheckInButton--yellow/green 判定；NavWaitUntil=domcontentloaded 规避 SPA 导航超时）；已现场核验 ALREADY_SIGNED 路径"
+      "note": "v4.13.29 改 visit-only：现场复核全站已无签到功能（CheckIn 按钮/文本均不存在，v4.13.3 的 Flarum 签到适配已失效），登录态正常，仅访问保活"
     },
     {
       "name": "invites",
@@ -312,10 +312,10 @@
     },
     {
       "name": "pting",
-      "url": "https://pting.club/?sort=newest",
+      "url": "https://fengchao.chat/latest",
       "strategy": "webbridge",
       "display_name": "全部主题 - 蜂巢",
-      "note": "auto: 书签同步新增"
+      "note": "v4.13.31: 站点换域名 pting.club→fengchao.chat（旧域名 302 重定向导致导航超时 NAV_FAIL），URL 直接指向新域名"
     },
     {
       "name": "linuxsb",
@@ -327,7 +327,7 @@
     {
       "name": "1ctrl",
       "url": "https://pt.1ctrl.cn/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "display_name": "修道院PT",
       "note": "auto: 书签同步新增"
     },
@@ -341,29 +341,36 @@
     {
       "name": "t-baozi",
       "url": "https://p.t-baozi.cc/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "display_name": "包子PT",
       "note": "auto: 书签同步新增"
     },
     {
-      "name": "fcloudpan",
-      "url": "https://fcloudpan.com/cloud",
-      "strategy": "webbridge",
-      "display_name": "F-Cloudpan 云盘",
-      "note": "v4.13.23 适配 / v4.13.24 改走幸运签到：先点右上角头像(aria-label=打开云盘个人菜单)展开 Base UI 下拉，再点面板内「幸运签到」(fcloud-las-vegas-check-in，1~20)；下拉仅聚焦时渲染故 BringToFront=$true；已签判定依据=签到按钮被置 disabled 或面板出现「今日已签到」"
-    },
-    {
       "name": "lp-bits",
       "url": "https://lp-bits.com/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "display_name": "LP-Bits",
       "note": "auto: 书签同步新增"
     },
     {
       "name": "muxuege",
       "url": "https://pt.muxuege.org/attendance.php",
-      "strategy": "web-read",
+      "strategy": "webbridge",
       "display_name": "慕雪阁PT",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "52movie",
+      "url": "https://www.52movie.top/attendance.php",
+      "strategy": "webbridge",
+      "display_name": "52MOVIE :: 签到 - Powered by NexusPHP",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "naturept",
+      "url": "https://naturept.top/attendance.php",
+      "strategy": "webbridge",
+      "display_name": "自然 :: 签到 - Powered by NexusPHP",
       "note": "auto: 书签同步新增"
     }
   ],

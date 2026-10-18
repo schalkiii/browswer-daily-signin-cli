@@ -11,6 +11,8 @@ $NexusPHPSignInDetect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
+  // v4.13.31: 站方临时关闭签到（NexusPHP 英文提示，521 实测）→ 站点侧状态，非失败
+  if(/Attendance has been temporarily disabled/i.test(t)) return 'SITE_DISABLED';
   // v4.13.0: 2FA / 异地登录（HDDolby 等）优先判定为登录失效
   if(location.pathname.indexOf('take2fa.php')>-1||t.indexOf('异地登录')>-1||t.indexOf('两步验证')>-1) return 'LOGIN_REQUIRED';
   // v4.12.9: 已签到状态优先于 CF 检测 —— 部分站点（xloli）attendance 页始终残留 .cf-turnstile
@@ -83,20 +85,25 @@ $NexusPHPCfSignInClick = @'
 # OurBits / GGPT / HDDolby / HDHome 的 Click 完全一致，抽出共享以避免 4 份重复维护。
 $NexusPHPExactClick = @'
 (function(){
+  // v4.13.31: 文本归一化——去掉首尾空白与方括号/全角方括号包裹。
+  //   NexusPHP 用户栏常用「[签到得魔力]」「[打卡]」形式（PigGo 实测），旧逻辑精确匹配失败 → NO_BTN。
+  function norm(s){
+    return (s||'').replace(/^[\s\[【]+/,'').replace(/[\s\]】]+$/,'').trim();
+  }
   // 收紧匹配：精确等于按钮文本 + 叶子节点过滤，避免误点导航栏容器
-  var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit]');
+  var candidates = document.querySelectorAll('a,button,b,font,span,input[type=submit],td');
   for(var i=0;i<candidates.length;i++){
     var el = candidates[i];
     if(el.children.length>1) continue;
-    var v = (el.textContent||el.value||'').trim();
-    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'){
+    var v = norm(el.textContent||el.value||'');
+    if(v==='签到得鲸币'||v==='签到得魔力'||v==='签到'||v==='打卡'||v==='签到得憨豆'){
       el.click(); return 'CLICKED_EXACT:'+v;
     }
   }
   for(var j=0;j<candidates.length;j++){
     var el2 = candidates[j];
     if(el2.children.length>1) continue;
-    var v2 = (el2.textContent||el2.value||'').trim();
+    var v2 = norm(el2.textContent||el2.value||'');
     if(v2.length<20 && (v2.indexOf('签到得')===0||v2.indexOf('打卡')===0)){
       el2.click(); return 'CLICKED_PREFIX:'+v2;
     }
@@ -267,6 +274,9 @@ $WebSignInConfigs = @{
   if(t.indexOf('获得')>-1&&t.indexOf('鸡腿')>-1) return 'SIGN_OK';
   if(t.indexOf('今日还未签到')>-1||t.indexOf('试试手气')>-1) return 'NEED_SIGN';
   if(t.indexOf('请登录')>-1||t.indexOf('必须登录')>-1||t.indexOf('您还未登录')>-1) return 'LOGIN_REQUIRED';
+  // v4.13.29: 未登录时 NodeSeek 侧边栏显示"登录后签到"（且无任何签到按钮，实测零 button）→ 明确判登录失效，
+  //   避免落入下方通用"签到"文本匹配误报 NEED_SIGN（曾导致每跑必失败 + 假回归）
+  if(t.indexOf('登录后签到')>-1) return 'LOGIN_REQUIRED';
   if(t.indexOf('正在检查')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
   // v4.12.26: NodeSeek 自有"Oops! Nework Error"网络错误页曾被兜底 LOGIN_REQUIRED 误判为登出，
   //   导致误报回归（实际是站点/代理侧波动）。显式识别网络错误 → SERVER_ERROR（非登录失效）。
@@ -415,7 +425,9 @@ $WebSignInConfigs = @{
         # v4.12.11: 雷池(Safeline) WAF JS 挑战页 body 初始为空，挑战通过后才注入真实内容。
         #   加大 WaitMs（12s→30s）给 WAF 挑战更充裕的求解时间，避免 body 仍空被判 UNKNOWN。
         WaitMs = 30000
-        PostClickMs = 5000
+        # v4.13.31: 点击 [签到得魔力] 后页面会重新过雷池 WAF（~25s），5s re-check 太早 →
+        #   实测已签到成功（魔力 +35）但仍报 NEED_SIGN。PostClick 加长到 30s 覆盖 WAF 重挑战。
+        PostClickMs = 30000
         # v4.12.6: 复用 NexusPHPSignInDetect（含 cfTokenPassed 修复，避免"安全验证"文本误判）
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPExactClick
@@ -574,14 +586,22 @@ $WebSignInConfigs = @{
 
     "Rousi" = @{
         Url = "https://rousi.pro/points"
-        WaitMs = 12000
+        # v4.13.31: SPA 水合慢且后台窗口不渲染——2026-10-18 实测 12s 时 innerText 仅 194 字符
+        #   （React Router 流式脚本）、15s+ 才出现完整 UI。加长等待 + BringToFront 强制聚焦确保水合。
+        WaitMs = 18000
         PostClickMs = 5000
+        BringToFront = $true
         Detect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
-  var t = document.body.innerText||'';
+  // v4.13.31: 用 textContent 而非 innerText（后台折叠窗口 innerText 可能为空）
+  var t = document.body.textContent||'';
   if(t.indexOf('签到成功')>-1||t.indexOf('已签到')>-1||t.indexOf('连续签到')>-1) return 'SIGN_OK';
   if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1) return 'LOGIN_REQUIRED';
+  // v4.13.29: RousiPro 为自定义 SPA，未登录时 /points 跳首页，显示"账户入口/登录/注册"（无"请登录"字样，
+  //   旧判据漏判 → UNKNOWN 假失败）。"账户入口"为匿名首页特有文案，直接作登录失效信号。
+  if(t.indexOf('账户入口')>-1) return 'LOGIN_REQUIRED';
+  if(t.indexOf('登录')>-1&&t.indexOf('注册')>-1&&t.indexOf('积分')<0&&t.indexOf('魔力')<0) return 'LOGIN_REQUIRED';
   return 'UNKNOWN';
 })()
 '@
@@ -607,6 +627,8 @@ $WebSignInConfigs = @{
         Url = "https://bilibili.download/attendance.php"
         WaitMs = 12000
         PostClickMs = 5000
+        # v4.13.29: 站点间歇性 30s 负载超时（10/13 批量 + 现场探测均偶发；登录态实测正常、页面可开）→ 导航超时加宽到 120s
+        NavTimeoutSec = 120
         Detect = $NexusPHPSignInDetect
         Click = $null
     }
@@ -727,6 +749,9 @@ $WebSignInConfigs = @{
         Url = "https://pt.521.best/attendance.php"
         WaitMs = 15000
         PostClickMs = 30000
+        # v4.13.31: 站方可临时关闭签到（页面显示 "Attendance has been temporarily disabled."，
+        #   2026-10-18 实测）。该判据已加入共享 $NexusPHPSignInDetect，返回 SITE_DISABLED，
+        #   由 batch 归类为 SKIPPED（站点侧状态，不计失败/回归）。
         Detect = $NexusPHPSignInDetect
         Click = @'
 (function(){
@@ -986,7 +1011,9 @@ $WebSignInConfigs = @{
     #      正文帖子标题也含「签到」（如「无法签到？不知道如何排查？」）会误命中。
     #   弹窗仅在标签页可见/聚焦时渲染（-NoFocus 后台打不开），故 BringToFront=$true。
     "pting" = @{
-        Url = "https://pting.club/?sort=newest"
+        # v4.13.31: 站点换域名——pting.club 现 302 到 fengchao.chat/latest，且重定向+巨型 SPA
+        #   导致 30s 导航超时（NAV_FAIL）。直接指向新域名，避免重定向开销。
+        Url = "https://fengchao.chat/latest"
         WaitMs = 14000
         PostClickMs = 4000
         Detect = @'
@@ -1076,52 +1103,15 @@ $WebSignInConfigs = @{
 '@
     }
 
-    # v4.13.3: pbh-btn（PBH-BTN 论坛）真实签到适配 —— 经 daemon 上线后现场 DOM 核验修正。
-    #   与蜂巢(pting)同款 Flarum check-in 插件，但 **按钮无 id**：未签为
-    #   <button class="Button CheckInButton--yellow hasIcon">签到</button>（可点），
-    #   已签后变为 <button class="Button CheckInButton--green hasIcon disabled">已签到N天</button>。
-    #   Flarum SPA 子资源可能长时间挂起而不触发 load：导航失败时 Open-SiteTab 会先校验
-    #   location.href 是否其实已到达（DOM 常已可用），并按需重试，故不影响本站签到。
+    # v4.13.29: pbh-btn 改 visit-only。v4.13.3 曾按 Flarum CheckInButton--yellow/green 适配签到，
+    #   但 2026-10-13 现场复核（首页 + /discussions 两页、等 15s 水合、原始 HTML/JS 全量 grep）：
+    #   全站已无 CheckIn 按钮、无"签到"文本——站点签到插件已不存在，Detect 恒 UNKNOWN 每跑必报失败。
+    #   账号登录态正常（用户名+退出登录可见），改为仅访问保活，与 Kufirc/AsianDVDClub 同款处理。
     "pbh-btn" = @{
         Url = "https://bbs.pbh-btn.com/"
-        WaitMs = 15000
-        PostClickMs = 3000
-        Detect = @'
-(function(){
-  // 主检测：pbh-btn 无 id，按 class 取 check-in 按钮（黄=未签，绿=已签）
-  var btn = document.querySelector('button.CheckInButton--yellow, button.CheckInButton--green');
-  if (btn) {
-    var txt = (btn.innerText || btn.textContent || '').trim();
-    if (btn.classList.contains('disabled') || /已签到/.test(txt)) return 'ALREADY_SIGNED';
-    return 'NEED_SIGN';
-  }
-  // 兜底：按文本「签到」找按钮（覆盖其他 class 变体）
-  var els = document.querySelectorAll('button, a');
-  for (var i = 0; i < els.length; i++) {
-    var t = (els[i].innerText || els[i].textContent || '').trim();
-    if (t === '签到' || t === '每日签到') return 'NEED_SIGN';
-  }
-  // 已签：页面出现连续签到天数
-  var full = document.body.innerText || '';
-  if (full.indexOf('已签到') > -1 || full.indexOf('连续签到') > -1 || full.indexOf('今日已签到') > -1) return 'ALREADY_SIGNED';
-  return 'UNKNOWN';
-})()
-'@
-        Click = @'
-(function(){
-  // 仅点「未签」状态的按钮（黄且未 disabled、文本非已签），避免对已签按钮重复点击
-  var btn = document.querySelector('button.CheckInButton--yellow, button.CheckInButton--green');
-  if (btn && !btn.classList.contains('disabled') && !/已签到/.test((btn.innerText || btn.textContent || ''))) {
-    btn.click(); return 'CLICKED';
-  }
-  var els = document.querySelectorAll('button, a');
-  for (var i = 0; i < els.length; i++) {
-    var t = (els[i].innerText || els[i].textContent || '').trim();
-    if (t === '签到' || t === '每日签到') { els[i].click(); return 'CLICKED'; }
-  }
-  return 'NO_BTN';
-})()
-'@
+        WaitMs = 8000
+        Detect = $null
+        Click = $null
     }
 
     "AsianDVDClub" = @{
@@ -1189,6 +1179,174 @@ $WebSignInConfigs = @{
         Click = $null
     }
 
+    # === v4.13.30: 书签同步 NexusPHP 站点接入自动化（原 web-read 无 $WebSignInConfigs 条目被静默跳过）===
+    # 2026-10-18 现场探测结论：均已登录、无 CF、无验证码，attendance.php 访问即签到（GET 即完成），
+    # 与 BiliDownload 同构（Detect=$NexusPHPSignInDetect + Click=$null）。
+    "1ctrl" = @{
+        Url = "https://pt.1ctrl.cn/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "t-baozi" = @{
+        Url = "https://p.t-baozi.cc/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    # lp-bits：英文 NexusPHP，attendance.php 无任何中文签到文案，GET 即静默签到（日历 events 由
+    #   服务端渲染，今日签到后当日即出现 title 事件）。状态只能解析页面 FullCalendar 的
+    #   `let events = JSON.parse('...')`：今日有 title 事件=已签；无=未签（重试重新 GET）。
+    "lp-bits" = @{
+        Url = "https://lp-bits.com/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var html = document.documentElement.outerHTML || '';
+  var m = html.match(/let events = JSON\.parse\('([\s\S]+?)'\)/);
+  if(!m) return 'UNKNOWN';
+  var evs;
+  try { evs = JSON.parse(m[1]); } catch(e){ return 'UNKNOWN'; }
+  var d = new Date();
+  var iso = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  for(var i=0;i<evs.length;i++){
+    if(evs[i].start===iso && evs[i].title) return 'SIGN_OK';
+  }
+  return 'NEED_SIGN';
+})()
+'@
+        Click = $null
+    }
+    "muxuege" = @{
+        Url = "https://pt.muxuege.org/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    "52movie" = @{
+        Url = "https://www.52movie.top/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 5000
+        Detect = $NexusPHPSignInDetect
+        Click = $null
+    }
+    # naturept：attendance.php 带 imagestring 图片验证码输入框，但用户浏览器装有验证码自动填入扩展
+    #   （实测导航后输入框已被填 6 位码）。Click 轮询 imagestring 有值后点「立即签到」提交。
+    "naturept" = @{
+        Url = "https://naturept.top/attendance.php"
+        WaitMs = 12000
+        PostClickMs = 20000
+        Detect = $NexusPHPSignInDetect
+        Click = @'
+(function(){
+  function findSubmit(f){
+    return f.querySelector('input[type=submit][value*="签到"]') ||
+           f.querySelector('input[type=submit][value*="簽到"]') ||
+           f.querySelector('input[type=submit]');
+  }
+  function captchaReady(){
+    var ti = document.querySelector('input[name="imagestring"]');
+    return !!(ti && ti.value && ti.value.length >= 4);
+  }
+  var form = document.querySelector('form[action*="attendance"]') || document.querySelector('form');
+  if(!form) return 'NO_FORM';
+  var submit = findSubmit(form);
+  if(!submit) return 'NO_SUBMIT';
+  if(captchaReady()){ submit.click(); return 'CLICKED_NOW'; }
+  // 验证码可能仍在等待扩展填入：异步轮询（1s/次，最多 15s），填入后立即提交
+  var ticks = 0;
+  var timer = setInterval(function(){
+    ticks += 1;
+    if(captchaReady()){
+      clearInterval(timer);
+      var f2 = document.querySelector('form[action*="attendance"]') || document.querySelector('form');
+      var s2 = f2 ? findSubmit(f2) : null;
+      if(s2) s2.click();
+    } else if(ticks >= 15){
+      clearInterval(timer);
+    }
+  }, 1000);
+  return 'CLICK_SCHEDULED';
+})()
+'@
+    }
+
+    # v4.13.30: 42w（42 API，NewAPI 部署）——域名已由 api.42w.shop 变为 api.42x.shop，且旧
+    #   /console/personal 路由 404；现场探测真实控制台路由为 /dashboard（根页链接指向它）。
+    #   ⚠️ 需人工一次性登录（/sign-in 支持账密/LinuxDO）；登录态有效后按 SPA 控制台保活判定。
+    "42w" = @{
+        Url = "https://api.42x.shop/dashboard"
+        WaitMs = 12000
+        PostClickMs = 5000
+        # 专用 Detect：NewAPI 未登录会跳 /sign-in（SPA 登录页正文含"登录"但不含"请登录/未登录"，
+        #   $SPASignInDetect 会误判 SIGN_OK）。以路径/密码框为准，其余按 SPA 保活处理。
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var t = document.body.textContent||'';
+  if(location.pathname.indexOf('/sign-in')>-1 || location.pathname.indexOf('/login')>-1) return 'LOGIN_REQUIRED';
+  if(document.querySelector('input[type=password]')) return 'LOGIN_REQUIRED';
+  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1) return 'LOGIN_REQUIRED';
+  if(t.length>100) return 'SIGN_OK';
+  return 'BODY_NULL';
+})()
+'@
+        Click = $null
+    }
+
+    # v4.13.30: xt-url（小天公益站签到系统，NewAPI checkin 子站）—— ⚠️ 需人工一次性登录：
+    #   入口是 LinuxDO OAuth，授权会落 connect.linux.do 的 CF 托管质询（后台窗口 60s+ 不自动放行，
+    #   与 V2EX/audiences 同类），无法全自动。登录态有效后：未签显示可见「立即签到 ☀️」按钮，
+    #   已签显示「明天再来签到吧」（二者均常驻 DOM 但按状态 display 切换，故 Detect 按可见性判定）。
+    "xt-url" = @{
+        Url = "https://checkin.new-api.xt-url.com/"
+        WaitMs = 10000
+        PostClickMs = 8000
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  function vis(el){
+    if(!el) return false;
+    var r = el.getBoundingClientRect(); var s = getComputedStyle(el);
+    return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && s.opacity!=='0';
+  }
+  // ⚠️ 必须纯可见性判定：页面在未登录态也常驻隐藏的「退出登录」「明天再来」等元素，
+  //   任何基于 textContent 的兜底都会把未登录误判为已签（2026-10-18 实测踩坑）。
+  var sign=null, done=null, linuxdo=null;
+  var els=[].slice.call(document.querySelectorAll('button,a'));
+  for(var i=0;i<els.length;i++){
+    var x=(els[i].innerText||'').trim();
+    if(/立即签到/.test(x)) sign=els[i];
+    if(/明天再来/.test(x)) done=els[i];
+    if(/使用 Linux ?Do 登录/i.test(x)) linuxdo=els[i];
+  }
+  if(linuxdo && vis(linuxdo)) return 'LOGIN_REQUIRED';
+  if(sign && vis(sign)) return 'NEED_SIGN';
+  if(done && vis(done)) return 'SIGN_OK';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  function vis(el){
+    var r = el.getBoundingClientRect(); var s = getComputedStyle(el);
+    return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden';
+  }
+  var els=[].slice.call(document.querySelectorAll('button,a'));
+  for(var i=0;i<els.length;i++){
+    var x=(els[i].innerText||'').trim();
+    if(/立即签到/.test(x) && vis(els[i])){ els[i].click(); return 'CLICKED'; }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
+
     # v4.13.23: fcloudpan（F-Cloudpan 云盘）真实签到适配 —— 经 daemon 上线后现场 DOM 核验。
     #   签到入口不在页面正文：须先点右上角头像按钮（aria-label="打开云盘个人菜单"）展开 Base UI 下拉，
     #   下拉内的 [data-slot="avatar-check-in-panel"] 才是签到面板。
@@ -1206,6 +1364,8 @@ $WebSignInConfigs = @{
         Url = "https://fcloudpan.com/cloud"
         WaitMs = 12000
         PostClickMs = 6000
+        # v4.13.29: 站点间歇性 30s 负载超时（10/13 批量 NAV_FAIL；SPA 子资源多）→ 导航超时加宽到 120s
+        NavTimeoutSec = 120
         Detect = @'
 (async function(){
   function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }

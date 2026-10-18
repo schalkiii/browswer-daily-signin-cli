@@ -1,5 +1,40 @@
 # Changelog
 
+## [v4.13.31] - 2026-10-18
+
+### 10 个人工/跳过站点接入自动化 + 今日失败站点修复
+
+**人工站点接入（除 FreeFarm 滑块、TJUPT 图片验证码外全部自动化）**
+- **6 个 web-read 跳过站接入 webbridge**（原缺 `$WebSignInConfigs` 条目被 NO_CONFIG 静默跳过）：
+  - `1ctrl`（修道院PT）、`t-baozi`（包子PT）、`muxuege`（慕雪阁PT）、`52movie`：标准 NexusPHP 访问即签到 → 实测 SIGN_OK。
+  - `lp-bits`：英文 NexusPHP，页面无中文签到文案，GET 即静默签到；新增专属 Detect 解析页面 FullCalendar 的 `let events = JSON.parse('...')`（今日有 title 事件=已签）→ 实测 SIGN_OK。
+  - `naturept`（自然）：attendance 表单带 imagestring 验证码，但浏览器扩展会自动填入；新增 Click 轮询 imagestring（1s×15）后点「立即签到」→ 实测 SIGN_OK。
+- **42w AI控制台**：域名已变 `api.42w.shop` → `api.42x.shop`，旧 `/console/personal` 404；真实路由 `/dashboard`。改 webbridge + 专用 Detect（`/sign-in` 路径/密码框 → LOGIN_REQUIRED，避免 SPA 登录页被 `$SPASignInDetect` 误判 SIGN_OK）。**需人工一次性登录**。
+- **xt-url（NewAPI 签到子站）**：LinuxDO OAuth 入口在 connect.linux.do 落 CF 托管质询（后台 60s+ 不放行），OAuth 需人工一次性完成。改 webbridge + **纯可见性** Detect/Click（登录/立即签到/明天再来按可见性判定，未登录时 DOM 里隐藏的"退出登录"不再致误判）。登录态有效后自动点「立即签到」。
+- **TJUPT 保留 manual**：签到页明示「禁止使用任何自动化脚本/程序进行签到」，ban_robot 图片选影视名验证码仍在。
+- **FreeFarm 保留 manual**：真·拖拽滑块（用户确认）。
+- **zxiaoruan 保留 manual**：站点连接被重置不可达，待恢复后再适配。
+
+**今日失败站点修复**
+- **PigGo**：签到入口是用户栏 `[签到得魔力]` 链接（方括号包裹），旧 `$NexusPHPExactClick` 精确匹配失败 → NO_BTN。共享 Click 增加文本归一化（剥离首尾 `[]`/`【】`），并加 `td` 候选；点击后页面重新过雷池 WAF 需 ~25s，PostClickMs 5s→30s。实测点击成功（魔力 +35）并正确判 ALREADY_SIGNED。
+- **pting（蜂巢）**：站点换域名 `pting.club` → `fengchao.chat`（旧域名 302 导致导航超时），URL 更新为 `https://fengchao.chat/latest` → 实测 ALREADY_SIGNED。
+- **Rousi**：SPA 水合慢且后台窗口不渲染（12s 时仅 React Router 流式脚本），WaitMs 12s→18s + `BringToFront=$true`，Detect 改用 textContent → 实测 SIGN_OK。
+- **521**：站点已临时关闭签到（页面 "Attendance has been temporarily disabled."）；共享 `$NexusPHPSignInDetect` 新增 `SITE_DISABLED` 信号，batch 归类 SKIPPED（站点侧状态不计失败）。
+- **HDDolby**：登录态过期（且当前站点导航超时）→ 需人工重登。
+- **HTCPT**：站点返回 HTTP 500（站点侧故障）。
+- **V2EX / audiences / vclib**：CF 盾，维持现状（audiences 宽松日可过；vclib 设计为人工勾盾）。
+
+## [v4.13.29] - 2026-10-13
+
+### 修复计划任务静默失败 3 周 + 失败站点排查与适配（重跑 daily checkin 后）
+
+- **计划任务修复（根因）**：PowerShell 预览版 7.7.3.0 → 7.7.5.0 升级后，`DailySigninBatch` 动作里硬编码的 `WindowsApps\...7.7.3.0...\pwsh.exe` 路径失效，每次运行立即失败（0x800710E0），最后成功运行为 09-23，之后约 3 周全部静默失败。重跑 `setup-daily-task.ps1` 重新注册，现指向版本无关稳定别名（`...\Microsoft.PowerShellPreview_8wekyb3d8bbwe\pwsh.exe`），已验证任务就绪、明早 2:00 正常触发。
+- **pbh-btn 改 visit-only**：现场复核（首页 + /discussions 两页、15s 水合、原始 HTML/JS 全量 grep）确认全站已无签到功能——v4.13.3 的 Flarum CheckInButton 适配已失效，Detect 恒 UNKNOWN 每跑必报失败。账号登录态正常，改仅访问保活（sites.json strategy + $WebSignInConfigs 同步）。实测 VISITED。
+- **NodeSeek / Rousi 登录失效判据**：两站登录态过期（NodeSeek 侧边栏显示"登录后签到"且无签到按钮；RousiPro 未登录跳首页显示"账户入口/登录/注册"），旧判据漏判 → UNKNOWN 假失败。Detect 增加未登录信号，实测均正确返回 LOGIN_REQUIRED。**需人工在 webbridge 浏览器重登**（连同 Yemapt、HDDolby 共 4 站登录态过期）。
+- **BiliDownload / fcloudpan 导航超时加宽**：两站间歇性 30s 负载超时（10/13 批量 + 多次探测复现），加 `NavTimeoutSec=120`。BiliDownload 实测 SIGN_OK（签到成功）；fcloudpan 导航已恢复但 Detect UNKNOWN + NO_TRIGGER（触发器 `[aria-label="打开云盘个人菜单"]` 不在 DOM、页面也无登录/注册文本，疑 UI 变更或异常渲染），待站点稳定后复核。
+- **其余失败均为站点侧/环境问题，无代码可改**：521（ERR_TIMED_OUT 不可达）、V2EX/audiences（CF 托管盾，后台窗口难过；audiences 已登录，CF 宽松日可过）、vclib（CF_PENDING 人工勾盾，设计使然）、库非/冬樱/A4APT/Sunny/CDFile/HDVbits（对方插件名单中的站点，本仓库未收录或站点本身故障）。
+- 修复后全量重跑结果：36 成功 / 11 基线回归（其中 4 站登录过期、1 站设计使然、3 站 CF、1 站不可达、2 站间歇超时）。
+
 ## [v4.13.28] - 2026-09-22
 
 ### 修复 vclib 卡死（15 分钟/单站）——CF 盾改为"人工勾选 → 自动点签到"

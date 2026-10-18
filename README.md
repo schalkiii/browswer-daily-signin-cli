@@ -21,9 +21,10 @@
 |----------|------|----------|----------|
 | `webbridge` | 打开网页 → 检测签到状态 → 必要时点击/绕过验证 | `SIGN_OK` / `ALREADY_SIGNED` / `NEED_SIGN` / `CF_CHALLENGE` / `SLIDER` / … | ✅ 自动 |
 | `visit-only` | 仅打开网页，**不检测不点击**（如 AsianDVDClub / Kufirc / asiandvd） | `VISITED` | ❌ 仅访问 |
-| `manual` | 跳过，由用户人工处理（如 TJUPT / 42w / zxiaoruan） | `SKIPPED`（记入 `skip_sites`，飞书给可点击链接） | ❌ 人工 |
+| `manual` | 跳过，由用户人工处理（当前仅 FreeFarm 滑块 / TJUPT 图片验证码 / zxiaoruan 站点不可达） | `SKIPPED`（记入 `skip_sites`，飞书给可点击链接） | ❌ 人工 |
 
 > 改某站为「仅打开不签到」：把 `strategy` 改成 `visit-only` 即可（无需改 `$WebSignInConfigs`，visit-only 靠 `DetectEval` 为空自动判定）。
+> **需一次性人工登录**：`42w`（`api.42x.shop/sign-in`）与 `xt-url`（LinuxDO OAuth）已接入 `webbridge`，但登录态需在浏览器中人工建立一次；之后每跑自动签到/保活。
 > **禁止自动添加 `manual`**：失败站点只进 `needs_manual_review` 列表通知用户，绝不自动改策略（见 `signin-batch.ps1` 注释）。
 
 ## 标签页去重（重要不变量）

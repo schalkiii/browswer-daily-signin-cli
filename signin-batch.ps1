@@ -308,6 +308,8 @@ foreach ($site in $config.sites) {
                         "SLIDER"        { $siteResult.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL" }
                         "NAV_FAIL"      { $siteResult.status = "TIMEOUT"; $signals.fail_sites += $site.name; Write-Output "  => TIMEOUT" }
                         "NO_CONFIG"     { $siteResult.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => NO_CONFIG" }
+                        # v4.13.31: 站方临时关闭签到（如 521 "Attendance has been temporarily disabled"）→ 跳过而非失败
+                        "SITE_DISABLED" { $siteResult.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => SITE_DISABLED (站方暂停签到)" }
                         "BODY_NULL"     { $siteResult.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (body null)" }
                         "REDIRECTING"   { $siteResult.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => REDIRECTING" }
                         "SERVER_ERROR"  { $siteResult.status = "PAGE_ERROR"; $signals.fail_sites += $site.name; Write-Output "  => PAGE_ERROR (server/network error)" }
