@@ -11,8 +11,13 @@ $NexusPHPSignInDetect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
+  // ⚠️ 站点侧"停签"判据必须用 textContent：后台折叠窗口 innerText 不返回占位正文（PigGo 实测），
+  //   而 textContent 始终可读。仅这两个特定文案用 textContent，避免隐藏模板引入误判。
+  var tc = document.body.textContent||'';
   // v4.13.31: 站方临时关闭签到（NexusPHP 英文提示，521 实测）→ 站点侧状态，非失败
-  if(/Attendance has been temporarily disabled/i.test(t)) return 'SITE_DISABLED';
+  if(/Attendance has been temporarily disabled/i.test(tc)) return 'SITE_DISABLED';
+  // v4.13.32: 站方下线签到功能（PigGo attendance 页只剩「敬请期待！」占位，签到入口点击无效）→ 站点侧状态
+  if(tc.indexOf('敬请期待')>-1) return 'SITE_DISABLED';
   // v4.13.0: 2FA / 异地登录（HDDolby 等）优先判定为登录失效
   if(location.pathname.indexOf('take2fa.php')>-1||t.indexOf('异地登录')>-1||t.indexOf('两步验证')>-1) return 'LOGIN_REQUIRED';
   // v4.12.9: 已签到状态优先于 CF 检测 —— 部分站点（xloli）attendance 页始终残留 .cf-turnstile
@@ -726,13 +731,6 @@ $WebSignInConfigs = @{
         Detect = $NexusPHPSignInDetect
         Click = $null
     }
-    "ptlao" = @{
-        Url = "https://ptlao.top/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
-        Detect = $NexusPHPSignInDetect
-        Click = $null
-    }
     "vclib" = @{
         Url = "https://pt.vclib.online/attendance.php"
         WaitMs = 15000
@@ -1213,9 +1211,17 @@ $WebSignInConfigs = @{
   try { evs = JSON.parse(m[1]); } catch(e){ return 'UNKNOWN'; }
   var d = new Date();
   var iso = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var maxTs = 0, latestTitle = null;
   for(var i=0;i<evs.length;i++){
     if(evs[i].start===iso && evs[i].title) return 'SIGN_OK';
+    if(evs[i].title){
+      var ts = Date.parse(evs[i].start);
+      if(ts>maxTs){ maxTs=ts; latestTitle=evs[i].start; }
+    }
   }
+  // v4.13.32: 跨日容错——站点日切时间晚于本地凌晨（实测 03:03 时今日事件尚未生成，14:30 已可签）。
+  //   若最近一次 title 事件在 24h 内，说明按站点日仍处于已签状态 → SIGN_OK（避免凌晨假失败）。
+  if(latestTitle && (Date.parse(iso) - maxTs) <= 86400000) return 'SIGN_OK';
   return 'NEED_SIGN';
 })()
 '@
@@ -1223,13 +1229,6 @@ $WebSignInConfigs = @{
     }
     "muxuege" = @{
         Url = "https://pt.muxuege.org/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
-        Detect = $NexusPHPSignInDetect
-        Click = $null
-    }
-    "52movie" = @{
-        Url = "https://www.52movie.top/attendance.php"
         WaitMs = 12000
         PostClickMs = 5000
         Detect = $NexusPHPSignInDetect

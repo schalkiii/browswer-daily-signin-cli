@@ -540,6 +540,11 @@ function Test-WebBridgeSignIn {
             Save-DebugSnapshot $SiteName $session $signal $DebugDir $SaveDebugSnapshot
             return $signal
         }
+        # v4.13.32: 站点侧停签（SITE_DISABLED）是终止态——无需再点击/等 PostClick（PigGo/521 实测）
+        if ($signal -match "SITE_DISABLED") {
+            Save-DebugSnapshot $SiteName $session "site_disabled" $DebugDir $SaveDebugSnapshot
+            return "SITE_DISABLED"
+        }
         # v4.12.18: SLIDER 不再在此提前 return —— 否则下方 Invoke-SlideBypass 滑块绕过
         # 逻辑（第 338 行起）成为死代码。SLIDER 必须落到该绕过块才能真正尝试绕过。
 

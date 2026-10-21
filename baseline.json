@@ -21,7 +21,6 @@
     "HDCITY",
     "OurBits",
     "DepthStudio",
-    "PTLAO",
     "音乐乌托邦",
     "HDBao",
     "AsianDVDClub",
@@ -61,7 +60,11 @@
     "cdy",
     "linuxsb",
     "haidan",
-    "fcloudpan"
+    "fcloudpan",
+    "1ctrl",
+    "t-baozi",
+    "muxuege",
+    "naturept"
   ],
   "manual_sites": [
     "北洋园PT",
@@ -73,7 +76,7 @@
     "xt-url",
     "pp"
   ],
-  "auto_total": 60,
+  "auto_total": 63,
   "manual_total": 8,
-  "last_updated": "2026-09-07 02:22:26"
+  "last_updated": "2026-10-21 22:37:22"
 }

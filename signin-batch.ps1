@@ -6,6 +6,15 @@ param(
     [string]$FeishuChatId = "",
     [string]$FeishuWebhook = "",
     [switch]$SaveDebugSnapshot,
+    # v4.13.32: 收尾恢复轮——全量跑完后对"可恢复"失败站再重试一轮（站内即时重试仅间隔 10s，
+    #   覆盖不了网络抖动/站点短时抽风）。默认冷却 120s，最多 15 站；-NoRecovery 可关闭。
+    [int]$RecoveryDelaySec = 120,
+    [int]$RecoveryMaxSites = 15,
+    [switch]$NoRecovery,
+    # v4.13.32: 本地/调试运行时不推飞书（避免测试卡片打扰）
+    [switch]$NoFeishu,
+    # v4.13.32: 跳过书签同步（调试/受控运行用；避免临时配置被书签全量列表重写）
+    [switch]$NoBookmarkSync,
     # v4.13.0: 仅执行配置一致性校验并退出（不打开浏览器、不签到）
     [switch]$ValidateConfig
 )
@@ -19,6 +28,8 @@ if ($PSVersionTable.PSVersion.Major -lt 6) {
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $results = @()
+# v4.13.32: 收尾恢复轮中从失败转为成功的站点（写入 log / 飞书）
+$script:recoveredSites = @()
 
 # kimi webbridge 集成
 . "$PSScriptRoot\signin-web.ps1"
@@ -228,7 +239,11 @@ function Sync-Bookmarks {
     return $ConfigObject
 }
 
-$config = Sync-Bookmarks $ConfigFile $config
+if (-not $NoBookmarkSync) {
+    $config = Sync-Bookmarks $ConfigFile $config
+} else {
+    Write-Output "[SYNC] Skipped (-NoBookmarkSync)"
+}
 
 # Cleanup old articles
 if (Test-Path $WebArticlesDir) {
@@ -381,6 +396,84 @@ foreach ($site in $config.sites) {
     Write-Output ""
 }
 
+# === v4.13.32: 收尾恢复轮 ===
+# 站内即时重试只间隔 10s，对网络抖动/站点短时抽风覆盖不足；在总结与飞书推送前对"可恢复"失败站
+# 再跑一轮（默认冷却 120s，最多 15 站）。排除 NO_LOGIN（需人工重登）与 CF_PENDING（需人工勾盾）。
+# 恢复成功的站点会从 fail_sites/regressions 移出，并在 log/飞书中标记「恢复轮」。
+if (-not $NoRecovery) {
+    $recoveryStatuses = @("TIMEOUT", "PAGE_ERROR", "NO_DETECT", "CF_BLOCKED", "SLIDER_FAIL")
+    $recoveryCandidates = @($results | Where-Object { $_.status -in $recoveryStatuses })
+    if ($recoveryCandidates.Count -gt 0) {
+        Write-Output ""
+        Write-Output "=== RECOVERY PASS: $($recoveryCandidates.Count) site(s) pending, cooldown ${RecoveryDelaySec}s ==="
+        if ($recoveryCandidates.Count -gt $RecoveryMaxSites) {
+            Write-Output "  (cap $RecoveryMaxSites sites; $($recoveryCandidates.Count - $RecoveryMaxSites) skipped)"
+        }
+        if ($RecoveryDelaySec -gt 0) { Start-Sleep -Seconds $RecoveryDelaySec }
+        foreach ($r in ($recoveryCandidates | Select-Object -First $RecoveryMaxSites)) {
+            Write-Output "[RECOVERY] $($r.name) (was $($r.status))"
+            try {
+                $rr = Invoke-WebSignIn -SiteName $r.name -Strategy $r.strategy -SaveDebugSnapshot $SaveDebugSnapshot -DebugDir $DebugDir -NoFocus:$true
+            } catch {
+                $rr = "EVAL_FAIL"
+                Write-Output "  exception: $_"
+            }
+            $r.signal = $rr
+            $newStatus = switch -Wildcard ($rr) {
+                "SIGN_OK"        { "SUCCESS" }
+                "ALREADY_SIGNED" { "ALREADY_DONE" }
+                "VISITED"        { "VISITED" }
+                "LOGIN_REQUIRED" { "NO_LOGIN" }
+                "CF_CHALLENGE"   { "CF_BLOCKED" }
+                "SLIDER"         { "SLIDER_FAIL" }
+                "NAV_FAIL"       { "TIMEOUT" }
+                "SITE_DISABLED"  { "SKIPPED" }
+                "NO_CONFIG"      { "SKIPPED" }
+                "BODY_NULL"      { "PAGE_ERROR" }
+                "REDIRECTING"    { "PAGE_ERROR" }
+                "SERVER_ERROR"   { "PAGE_ERROR" }
+                "EVAL_FAIL"      { "PAGE_ERROR" }
+                default          { "NO_DETECT" }
+            }
+            $r.status = $newStatus
+            Write-Output "  => $rr ($newStatus)"
+            if ($newStatus -in @("SUCCESS", "ALREADY_DONE", "VISITED")) {
+                $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $r.name })
+                if ($r.name -notin $signals.ok_sites) { $signals.ok_sites += $r.name }
+                $tracking.regressions = @($tracking.regressions | Where-Object { $_ -ne $r.name })
+                $tracking.needs_manual_review = @($tracking.needs_manual_review | Where-Object { $_ -notlike "$($r.name)(*" })
+                if ($r.name -notin $baseline.sites) { $tracking.new_sites += $r.name; $baseline.sites += $r.name }
+                $script:recoveredSites += $r.name
+            } elseif ($newStatus -eq "SKIPPED") {
+                $signals.fail_sites = @($signals.fail_sites | Where-Object { $_ -ne $r.name })
+                if ($r.name -notin $signals.skip_sites) { $signals.skip_sites += $r.name }
+            }
+        }
+        Write-Output "=== RECOVERY DONE: recovered $($script:recoveredSites.Count) site(s) ==="
+        # 恢复轮后增量落盘，后台任务被回收也能看到最新结果
+        $partialSummary = @{
+            timestamp     = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+            total         = $total
+            success       = $signals.ok_sites.Count
+            failed        = $signals.fail_sites.Count
+            skipped       = $signals.skip_sites.Count
+            iterations    = $script:iterationLog.Count
+            baseline_known= $baseline.sites.Count
+            new_successes = $tracking.new_sites
+            regressions   = $tracking.regressions
+            needs_manual_review = $tracking.needs_manual_review
+            ok_sites      = $signals.ok_sites
+            fail_sites    = $signals.fail_sites
+            skip_sites    = $signals.skip_sites
+            recovered_sites = $script:recoveredSites
+            iteration_log = $script:iterationLog
+            results       = $results
+            partial       = $true
+        }
+        $partialSummary | ConvertTo-Json -Depth 4 | Out-File $ResultFile -Encoding UTF8
+    }
+}
+
 $signals.ok = ($signals.fail_sites.Count -eq 0)
 
 $iterCount = $script:iterationLog.Count
@@ -419,6 +512,7 @@ $summary = @{
     ok_sites      = $signals.ok_sites
     fail_sites    = $signals.fail_sites
     skip_sites    = $signals.skip_sites
+    recovered_sites = $script:recoveredSites
     iteration_log = $script:iterationLog
     results       = $results
 }
@@ -513,6 +607,11 @@ function Send-FeishuSummary {
     if ($tracking.regressions.Count -gt 0) {
         $regJoined = ($tracking.regressions | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
         $baselineMd += "$e_alarm 基线回归: **$($tracking.regressions.Count)** 站 ($regJoined)`n"
+    }
+    # v4.13.32: 收尾恢复轮战果
+    if ($Summary.recovered_sites -and @($Summary.recovered_sites).Count -gt 0) {
+        $recJoined = ($Summary.recovered_sites | Sort-Object | ForEach-Object { Format-SiteLink $_ }) -join ", "
+        $baselineMd += "$e_green 恢复轮: **$(@($Summary.recovered_sites).Count)** 站重试成功 ($recJoined)`n"
     }
 
     # ===== Iteration summary =====
@@ -706,7 +805,7 @@ function Send-FeishuSummary {
     }
 }
 
-Send-FeishuSummary $FeishuWebhook $FeishuChatId $summary
+if (-not $NoFeishu) { Send-FeishuSummary $FeishuWebhook $FeishuChatId $summary } else { Write-Output "=== Feishu Push skipped (-NoFeishu) ===" }
 
 # 关闭统一 webbridge session
 if ($script:webbridgeAvailable) {

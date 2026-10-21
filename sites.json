@@ -213,13 +213,6 @@
       "note": "书签同步: 远景论坛签到 - webbridge (browser-eval-click不稳定，改用webbridge)"
     },
     {
-      "name": "42w",
-      "url": "https://api.42x.shop/dashboard",
-      "strategy": "webbridge",
-      "display_name": "42w AI控制台",
-      "note": "v4.13.30: 域名已变 api.42w.shop→api.42x.shop，旧 /console/personal 404；真实路由 /dashboard（NewAPI）。需人工一次性登录 /sign-in，之后按 SPA 控制台保活"
-    },
-    {
       "name": "hdbao",
       "url": "https://hdbao.cc/attendance.php",
       "strategy": "webbridge",
@@ -245,13 +238,6 @@
       "url": "https://new-api-bxhm.onrender.com/console/personal",
       "strategy": "webbridge",
       "display_name": "NewAPI(bxhm)",
-      "note": "auto: 书签同步新增"
-    },
-    {
-      "name": "ptlao",
-      "url": "https://ptlao.top/attendance.php",
-      "strategy": "webbridge",
-      "display_name": "PTLao",
       "note": "auto: 书签同步新增"
     },
     {
@@ -311,13 +297,6 @@
       "note": "auto: 书签同步新增"
     },
     {
-      "name": "pting",
-      "url": "https://fengchao.chat/latest",
-      "strategy": "webbridge",
-      "display_name": "全部主题 - 蜂巢",
-      "note": "v4.13.31: 站点换域名 pting.club→fengchao.chat（旧域名 302 重定向导致导航超时 NAV_FAIL），URL 直接指向新域名"
-    },
-    {
       "name": "linuxsb",
       "url": "https://linux.sb/daily_checkin",
       "strategy": "webbridge",
@@ -360,17 +339,24 @@
       "note": "auto: 书签同步新增"
     },
     {
-      "name": "52movie",
-      "url": "https://www.52movie.top/attendance.php",
-      "strategy": "webbridge",
-      "display_name": "52MOVIE :: 签到 - Powered by NexusPHP",
-      "note": "auto: 书签同步新增"
-    },
-    {
       "name": "naturept",
       "url": "https://naturept.top/attendance.php",
       "strategy": "webbridge",
       "display_name": "自然 :: 签到 - Powered by NexusPHP",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "42w",
+      "url": "https://api.42w.shop/profile",
+      "strategy": "browser-open",
+      "display_name": "42 API",
+      "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "pting",
+      "url": "https://pting.club/?sort=newest",
+      "strategy": "browser-open",
+      "display_name": "全部主题 - 蜂巢",
       "note": "auto: 书签同步新增"
     }
   ],

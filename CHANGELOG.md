@@ -1,5 +1,27 @@
 # Changelog
 
+## [v4.13.32] - 2026-10-21
+
+### 新增批末「收尾恢复轮」+ 今日失败站点排查与适配
+
+**新增收尾恢复轮（用户提议）**
+- `signin-batch.ps1` 在全量循环结束后、总结与飞书推送前，对"可恢复"失败站再跑一轮：
+  - 候选状态：`TIMEOUT` / `PAGE_ERROR` / `NO_DETECT` / `CF_BLOCKED` / `SLIDER_FAIL`；
+  - 排除 `NO_LOGIN`（需人工重登）与 `CF_PENDING`（需人工勾盾）；
+  - 默认冷却 `-RecoveryDelaySec 120`、上限 `-RecoveryMaxSites 15`；`-NoRecovery` 可关闭；
+  - 恢复成功会从 `fail_sites`/`regressions` 移出，写入 `recovered_sites` 并在飞书卡片显示「恢复轮」。
+  - 设计理由：站内即时重试仅间隔 10s，覆盖不了网络抖动/站点短时抽风；批末再给一次机会，且推送的是最终结果。
+- 新增 `-NoFeishu`（本地调试不推卡片）与 `-NoBookmarkSync`（跳过书签同步，避免临时配置被书签全量列表重写）。
+
+**今日失败站点排查结论（42 成功 / 9 失败）**
+- **站点侧，无需改代码**：HDVideo（"站点关闭维护中"）、audiences（CF 521 源站宕机）、vclib（服务器维护至当日 23 点）、HDDolby/V2EX（导航 30s 超时；V2EX 叠加 CF）、PigGo（签到页只剩「敬请期待！」占位）。
+- **适配修复**：
+  - **PigGo**：共享 `$NexusPHPSignInDetect` 增加 `敬请期待` → `SITE_DISABLED`（用 `textContent` 判定，后台 `innerText` 读不到占位文案）；`kimi-webbridge.ps1` 将 `SITE_DISABLED` 设为终止态（不再白白点击+等 30s）。
+  - **lp-bits**：凌晨 03:03 判 `NEED_SIGN` 但 14:30 已签——站点日切晚于本地凌晨；Detect 增加跨日容错（最近 title 事件在 24h 内即 `SIGN_OK`）。
+  - **52movie**：站点公告永久关闭 → 从 `sites.json`/`$WebSignInConfigs`/`baseline.json` 移除。
+  - **ptlao**：域名已改为"忘年桥资源站"（非原 PT 站，无签到功能）→ 同上移除。
+- 备注：批脚本启动时 `Sync-Bookmarks` 会用书签重写 `sites.json`（按域名保留/新增/删除站点）；本次确认两个失效站点已不在书签中，移除不会被同步加回。
+
 ## [v4.13.31] - 2026-10-18
 
 ### 10 个人工/跳过站点接入自动化 + 今日失败站点修复
