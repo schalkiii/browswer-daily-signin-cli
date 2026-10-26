@@ -1,6 +1,6 @@
 {
-  "version": "v4.12.0",
-  "total": 57,
+  "version": "v4.13.33",
+  "total": 54,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -50,7 +50,7 @@
       "name": "V2EX",
       "url": "https://www.v2ex.com/mission/daily",
       "strategy": "webbridge",
-      "note": "书签同步: V2EX - webbridge (需点击领取按钮，browser-visit无法签到)"
+      "note": "v4.13.33: 全屏 CF managed challenge —— 框架自动焦点仿真 + 坐标点击 + 键盘激活（DOM.focus iframe→Tab→Space，实测可过盾）；token 未填才判 CF，自动失败落 CF_PENDING。2026-10-26 现场 CF 已过但源站响应超时，属站点/网络侧"
     },
     {
       "name": "13City",
@@ -105,7 +105,7 @@
       "name": "HDDolby",
       "url": "https://www.hddolby.com/attendance.php",
       "strategy": "webbridge",
-      "note": "书签同步: HDDolby签到 - webbridge (web-read被CF拦截，改用webbridge)"
+      "note": "v4.13.33: 2026-10-26 现场为 Cloudflare「421 Misdirected Request」（源站/域名配置故障），归 SERVER_ERROR；非登录失效，待站点侧恢复"
     },
     {
       "name": "HDHome",
@@ -117,7 +117,7 @@
       "name": "HDVideo",
       "url": "https://hdvideo.top/attendance.php",
       "strategy": "webbridge",
-      "note": "书签同步: HDVideo签到"
+      "note": "v4.13.33: 2026-10-26 页面显示「站点关闭维护中，请稍后再访问」——Detect 新增维护公告判据，归 SITE_DISABLED（跳过，不计失败）"
     },
     {
       "name": "HHCLUB",
@@ -166,7 +166,7 @@
       "name": "SBPT",
       "url": "https://sbpt.link/attendance.php",
       "strategy": "webbridge",
-      "note": "书签同步: SBPT签到 (2026-06-19: web-read返回TOO_SMALL，browser-open回退也失败，需进一步分析)"
+      "note": "v4.13.33: 2026-10-26 现场为 Cloudflare 502 Bad Gateway / Host Error（源站宕机），Detect 新增 50x/421 判据归 SERVER_ERROR；待站点恢复"
     },
     {
       "name": "SpeedApp",
@@ -201,10 +201,10 @@
     },
     {
       "name": "Yemapt",
-      "url": "https://www.yemapt.org/#/consumer/checkIn",
+      "url": "https://www.yemapt.org/#/user/growth?tab=checkIn",
       "strategy": "webbridge",
       "display_name": "YemaPT",
-      "note": "2026-07-06: v4.12.4 改回 webbridge（v4.12.3 已修复 extension 冷启动+tab 清理，配合 CF 重试改进重试）"
+      "note": "v4.13.33: 旧 /consumer/checkIn 会重定向登录页；真实签到页改为 /user/growth?tab=checkIn。登录页 ALTCHA（我不是机器人）与 Ant Design 登录按钮已实测可自动完成（用户名/密码由浏览器预填），登录后自动点 ALTCHA + 立即签到"
     },
     {
       "name": "远景论坛",
@@ -245,21 +245,14 @@
       "url": "https://pt.vclib.online/attendance.php",
       "strategy": "webbridge",
       "display_name": "VCLib",
-      "note": "v4.13.28: Cloudflare 盾需人工在浏览器内勾选（自动点击无效，v4.13.27 曾卡 906s 拖慢批次）；Detect 返回 CF_PENDING 绕过自动重试，Click 异步等人工勾选（cf-turnstile-response 出现）后自动提交签到，窗口约 50s 超时报 CF_PENDING 提示人工复核"
-    },
-    {
-      "name": "521",
-      "url": "https://pt.521.best/attendance.php",
-      "strategy": "webbridge",
-      "display_name": "521PT",
-      "note": "v4.12.0: 用户浏览器配备验证码自动输入扩展，改回webbridge + Click JS 等待 imagestring 自动填入后点击提交"
+      "note": "v4.13.33: 根因是后台标签页不渲染 Turnstile iframe（widget 仅空占位），并非自动点击无效。框架现于 CF 时启用焦点仿真 → 坐标点击复选框 → token 出现后提交 attendance 表单；2026-10-26 实测自动过盾并签到成功（签到已得15）。自动失败才落 CF_PENDING 人工兜底"
     },
     {
       "name": "audiences",
       "url": "https://audiences.me/attendance.php",
       "strategy": "webbridge",
       "display_name": "Audiences",
-      "note": "auto: 书签同步新增"
+      "note": "v4.13.33: CF 站点改为焦点仿真 + 坐标点击/CDP 兜底，重试收敛为 3×20s 自适应轮询；2026-10-26 复测已签到（当日 CF 未触发）"
     },
     {
       "name": "huan666",

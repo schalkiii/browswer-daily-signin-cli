@@ -251,7 +251,7 @@ if (Test-Path $WebArticlesDir) {
     Get-ChildItem $WebArticlesDir -File | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-Write-Output "=== PT Sign-in v4.12.25 (self-iterating + baseline + forum click + cleanup + bookmark-sync) ==="
+Write-Output "=== PT Sign-in v4.13.33 (self-iterating + baseline + forum click + cleanup + bookmark-sync) ==="
 Write-Output "Started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 Write-Output "Sites: $($config.sites.Count)"
 Write-Output ""
@@ -320,6 +320,8 @@ foreach ($site in $config.sites) {
                         "VISITED"       { $siteResult.status = "VISITED"; $signals.ok_sites += $site.name; Write-Output "  => VISITED (visit-only)" }
                         "LOGIN_REQUIRED"{ $siteResult.status = "NO_LOGIN"; $signals.login_expired += $site.name; Write-Output "  => NO_LOGIN" }
                         "CF_CHALLENGE"  { $siteResult.status = "CF_BLOCKED"; $signals.fail_sites += $site.name; Write-Output "  => CF_BLOCKED" }
+                        # v4.13.33: 自动 CF 未过、需人工勾选——独立状态，不进可重试列表（重跑同样过不了盾）
+                        "CF_PENDING"    { $siteResult.status = "CF_PENDING"; $signals.fail_sites += $site.name; Write-Output "  => CF_PENDING (需人工勾选 CF)" }
                         "SLIDER"        { $siteResult.status = "SLIDER_FAIL"; $signals.fail_sites += $site.name; Write-Output "  => SLIDER_FAIL" }
                         "NAV_FAIL"      { $siteResult.status = "TIMEOUT"; $signals.fail_sites += $site.name; Write-Output "  => TIMEOUT" }
                         "NO_CONFIG"     { $siteResult.status = "SKIPPED"; $signals.skip_sites += $site.name; Write-Output "  => NO_CONFIG" }

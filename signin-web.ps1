@@ -18,6 +18,10 @@ $NexusPHPSignInDetect = @'
   if(/Attendance has been temporarily disabled/i.test(tc)) return 'SITE_DISABLED';
   // v4.13.32: 站方下线签到功能（PigGo attendance 页只剩「敬请期待！」占位，签到入口点击无效）→ 站点侧状态
   if(tc.indexOf('敬请期待')>-1) return 'SITE_DISABLED';
+  // v4.13.33: CF 源站错误页（421/502/503/504/52x 等）→ SERVER_ERROR（站点侧故障，避免误报 UNKNOWN 后长重试）
+  if(/Bad gateway|Error code (?:42[01]|50[234]|52[0-9])|Misdirected Request|Host Error|Service Unavailable/i.test(tc)) return 'SERVER_ERROR';
+  // v4.13.33: 站点维护公告（HDVideo 实测「站点关闭维护中，请稍后再访问」）→ 站点侧状态，计入跳过而非失败
+  if(tc.indexOf('站点关闭维护')>-1||tc.indexOf('关闭维护中，请稍后')>-1) return 'SITE_DISABLED';
   // v4.13.0: 2FA / 异地登录（HDDolby 等）优先判定为登录失效
   if(location.pathname.indexOf('take2fa.php')>-1||t.indexOf('异地登录')>-1||t.indexOf('两步验证')>-1) return 'LOGIN_REQUIRED';
   // v4.12.9: 已签到状态优先于 CF 检测 —— 部分站点（xloli）attendance 页始终残留 .cf-turnstile
@@ -117,74 +121,6 @@ $NexusPHPExactClick = @'
 })()
 '@
 
-# v4.13.28: vclib 专属检测——CF 盾必须人工勾选，绝不能返回 CF_CHALLENGE（否则触发框架自动点击
-# 6×45s 重试，PigGo 之外曾实测本站单站耗时 906s）。CF 未过 → CF_PENDING（直接落到自定义 Click
-# 等待人工勾选）。已勾选（token 填充）后按标准 NEED_SIGN / SIGN_OK 判定。
-$VclibCfSignInDetect = @'
-(function(){
-  if(!document.body) return 'UNKNOWN';
-  var t = document.body.innerText||'';
-  if(location.pathname.indexOf('take2fa.php')>-1||t.indexOf('异地登录')>-1||t.indexOf('两步验证')>-1) return 'LOGIN_REQUIRED';
-  // 已签优先（简体 + 繁体）
-  if(t.indexOf('签到已得')>-1||t.indexOf('今日已签到')>-1||t.indexOf('已签到')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('簽到已得')>-1||t.indexOf('今日已簽到')>-1||t.indexOf('已簽到')>-1||t.indexOf('簽到成功')>-1) return 'SIGN_OK';
-  if(t.indexOf('今日签到')>-1||t.indexOf('得到魔力加成')>-1) return 'SIGN_OK';
-  if(t.indexOf('已领取')>-1||t.indexOf('本次签到获得')>-1) return 'SIGN_OK';
-  // CF 盾判据：widget 在且 token 未填 → CF_PENDING（人工勾选）；"正在检查/Just a moment" 同理
-  var cfWidget = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]') || document.querySelector('#challenge-stage') || document.querySelector('[class*="cf-"]');
-  if (cfWidget) {
-    var ti = document.querySelector('input[name="cf-turnstile-response"]');
-    if(!ti || !ti.value || ti.value.length < 10) return 'CF_PENDING';
-  }
-  if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1) return 'CF_PENDING';
-  if(t.indexOf('安全验证')>-1 && !cfWidget) return 'CF_PENDING';
-  // 待签
-  if(t.indexOf('签到得魔力')>-1||t.indexOf('签到得鲸币')>-1||t.indexOf('签到得憨豆')>-1||t.indexOf('签到领取')>-1||t.indexOf('立即签到')>-1||t.indexOf('打卡')>-1) return 'NEED_SIGN';
-  if(t.indexOf('簽到得魔力')>-1||t.indexOf('簽到得鯨幣')>-1||t.indexOf('簽到領取')>-1) return 'NEED_SIGN';
-  if(t.indexOf('请登录')>-1||t.indexOf('未登录')>-1||t.indexOf('必须登录')>-1) return 'LOGIN_REQUIRED';
-  if(t.length<20) return 'UNKNOWN';
-  var match = t.match(/签到.{0,20}/);
-  if(match) return 'NEED_SIGN:'+match[0];
-  return 'UNKNOWN';
-})()
-'@
-
-# v4.13.28: vclib 专属 Click——先等人工勾选 CF 盾（异步轮询 cf-turnstile-response token 填充），
-# token 出现后立即点签到 submit；返回同步信号（CF_WAIT_SCHEDULED），真正点击发生在 PostClickMs 窗口内。
-# token 已就绪则立即提交（无需等待）。
-$VclibCfSignInClick = @'
-(function(){
-  function findSubmit(f){
-    return f.querySelector('input[type=submit][value*="签到"]') ||
-           f.querySelector('input[type=submit][value*="簽到"]') ||
-           f.querySelector('input[type=submit]');
-  }
-  function cfReady(){
-    var ti = document.querySelector('input[name="cf-turnstile-response"]');
-    return !!(ti && ti.value && ti.value.length >= 10);
-  }
-  var form = document.querySelector('form[action*="attendance"]') || document.querySelector('form');
-  if(!form) return 'NO_FORM';
-  var submit = findSubmit(form);
-  if(!submit) return 'NO_SUBMIT';
-  if(cfReady()){ submit.click(); return 'CLICKED_NOW'; }
-  // CF 未人工勾选 → 异步轮询等 token 出现后提交（最多 ~100s，配合 PostClickMs 总窗口 ≤ ~50s）
-  var ticks = 0;
-  var timer = setInterval(function(){
-    ticks += 1;
-    if(cfReady()){
-      clearInterval(timer);
-      var f2 = document.querySelector('form[action*="attendance"]') || document.querySelector('form');
-      var s2 = f2 ? findSubmit(f2) : null;
-      if(s2) s2.click();
-    } else if(ticks >= 50){
-      clearInterval(timer);
-    }
-  }, 2000);
-  return 'CF_WAIT_SCHEDULED';
-})()
-'@
-
 # SPA 控制台/资料页通用检测：登录态保持即视为成功（API 控制台类站点）
 $SPASignInDetect = @'
 (function(){
@@ -235,18 +171,30 @@ $WebSignInConfigs = @{
         Url = "https://www.v2ex.com/mission/daily"
         WaitMs = 6000
         PostClickMs = 4000
+        # v4.13.33: 全屏 CF managed challenge 适配——先焦点仿真，再坐标点击/CDP 键盘激活；
+        #   token 未填时才判 CF（旧逻辑仅凭 [name=cf-turnstile-response] 存在就误报）。自动失败落 CF_PENDING。
+        CfRetryCount = 3
+        CfRetryWaitMs = 20000
+        CfFallbackPending = $true
         Detect = @'
 (function(){
+  if(!document.body) return 'BODY_NULL';
   var t = document.body.innerText||'';
   var title = document.title||'';
-  // v4.12.0: CF managed challenge 拦截（title="请稍候…" + "正在进行安全验证"）
-  if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage,[name="cf-turnstile-response"]')) return 'CF_CHALLENGE';
-  if(title.indexOf('请稍候')>-1||t.indexOf('正在进行安全验证')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
+  var token = document.querySelector('input[name="cf-turnstile-response"]');
+  var tokenOk = !!(token && token.value && token.value.length > 10);
+  var cfWidget = document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],#challenge-stage');
+  var cfText = title.indexOf('请稍候')>-1 || title.indexOf('Just a moment')>-1 ||
+               t.indexOf('正在进行安全验证')>-1 || t.indexOf('验证您是否是真人')>-1 ||
+               t.indexOf('验证成功，正在等待')>-1;
+  // CF 未通过/全屏挑战过渡页 → 交给框架；token 已填充后不再误判
+  if(!tokenOk && (cfWidget || cfText)) return 'CF_CHALLENGE';
   if(t.indexOf('每日登录奖励已领取')>-1||t.indexOf('已连续登录')>-1) return 'SIGN_OK';
   if(t.indexOf('未登录')>-1||t.indexOf('请登录')>-1) return 'LOGIN_REQUIRED';
   var btn = document.querySelector('input[value*="领取"]');
   if(btn) return 'NEED_SIGN';
   if(t.indexOf('领取')>-1&&t.indexOf('每日登录奖励')>-1) return 'NEED_SIGN';
+  if(t.length<20||title.indexOf('Redirecting')>-1) return 'REDIRECTING';
   return 'UNKNOWN';
 })()
 '@
@@ -641,13 +589,11 @@ $WebSignInConfigs = @{
         Url = "https://dstudio.me/attendance.php"
         # v4.12.5: CF Turnstile 站点（attendance 页含 .cf-turnstile 内联控件），需要 CF 验证通过后提交表单。
         # 验证：CF 托管挑战偶发（CF 反爬强度波动），宽松日可过，严格日 no-rect 失败属站点侧行为。
-        # v4.12.11: 加大 CF 耐心（WaitMs 18s→24s，重试 4→6 次、单次 15s→20s）以应对严格日更长的
-        #   全页 CF 插页；宽松日 CF 快速通过会在首次重试即跳出，不增加耗时。
-        # v4.12.12: 单次 CF 重试等待 20s→45s（用户要求拉长，覆盖更硬的插页）。
+        # v4.13.33: 坐标解析修复 + 焦点仿真后，点击通常数秒内填充 token；收敛为 3×20s 自适应轮询。
         WaitMs = 24000
         PostClickMs = 8000
-        CfRetryCount = 6
-        CfRetryWaitMs = 45000
+        CfRetryCount = 3
+        CfRetryWaitMs = 20000
         # v4.13.6: CF Turnstile 坐标点击站——必须导航后即固定 1280x800 视口（默认已改为自然分辨率）
         ForceLayoutViewport = $true
         Detect = $NexusPHPSignInDetect
@@ -734,14 +680,16 @@ $WebSignInConfigs = @{
     "vclib" = @{
         Url = "https://pt.vclib.online/attendance.php"
         WaitMs = 15000
-        PostClickMs = 50000
-        # v4.13.28: vclib 的 CF 盾必须由人工在浏览器内勾选（自动/坐标点击无效，v4.13.27 曾使本站
-        #   陷入 6×45s CF 自动重试 → 单站耗时达 906s，把批次重度拖慢）。
-        #   关键：Detect **不能**返回 CF_CHALLENGE（否则进框架自动点击重试），CF 未过一律回 CF_PENDING，
-        #   落入下方自定义 Click：异步轮询等待用户勾选盾牌验证（cf-turnstile-response 出现 → 自动点签到）；
-        #   PostClickMs 即"等人工勾选+提交"的总窗口，超时未过报 CF_PENDING，报告提示人工复核而非无限卡。
-        Detect = $VclibCfSignInDetect
-        Click = $VclibCfSignInClick
+        PostClickMs = 8000
+        # v4.13.33: 后台标签页不渲染 Turnstile iframe 才是"自动点击无效"的根因；框架现在会在 CF 时
+        #   启用焦点仿真 → 坐标点击复选框 → token 出现后提交 attendance 表单（已实测签到成功）。
+        #   自动尝试失败才返回 CF_PENDING，交人工勾选兜底，不再长时间卡住批次。
+        CfRetryCount = 3
+        CfRetryWaitMs = 15000
+        CfFallbackPending = $true
+        ForceLayoutViewport = $true
+        Detect = $NexusPHPSignInDetect
+        Click = $NexusPHPCfSignInClick
     }
     "521" = @{
         Url = "https://pt.521.best/attendance.php"
@@ -781,12 +729,11 @@ $WebSignInConfigs = @{
     "audiences" = @{
         Url = "https://audiences.me/attendance.php"
         # v4.12.5: CF 站点需要更长等待 + 多次 CF 重试 + CF 通过后提交表单
-        # v4.12.11: 加大 CF 耐心（WaitMs 18s→24s，重试 4→6 次、单次 15s→20s），同 DepthStudio
-        # v4.12.12: 单次 CF 重试等待 20s→45s（用户要求拉长，覆盖更硬的插页）。
+        # v4.13.33: 坐标解析修复 + 焦点仿真后，点击通常数秒内填充 token；收敛为 3×20s 自适应轮询。
         WaitMs = 24000
         PostClickMs = 8000
-        CfRetryCount = 6
-        CfRetryWaitMs = 45000
+        CfRetryCount = 3
+        CfRetryWaitMs = 20000
         # v4.13.6: CF Turnstile 坐标点击站——必须导航后即固定 1280x800 视口（默认已改为自然分辨率）
         ForceLayoutViewport = $true
         Detect = $NexusPHPSignInDetect
@@ -797,14 +744,18 @@ $WebSignInConfigs = @{
     # 07-01 曾因导航超时+tab 丢失回退 manual，v4.12.3 修复 extension 冷启动 + Clear-WebBridgeTabs 后重试
     # v4.12.6: 添加 ALTCHA checkbox 异步处理（PoW 计算最多 12 秒）
     "Yemapt" = @{
-        Url = "https://www.yemapt.org/#/consumer/checkIn"
+        # v4.13.33: 旧 /consumer/checkIn 会重定向到登录页；真实签到页为 /user/growth?tab=checkIn
+        Url = "https://www.yemapt.org/#/user/growth?tab=checkIn"
         WaitMs = 18000
-        PostClickMs = 15000
+        # v4.13.33: 登录流程（ALTCHA + 登录）与签到流程（ALTCHA + 立即签到）可能串联，窗口放宽到 30s
+        PostClickMs = 30000
         CfRetryCount = 4
         CfRetryWaitMs = 15000
         # v4.13.6: ALTCHA 坐标点击站——rect 由 ClickEval 在【点击前】算出，必须导航后即固定 1280x800
         #   视口（懒启用来不及：启用发生在 rect 计算之后会导致坐标系不一致）
         ForceLayoutViewport = $true
+        # v4.13.33: 登录页/SPA 路由切换在后台易被节流；焦点仿真只让页面可见，不抢真实焦点
+        BringToFront = $true
         Detect = @'
 (function(){
   if(!document.body) return 'BODY_NULL';
@@ -812,6 +763,16 @@ $WebSignInConfigs = @{
   // CF Turnstile 检测（CF iframe 优先匹配）
   if(!!document.querySelector('.cf-turnstile,iframe[src*="challenges.cloudflare.com"],iframe[src*="turnstile"],#challenge-stage')) return 'CF_CHALLENGE';
   if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1) return 'CF_CHALLENGE';
+  // v4.13.33: 登录页——浏览器已预填用户名/密码时走自动登录（ALTCHA + 登录按钮）；
+  //   无预填或出现登录错误则判 LOGIN_REQUIRED（避免批处理反复重试导致锁号）。
+  if(location.hash.indexOf('/user/login')>-1){
+    if(t.indexOf('密码错误')>-1||t.indexOf('登录失败')>-1||t.indexOf('账号或密码')>-1||t.indexOf('验证码错误')>-1) return 'LOGIN_REQUIRED';
+    // ⚠️ 该站 autocomplete 实际为 "username webauthn"（带后缀），精确匹配会落空 → 用包含匹配
+    var u = document.querySelector('input[autocomplete*="username"], input[placeholder*="用户名"]');
+    var p = document.querySelector('input[type="password"]');
+    if(u && u.value && p && p.value) return 'NEED_SIGN';
+    return 'LOGIN_REQUIRED';
+  }
   // 已签到明确标志（优先于登录判定）
   if(t.indexOf('已签到')>-1||t.indexOf('今日已签')>-1||t.indexOf('签到成功')>-1) return 'SIGN_OK';
   // v4.13.21: 登录态正信号优先判定——出现「签到中心/当前积分/连续签到/立即签到/尚未签到」
@@ -843,7 +804,8 @@ $WebSignInConfigs = @{
   // v4.13.21: Yemapt 使用 ALTCHA（<altcha-widget> web component，proof-of-work）。
   // 现场实测该站 ALTCHA 无 shadow DOM，真实复选框即 light DOM 的 input[type=checkbox]，
   // 直接 JS .click() 即可触发 PoW 验证（CDP 坐标点击会被复选框上层 svg 图标拦截，已降级为兜底）。
-  // 验证完成（隐藏 JWT 字段 / aria-checked）后点击「立即签到」。
+  // v4.13.33: 登录页复用同一套 ALTCHA 处理；验证通过后点 Ant Design 登录按钮，
+  //   等待 SPA 跳到签到页，再自动点 ALTCHA + 立即签到。
   function collect(){
     var docs = [document];
     var frames = document.querySelectorAll('iframe');
@@ -889,51 +851,109 @@ $WebSignInConfigs = @{
     try { el.click(); } catch(e){}
     try { el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); } catch(e2){}
   }
-  var found = collect();
-  // 已验证 → 直接点签到
-  if(found.verified){
-    if(found.signBtn){ found.signBtn.click(); return 'ALTCHA_DONE_CLICKED'; }
-    return 'ALTCHA_DONE_NO_BTN';
-  }
-  // v4.13.21: 首选直接 JS 点击复选框 —— 该站 ALTCHA 无 shadow DOM，实测 JS .click() 可立即触发
-  //   PoW 并验证成功；而 CDP 坐标点击（含复选框几何中心 353,528 与 label 中心 414,528）实测均失败
-  //   （复选框上方覆盖 11x11 的 svg 打勾图标，会拦截真实鼠标事件）。
-  //   验证完成后轮询点到「立即签到」，500ms 粒度以便尽快在 PostClickWaitMs 内完成。
-  if(found.checkbox){
-    found.checkbox.click();
-    var start = Date.now();
-    var poll = setInterval(function(){
-      var f2 = collect();
-      if(f2.verified || (Date.now()-start) > 20000){
-        clearInterval(poll);
-        if(f2.signBtn){ f2.signBtn.click(); window.__yemapt = 'CLICKED'; }
-        else { window.__yemapt = 'NO_BTN'; }
+  // Ant Design 按钮渲染为「登 录」（中间有空格），必须归一化后匹配
+  function findLoginBtn(){
+    var btns = document.querySelectorAll('button, [role="button"], a');
+    for(var i=0;i<btns.length;i++){
+      var v = (btns[i].textContent||'').replace(/\s+/g,'').trim();
+      if(v==='登录'||v==='登入'){
+        var r = btns[i].getBoundingClientRect();
+        if(r.width > 80) return btns[i];
       }
-    }, 500);
-    return 'ALTCHA_JS_CLICKED';
+    }
+    return null;
   }
-  // 兜底：复选框取不到（站点改回 shadow DOM 版本）时，退回 widget 视口坐标交 PowerShell 做 CDP 点击
-  if(found.widget){
-    var r = found.widget.getBoundingClientRect();
-    // v4.13.21: 坐标校准 —— 复选框在 widget 左侧约 22px、垂直居中（0.5h）。
-    //   旧值 (x+26, y+0.30h) 在 widget h=73 时算出 y=524，比复选框中心(≈538)高约 14px → 点击打空，
-    //   PoW 永不完成（实测主点+3 个候选点各长轮询 30~42s 全部 miss，站点始终"未签到"）。
-    var cx = Math.round(r.x + Math.min(22, r.width * 0.04));
-    var cy = Math.round(r.y + r.height * 0.5);
-    var start2 = Date.now();
-    var poll2 = setInterval(function(){
-      var f3 = collect();
-      if(f3.verified || (Date.now()-start2) > 18000){
-        clearInterval(poll2);
-        if(f3.signBtn){ f3.signBtn.click(); window.__yemapt = 'CLICKED'; }
-        else { window.__yemapt = 'NO_BTN'; }
+  function checkInFlow(){
+    var found = collect();
+    // 已验证 → 直接点签到
+    if(found.verified){
+      if(found.signBtn){ found.signBtn.click(); return 'ALTCHA_DONE_CLICKED'; }
+      return 'ALTCHA_DONE_NO_BTN';
+    }
+    // v4.13.21: 首选直接 JS 点击复选框 —— 该站 ALTCHA 无 shadow DOM，实测 JS .click() 可立即触发
+    //   PoW 并验证成功；而 CDP 坐标点击（含复选框几何中心 353,528 与 label 中心 414,528）实测均失败
+    //   （复选框上方覆盖 11x11 的 svg 打勾图标，会拦截真实鼠标事件）。
+    //   验证完成后轮询点到「立即签到」，500ms 粒度以便尽快在 PostClickWaitMs 内完成。
+    if(found.checkbox){
+      found.checkbox.click();
+      var start = Date.now();
+      var poll = setInterval(function(){
+        var f2 = collect();
+        if(f2.verified || (Date.now()-start) > 20000){
+          clearInterval(poll);
+          if(f2.signBtn){ f2.signBtn.click(); window.__yemapt = 'CLICKED'; }
+          else { window.__yemapt = 'NO_BTN'; }
+        }
+      }, 500);
+      return 'ALTCHA_JS_CLICKED';
+    }
+    // 兜底：复选框取不到（站点改回 shadow DOM 版本）时，退回 widget 视口坐标交 PowerShell 做 CDP 点击
+    if(found.widget){
+      var r = found.widget.getBoundingClientRect();
+      // v4.13.21: 坐标校准 —— 复选框在 widget 左侧约 22px、垂直居中（0.5h）。
+      var cx = Math.round(r.x + Math.min(22, r.width * 0.04));
+      var cy = Math.round(r.y + r.height * 0.5);
+      var start2 = Date.now();
+      var poll2 = setInterval(function(){
+        var f3 = collect();
+        if(f3.verified || (Date.now()-start2) > 18000){
+          clearInterval(poll2);
+          if(f3.signBtn){ f3.signBtn.click(); window.__yemapt = 'CLICKED'; }
+          else { window.__yemapt = 'NO_BTN'; }
+        }
+      }, 1000);
+      return 'ALTCHA_RECT:' + cx + ',' + cy + ',' + Math.round(r.width) + ',' + Math.round(r.height);
+    }
+    // 无 ALTCHA → 直接点签到
+    if(found.signBtn){ found.signBtn.click(); return 'CLICKED'; }
+    return 'NO_BTN';
+  }
+  // 登录成功后 SPA 通过 hash 路由切到签到页；轮询到页面元素就绪后自动走签到流程
+  function waitForCheckInPage(){
+    var started = Date.now();
+    var timer = setInterval(function(){
+      if(location.hash.indexOf('/user/login')===-1){
+        var f = collect();
+        if(f.checkbox || f.verified || f.signBtn){
+          clearInterval(timer);
+          checkInFlow();
+        } else if(Date.now()-started > 30000){
+          clearInterval(timer);
+        }
+      } else if(Date.now()-started > 30000){
+        clearInterval(timer);
       }
-    }, 1000);
-    return 'ALTCHA_RECT:' + cx + ',' + cy + ',' + Math.round(r.width) + ',' + Math.round(r.height);
+    }, 800);
   }
-  // 无 ALTCHA → 直接点签到
-  if(found.signBtn){ found.signBtn.click(); return 'CLICKED'; }
-  return 'NO_BTN';
+  function loginFlow(){
+    var f = collect();
+    // ALTCHA 已通过 → 稍等表单状态同步后提交登录
+    if(f.verified){
+      setTimeout(function(){
+        var lb = findLoginBtn();
+        if(lb){ lb.click(); waitForCheckInPage(); }
+      }, 800);
+      return 'LOGIN_SUBMITTED';
+    }
+    if(f.checkbox){
+      f.checkbox.click();
+      var start = Date.now();
+      var timer = setInterval(function(){
+        var f2 = collect();
+        if(f2.verified || Date.now()-start > 20000){
+          clearInterval(timer);
+          setTimeout(function(){
+            var lb = findLoginBtn();
+            if(lb){ lb.click(); waitForCheckInPage(); }
+          }, 800);
+        }
+      }, 500);
+      return 'LOGIN_ALTCHA_SCHEDULED';
+    }
+    return 'LOGIN_NO_ALTCHA';
+  }
+  if(location.hash.indexOf('/user/login')>-1) return loginFlow();
+  return checkInFlow();
 })()
 '@
     }
@@ -1610,6 +1630,8 @@ function Invoke-WebSignIn {
     if ($cfg.NavTimeoutSec) { $params.NavTimeoutSec = $cfg.NavTimeoutSec }
     if ($cfg.CfRetryCount) { $params.CfRetryCount = $cfg.CfRetryCount }
     if ($cfg.CfRetryWaitMs) { $params.CfRetryWaitMs = $cfg.CfRetryWaitMs }
+    # v4.13.33: 自动 CF 未过时是否落 CF_PENDING（需人工勾选），避免批处理对必人工站点反复重跑
+    if ($cfg.ContainsKey('CfFallbackPending')) { $params.CfFallbackPending = $cfg.CfFallbackPending }
     # v4.13.6: LoadWaitSec 全局默认 45s（在 Test-WebBridgeSignIn 参数默认值中）；
     #   用 ContainsKey 判断，允许站点显式设 LoadWaitSec=0 退回固定 WaitMs（if($cfg.LoadWaitSec) 会把 0 当假漏传）。
     if ($cfg.ContainsKey('LoadWaitSec')) { $params.LoadWaitSec = $cfg.LoadWaitSec }

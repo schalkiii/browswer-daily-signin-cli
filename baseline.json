@@ -1,6 +1,6 @@
 {
-  "version": "v4.12.11",
-  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v4.10.1: vclib/521（验证码）、zxiaoruan/littlesheep/xt-url（OAuth登录）、42w/pp（URL失效）改为manual。v4.12.11: FreeFarm（滑块误判修复+set_access_token绕过）、UBits、Yemapt（ALTCHA）、42w（URL恢复）经 webbridge 验证可自动签到，从 manual_sites 移回 sites（auto）。DepthStudio/audiences 为 CF 严格日波动，仍在基线中追踪回归。",
+  "version": "v4.13.33",
+  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v4.13.33: 修复 evaluate 对象信号序列化（CF widget rect 长期解析为 null 的根因）；CF 流程新增焦点仿真、CDP 穿透 closed shadow、键盘激活（V2EX 全屏挑战实测可过盾）；vclib 恢复自动过盾签到；Yemapt 切换真实签到页 /user/growth?tab=checkIn 并新增登录页 ALTCHA+登录自动恢复；HDVideo 维护页归 SITE_DISABLED，HDDolby(421)/SBPT(502) 归 SERVER_ERROR。manual 仅剩 FreeFarm/TJUPT/zxiaoruan。",
   "sites": [
     "GGPT",
     "V2EX",
@@ -64,19 +64,15 @@
     "1ctrl",
     "t-baozi",
     "muxuege",
-    "naturept"
+    "naturept",
+    "lp-bits"
   ],
   "manual_sites": [
-    "北洋园PT",
+    "FreeFarm",
     "TJUPT",
-    "vclib",
-    "521",
-    "zxiaoruan",
-    "littlesheep",
-    "xt-url",
-    "pp"
+    "zxiaoruan"
   ],
-  "auto_total": 63,
-  "manual_total": 8,
-  "last_updated": "2026-10-21 22:37:22"
+  "auto_total": 64,
+  "manual_total": 3,
+  "last_updated": "2026-10-26 09:35:00"
 }

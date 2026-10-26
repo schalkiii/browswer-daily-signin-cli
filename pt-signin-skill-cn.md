@@ -147,8 +147,10 @@ signin-batch.ps1（编排）
 - `ALREADY_SIGNED`：今日已签到（状态页直接显示，非本次点击所致）
 - `SIGN_FAIL`：点击后仍未成功
 - `CF_CHALLENGE`：页面含 Cloudflare 质询（`cf-turnstile` / `challenges.cloudflare`）
+- `CF_PENDING`：CF 未过、需人工勾选（自动点击/键盘激活均失败）
+- `SITE_DISABLED`：站方停签 / 维护公告（跳过，不计失败）
 - `SLIDER`：出现滑块验证
-- `SERVER_ERROR`：chrome-error 页 / 连接错误（网络/代理/站点侧，非代码缺陷）
+- `SERVER_ERROR`：chrome-error 页 / 连接错误 / CF 421·502·52x 源站错误（网络/代理/站点侧，非代码缺陷）
 - `LOGIN_REQUIRED`：未登录
 
 PowerShell 侧按信号映射到 `SUCCESS` / `ALREADY_DONE` / `NO_DETECT` / `CF_BLOCKED` / `SLIDER_FAIL` / `PAGE_ERROR` / `NO_LOGIN` 等结果状态（`signin-batch.ps1` 的 `switch -Wildcard`）。
@@ -162,14 +164,18 @@ PowerShell 侧按信号映射到 `SUCCESS` / `ALREADY_DONE` / `NO_DETECT` / `CF_
 部分 NexusPHP 站（`NexusPHPCfSignInClick` 类）签到前需先过 CF Turnstile：
 
 1. `Wait-PostNavigate` 轮询，检测到 `cf-turnstile` 未过时进入 CF 处理；
-2. 通过 `Page.bringToFront` 给 tab 焦点（CF iframe 需焦点才渲染），必要时临时关闭 `-NoFocus`；
-3. `Get-CfWidgetViewportRect` 读取 widget 视口坐标，配合 `ForceLayoutViewport` 启用布局视口后点击；
-4. 轮询 `Test-CfTurnstilePassed`（`cf-turnstile` 消失且页面就绪）确认通过；
-5. 通过后提交 attendance 表单（`ClickEval` 点击签到），最多按 `CfRetryCount` 重试。
+2. **焦点仿真**：`Page.bringToFront`（当前 daemon 实现为 focus emulation，不抢真实焦点）。后台标签页不渲染 Turnstile iframe（widget 只剩空占位 300×65），这是「自动点击一直无效、只能人工勾选」的根因；
+3. **多层点击**：① JS `Get-CfWidgetViewportRect` 读取可见 widget/iframe 视口坐标（过滤 0×0 与全屏容器）→ 坐标点击；② CDP `DOM.getFlattenedDocument(pierce=true)` 穿透 closed shadow 找到全屏挑战 iframe → `DOM.getBoxModel` 坐标点击；③ **键盘激活**：`DOM.focus(iframe)` → Tab → Space（V2EX 全屏 managed challenge 实测 token 成功填充）；④ iframe 中心兜底；
+4. 每 2s 轮询 `Test-CfTurnstilePassed`（token 已填充 / 挑战消失），命中即退；过盾后若页面仍卡在「验证成功，正在等待源站响应」，用 `cf_clearance` 重新导航一次；
+5. 通过后提交 attendance 表单（`ClickEval` 点击签到），最多按 `CfRetryCount` 重试；
+6. 自动全部失败且站点声明 `CfFallbackPending=$true` → 返回 `CF_PENDING`（需人工勾选），不返回 `CF_CHALLENGE` 以免批处理反复重跑。
+
+> ⚠️ **对象信号必须 JSON 序列化**：evaluate 返回 JS 对象时 daemon 给的是结构化 `value`；`Get-ResultSignal` 必须 `ConvertTo-Json`，否则 `"$value"` 会变成 PowerShell 的 `@{x=...; y=...}`，下游 `ConvertFrom-Json` 必失败，CF rect 恒为 null（v4.13.33 修复的长期根因）。
 
 ### ALTCHA / SLIDER
 
 - **ALTCHA**（如 Yemapt）：`ClickEval` 先解 ALTCHA 再点击签到。主路径直接对 `input[type=checkbox]` 执行 JS `.click()`（该 widget **无 shadow DOM**）；仅当复选框取不到时才退回 CDP 坐标点击兜底。校验复用 `Test-AltchaVerified`。
+- **YemaPT 登录恢复**：登录页若用户名/密码已由浏览器预填，Click 先解 ALTCHA → 点 Ant Design「登 录」（文本实际为「登 录」，需归一化空白）→ 等 SPA 跳到 `/user/growth?tab=checkIn` → 再解一次 ALTCHA → 立即签到；登录错误（密码错误/登录失败等）判 `LOGIN_REQUIRED`，避免反复重试锁号。
 - **SLIDER**：坐标点击滑块，`ForceLayoutViewport=$true`，失败归 `SLIDER_FAIL` 进入批处理重试。
 
 ### 头像 / 下拉菜单类两步签到（pting / fcloudpan）

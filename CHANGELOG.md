@@ -1,5 +1,40 @@
 # Changelog
 
+## [v4.13.33] - 2026-10-26
+
+### CF 验证鲁棒性重构 + vclib 自动过盾 + Yema 自动登录 + 失败站归类
+
+**根因修复：CF 坐标恒为 null（长期自动过盾失效的真凶）**
+- `Get-ResultSignal` 遇到 daemon 返回的 JS 对象（`{type:'object', value:{...}}`）时，把 `value` 拼成 PowerShell 的 `@{x=...; y=...}` 字符串，下游 `ConvertFrom-Json` 必失败 → `Get-CfWidgetViewportRect` 恒返回 null，所有 CF 坐标点击退化为 `cdp:no-rect`。
+- 修复为：非字符串 `value` 统一 `ConvertTo-Json` 序列化（同时覆盖 `ReadyEval` 返回对象等潜在问题）。坐标路径恢复后，vclib/xloli 的复选框点击立即可用。
+
+**CF 流程重构（`kimi-webbridge.ps1`）**
+- **焦点仿真**：检测到 CF 时自动 `Page.bringToFront`（daemon 实现为 focus emulation，不抢用户真实焦点）。后台标签页原先不渲染 Turnstile iframe（widget 只有空占位 300×65），这是 vclib「自动点击无效、只能人工勾选」的真正原因。
+- **多层点击策略**：① JS 视口坐标点击 inline widget（优先 iframe，过滤 0×0 与全屏容器）；② CDP `DOM.getFlattenedDocument(pierce=true)` 穿透 closed shadow 定位全屏挑战 iframe，按其 box model 坐标点击；③ **键盘激活**：`DOM.focus(iframe)` → `Tab` → `Space`（V2EX 全屏 managed challenge 实测 token 成功填充）；④ iframe 中心兜底。
+- **自适应轮询**：不再固定睡满 `CfRetryWaitMs`，每 2s 检查 token/turnstile 状态，命中即退；`no-target` 时只等 6s。audiences/DepthStudio 重试收敛为 3×20s。
+- **过盾后重导航**：全屏挑战通过但卡在「验证成功，正在等待源站响应」时，用 `cf_clearance` 重新导航一次，通常可直接落到目标页。
+- **CF_PENDING 独立状态**：新增站点参数 `CfFallbackPending`；自动点击/键盘均失败时返回 `CF_PENDING`，`signin-batch.ps1` 新增对应分支（计入失败/需人工审核，但不进可重试列表），避免此前 `CF_PENDING` 落到 `NO_DETECT` 且死代码不触发人工审核的问题。
+- **SERVER_ERROR 收敛**：重导航确认仍为服务端错误时立即返回，不再对错误页跑 ClickEval。
+
+**CF 站点实测与适配**
+- **vclib**：移除 v4.13.28「只等人工勾选」的 50s 方案，恢复 `$NexusPHPSignInDetect + $NexusPHPCfSignInClick`，`CfFallbackPending=true`。2026-10-26 实测：焦点仿真 → 点击复选框 → token 858 → 提交 → **签到成功（签到已得15）**。
+- **V2EX**：Detect 改为 token 感知（旧逻辑 `[name=cf-turnstile-response]` 存在即误报 CF）。全屏挑战键盘激活实测通过（token 填充、页面显示「验证成功，正在等待响应」）；但当日源站响应超时/导航 30s 失败，属站点/网络侧，未能完成签到。
+- **audiences**：2026-10-26 复测已签到（当日未触发 CF），检测正常。
+- **xloli**：用新流程现场验证 Turnstile（`cdp:click:…:passed`，token 837）。
+
+**YemaPT（Yema）**
+- 旧 `/consumer/checkIn` 会重定向登录页；真实签到页改为 `/#/user/growth?tab=checkIn`（`sites.json` + `$WebSignInConfigs` 同步）。
+- 登录页「我不是机器人」为 ALTCHA：新增自动恢复流程——用户名/密码由浏览器预填时，Detect 返回 `NEED_SIGN` → Click 点击 ALTCHA → 等待验证 → 点 Ant Design「登 录」（文本归一化兼容「登 录」空格）→ SPA 跳签到页 → 自动再点 ALTCHA + 立即签到。登录错误（密码错误/登录失败等）判 `LOGIN_REQUIRED`，避免反复重试锁号。
+- 2026-10-26 实测：登录页 ALTCHA token 624 → 登录成功 → 路由 `#/index` → `#/user/growth?tab=checkIn`；签到页 `NEED_SIGN → ALTCHA_JS_CLICKED → SIGN_OK`。
+
+**其余失败站归类（站点侧，无代码可改）**
+- **HDVideo**：页面「站点关闭维护中，请稍后再访问」→ 共享 Detect 新增维护判据 → `SITE_DISABLED`（SKIPPED，不计失败）。
+- **HDDolby**：Cloudflare「421 Misdirected Request」（连续两次复现）→ `SERVER_ERROR`。
+- **SBPT**：Cloudflare 502 Bad Gateway / Host Error → `SERVER_ERROR`（共享 Detect 新增 421/502/503/504/52x 判据）。
+
+**验证边界（诚实说明）**
+- 正常日批量尚未整批重跑；V2EX 因源站/网络超时未完成端到端签到，仅验证到 CF 过盾；audiences 当日已签无法复测签到动作。
+
 ## [v4.13.32] - 2026-10-21
 
 ### 新增批末「收尾恢复轮」+ 今日失败站点排查与适配

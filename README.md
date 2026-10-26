@@ -19,12 +19,13 @@
 
 | strategy | 行为 | 结果信号 | 是否签到 |
 |----------|------|----------|----------|
-| `webbridge` | 打开网页 → 检测签到状态 → 必要时点击/绕过验证 | `SIGN_OK` / `ALREADY_SIGNED` / `NEED_SIGN` / `CF_CHALLENGE` / `SLIDER` / … | ✅ 自动 |
+| `webbridge` | 打开网页 → 检测签到状态 → 必要时点击/绕过验证 | `SIGN_OK` / `ALREADY_SIGNED` / `NEED_SIGN` / `CF_CHALLENGE` / `CF_PENDING` / `SLIDER` / … | ✅ 自动 |
 | `visit-only` | 仅打开网页，**不检测不点击**（如 AsianDVDClub / Kufirc / asiandvd） | `VISITED` | ❌ 仅访问 |
 | `manual` | 跳过，由用户人工处理（当前仅 FreeFarm 滑块 / TJUPT 图片验证码 / zxiaoruan 站点不可达） | `SKIPPED`（记入 `skip_sites`，飞书给可点击链接） | ❌ 人工 |
 
 > 改某站为「仅打开不签到」：把 `strategy` 改成 `visit-only` 即可（无需改 `$WebSignInConfigs`，visit-only 靠 `DetectEval` 为空自动判定）。
 > **需一次性人工登录**：`42w`（`api.42x.shop/sign-in`）与 `xt-url`（LinuxDO OAuth）已接入 `webbridge`，但登录态需在浏览器中人工建立一次；之后每跑自动签到/保活。
+> **YemaPT 自动登录**：登录页为 ALTCHA「我不是机器人」+ Ant Design 登录按钮；当浏览器已预填用户名/密码时，Detect 返回 `NEED_SIGN`，Click 自动完成 ALTCHA → 登录 → 跳转签到页 → ALTCHA → 立即签到。登录错误会判 `LOGIN_REQUIRED`，不会反复重试锁号。
 > **禁止自动添加 `manual`**：失败站点只进 `needs_manual_review` 列表通知用户，绝不自动改策略（见 `signin-batch.ps1` 注释）。
 
 ## 标签页去重（重要不变量）
@@ -51,8 +52,8 @@
 ## 后台运行（不弹前台）
 
 所有入口脚本默认 `-NoFocus:$true`，`Invoke-WebSignIn` 的 `NoFocus` 默认也是 `$true`。
-daemon 的 `navigate newTab=true` 本身不抬窗口；抢焦点的是 `Page.bringToFront`——除 CF Turnstile（验证 iframe 需焦点）外，部分站点弹窗也需聚焦才渲染（如 pting 日历弹窗），对应站点在 `$WebSignInConfigs` 声明 `BringToFront=$true`，框架会瞬时借焦点，不弹前台。
-代价：依赖焦点的站（CF Turnstile / pting 弹窗等）后台下可能不渲染——与「不弹前台」诉求相比优先级更低；已声明 `BringToFront` 的站会瞬时抢焦点规避。
+daemon 的 `navigate newTab=true` 本身不抬窗口。**CF 站点特殊处理**：检测到 `CF_CHALLENGE` 时框架自动调用 `Page.bringToFront`——当前 daemon 把它实现为 **focus emulation**（页面可见、可接受真实输入，但不抢用户真实焦点），后台标签页因此能真正渲染 Turnstile iframe。之后按「JS 坐标点击 → CDP 穿透 closed shadow 点击 → 键盘激活（focus iframe + Tab + Space）→ iframe 中心」逐层尝试；自动全部失败且站点声明 `CfFallbackPending=$true` 时返回 `CF_PENDING`（需人工勾选），不拖住批次。
+部分站点弹窗也需聚焦才渲染（如 pting 日历弹窗），对应站点在 `$WebSignInConfigs` 声明 `BringToFront=$true`，框架会瞬时借焦点，不弹前台。
 
 ## 调试
 

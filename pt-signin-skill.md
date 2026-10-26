@@ -143,8 +143,10 @@ Each site's `Detect` in `$WebSignInConfigs` is an IIFE returning a string signal
 - `ALREADY_SIGNED`: already signed in today (state page shows directly, not from this click)
 - `SIGN_FAIL`: still failed after click
 - `CF_CHALLENGE`: page contains Cloudflare challenge (`cf-turnstile` / `challenges.cloudflare`)
+- `CF_PENDING`: CF not passed after all automatic attempts; needs a manual tick
+- `SITE_DISABLED`: sign-in disabled / maintenance notice (skipped, not a failure)
 - `SLIDER`: slider verification appeared
-- `SERVER_ERROR`: chrome-error page / connection error (network/proxy/site-side, not a code defect)
+- `SERVER_ERROR`: chrome-error page / connection error / CF 421·502·52x origin errors (network/proxy/site-side, not a code defect)
 - `LOGIN_REQUIRED`: not logged in
 
 PowerShell maps signals to result states `SUCCESS` / `ALREADY_DONE` / `NO_DETECT` / `CF_BLOCKED` / `SLIDER_FAIL` / `PAGE_ERROR` / `NO_LOGIN` (the `switch -Wildcard` in `signin-batch.ps1`).
@@ -158,14 +160,18 @@ PowerShell maps signals to result states `SUCCESS` / `ALREADY_DONE` / `NO_DETECT
 Some NexusPHP sites (the `NexusPHPCfSignInClick` family) need CF Turnstile cleared before sign-in:
 
 1. `Wait-PostNavigate` polls; when `cf-turnstile` is not yet passed it enters CF handling;
-2. `Page.bringToFront` gives the tab focus (CF iframe needs focus to render); `-NoFocus` may be temporarily disabled;
-3. `Get-CfWidgetViewportRect` reads the widget viewport coords, and with `ForceLayoutViewport` enabled clicks it;
-4. Polls `Test-CfTurnstilePassed` (`cf-turnstile` gone and page ready) to confirm;
-5. After passing, submits the attendance form (`ClickEval` clicks sign-in), retrying up to `CfRetryCount`.
+2. **Focus emulation**: `Page.bringToFront` (the current daemon implements it as focus emulation — the page becomes visible and accepts real input without stealing the user's focus). A background tab does not render the Turnstile iframe (the widget is an empty 300×65 placeholder), which is the real root cause of "auto-click never works, must tick by hand";
+3. **Layered click strategy**: ① JS `Get-CfWidgetViewportRect` reads visible widget/iframe viewport coords (rejects 0×0 and full-page containers) → coordinate click; ② CDP `DOM.getFlattenedDocument(pierce=true)` pierces the closed shadow to locate a full-page challenge iframe → `DOM.getBoxModel` coordinate click; ③ **keyboard activation**: `DOM.focus(iframe)` → Tab → Space (verified on V2EX's full-page managed challenge, token filled); ④ iframe-center fallback;
+4. Polls `Test-CfTurnstilePassed` every 2s (token filled / challenge gone), exits immediately when passed; if the page stays at "验证成功，正在等待源站响应", re-navigates once with the `cf_clearance` cookie;
+5. After passing, submits the attendance form (`ClickEval` clicks sign-in), retrying up to `CfRetryCount`;
+6. If every automatic attempt fails and the site declares `CfFallbackPending=$true`, returns `CF_PENDING` (manual tick required) instead of `CF_CHALLENGE` so the batch does not re-run hopelessly.
+
+> ⚠️ **Object signals must be JSON-serialized**: when `evaluate` returns a JS object, the daemon hands back a structured `value`; `Get-ResultSignal` must run `ConvertTo-Json`, otherwise `"$value"` becomes PowerShell's `@{x=...; y=...}`, `ConvertFrom-Json` fails downstream, and the CF rect is always null (the long-standing root cause fixed in v4.13.33).
 
 ### ALTCHA / SLIDER
 
 - **ALTCHA** (e.g. Yemapt): `ClickEval` solves ALTCHA first, then clicks sign-in. The primary solver does a direct JS `.click()` on the `input[type=checkbox]` (the widget has **no shadow DOM**); CDP coordinate-click stays only as a fallback when the checkbox isn't directly reachable. Verification reuses `Test-AltchaVerified`.
+- **YemaPT login recovery**: when the login page has browser-prefilled username/password, Click solves ALTCHA → clicks the Ant Design login button (text is actually "登 录"; whitespace must be normalized) → waits for the SPA to route to `/user/growth?tab=checkIn` → solves ALTCHA again → clicks "立即签到". Login errors (password wrong / login failed) map to `LOGIN_REQUIRED` to avoid retry-driven account lockout.
 - **SLIDER**: coordinate-click the slider with `ForceLayoutViewport=$true`; failure ⇒ `SLIDER_FAIL` enters batch retry.
 
 ### Two-step sign-in behind an avatar / dropdown menu (pting / fcloudpan)

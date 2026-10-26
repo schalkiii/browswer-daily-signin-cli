@@ -133,7 +133,15 @@ function Get-ResultSignal {
     param($Result)
     if ($null -eq $Result) { return $null }
     if ($Result -is [string]) { return $Result }
-        if ($Result.value) { return "$($Result.value)" }
+    if ($null -ne $Result.value) {
+        $v = $Result.value
+        if ($v -is [string]) { return $v }
+        if ($v -is [bool] -or $v -is [int] -or $v -is [long] -or $v -is [double] -or $v -is [decimal]) { return "$v" }
+        # evaluate 返回 JS 对象时，daemon 给的是结构化 value；必须序列化成 JSON，
+        # 否则 "$v" 会得到 "@{x=...; y=...}"，下游 ConvertFrom-Json 必失败
+        #（CF widget rect 曾因此恒为 null，所有坐标点击退化为 no-rect）。
+        try { return ($v | ConvertTo-Json -Compress -Depth 12) } catch { return "$v" }
+    }
     return "$Result"
 }
 
@@ -391,6 +399,9 @@ function Test-WebBridgeSignIn {
         [int]$NavTimeoutSec = 120,
         [int]$CfRetryCount = 3,
         [int]$CfRetryWaitMs = 10000,
+        # v4.13.33: CF 自动尝试全部失败后返回 CF_PENDING（需人工勾选）而非 CF_CHALLENGE。
+        #   CF_CHALLENGE 会被批处理当作可重试失败（每轮再跑 2 次），对必须人工过盾的站点纯属空耗。
+        [bool]$CfFallbackPending = $false,
         [bool]$SaveDebugSnapshot = $false,
         [string]$DebugDir = "",
         [bool]$NoFocus = $false,
@@ -559,7 +570,14 @@ function Test-WebBridgeSignIn {
                 if ($seSig -and $seSig -notmatch "SERVER_ERROR") {
                     Write-Host "  [WebBridge] $SiteName : after re-nav, signal=$seSig"
                     $signal = $seSig
+                } else {
+                    # v4.13.33: 确认仍是服务端错误 → 终止，别再对错误页跑 ClickEval（白白点击 + 等 PostClick）
+                    Save-DebugSnapshot $SiteName $session "server_error_final" $DebugDir $SaveDebugSnapshot
+                    return "SERVER_ERROR"
                 }
+            } else {
+                Save-DebugSnapshot $SiteName $session "server_error_final" $DebugDir $SaveDebugSnapshot
+                return "SERVER_ERROR"
             }
         }
 
@@ -582,6 +600,11 @@ function Test-WebBridgeSignIn {
         }
 
         if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
+            # v4.13.33: CF 首步——焦点仿真。batch 默认 -NoFocus 的后台标签页不渲染 Turnstile iframe，
+            #   widget 只剩空占位，坐标点击必然打空（vclib 曾因此被迫人工勾选）。
+            #   daemon 的 Page.bringToFront 实现为 focus emulation：不抢用户真实焦点，但让页面可见并可接受真实输入。
+            Enable-CfFocus $session
+            $cfReNavDone = $false
             for ($retry = 0; $retry -lt $CfRetryCount; $retry++) {
                 # v4.12.17: 每次重试先重跑完整 Detect —— 修复 xloli 类误判：
                 # BODY_NULL/CF_CHALLENGE 实为页面渲染滞后或 CF 后台已通过，真实已签到
@@ -597,25 +620,35 @@ function Test-WebBridgeSignIn {
                     }
                     if ($reSig0 -match "NEED_SIGN|UNKNOWN") { $signal = $reSig0; break }
                     if ($reSig0 -match "LOGIN_REQUIRED") { Save-DebugSnapshot $SiteName $session "login_required" $DebugDir $SaveDebugSnapshot; return "LOGIN_REQUIRED" }
+                    # 站点侧终止态（停签/维护/服务端错误）不进入 CF 点击
+                    if ($reSig0 -match "SITE_DISABLED|SERVER_ERROR") { Save-DebugSnapshot $SiteName $session "cf_terminal" $DebugDir $SaveDebugSnapshot; return $reSig0 }
                 }
-                # 仍判定 CF/BODY_NULL → 走原有 CF 点击流程
-                # v4.12.5: Invoke-CfVerifyClick 内部会 scrollIntoView + 点击 iframe/widget
+                # 仍判定 CF/BODY_NULL → 坐标点击 + 键盘激活（Invoke-CfVerifyClick 内部按序尝试）
                 $cfClickResult = Invoke-CfVerifyClick $session $SiteName $retry
                 if ($cfClickResult) { Write-Host "  [WebBridge] $SiteName : CF verify: $cfClickResult" }
 
-                # v4.12.5: 点击后等待 CF Turnstile 处理（iframe 内部验证 + token 填充）
-                $waitSec = [math]::Round($CfRetryWaitMs / 1000, 0)
-                Write-Host "  [WebBridge] $SiteName : CF retry $($retry+1)/$CfRetryCount, wait ${waitSec}s..."
-                Start-Sleep -Seconds $waitSec
-
-                # v4.12.5: 先检查 CF Turnstile 是否已通过（token 已填入 hidden input）
-                # v4.12.6: no-cf 也视为 CF 已通过（CF 验证通过后 widget 会被移除，token 可能被清空）
-                $cfPassed = Test-CfTurnstilePassed $session $SiteName
+                # v4.13.33: 自适应轮询 token（不再固定睡满 CfRetryWaitMs）：点击命中后通常 2~5s 填充，
+                #   未命中时也能尽快进入下一次尝试，避免 6×45s 这类长空耗。
+                # no-target（页面还在加载/无 CF 控件）没必要等满预算，快速进入下一轮
+                $cfWaitBudgetMs = if ($cfClickResult -eq 'no-target') { 6000 } else { $CfRetryWaitMs }
+                $cfWaitSteps = [Math]::Max(1, [int][Math]::Ceiling($cfWaitBudgetMs / 2000))
+                Write-Host "  [WebBridge] $SiteName : CF retry $($retry+1)/$CfRetryCount, polling token (<=$($cfWaitBudgetMs)ms)..."
+                $cfPassed = $null
+                for ($w = 0; $w -lt $cfWaitSteps; $w++) {
+                    $cfPassed = Test-CfTurnstilePassed $session $SiteName
+                    if ($cfPassed -match "^passed:|^no-cf$") { break }
+                    Start-Sleep -Seconds 2
+                }
                 Write-Host "  [WebBridge] $SiteName : CF state=$cfPassed"
                 if ($cfPassed -match "^passed:|^no-cf$") {
-                    # CF 已通过或已消失，重新检测页面状态
-                    $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
-                    $reSig = Get-ResultSignal $reDetect
+                    # CF 已通过/已消失：全屏挑战可能正在跳转，最多等 10s 让目标页落地后再判定
+                    $reSig = $null
+                    for ($nr = 0; $nr -lt 5; $nr++) {
+                        $reDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+                        $reSig = Get-ResultSignal $reDetect
+                        if ($reSig -and $reSig -notmatch "CF_CHALLENGE|BODY_NULL|REDIRECTING") { break }
+                        Start-Sleep -Seconds 2
+                    }
                     Write-Host "  [WebBridge] $SiteName : post-CF signal=$reSig"
                     if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
                         $cfPassSignal = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
@@ -630,12 +663,47 @@ function Test-WebBridgeSignIn {
                         Save-DebugSnapshot $SiteName $session "login_required" $DebugDir $SaveDebugSnapshot
                         return "LOGIN_REQUIRED"
                     }
-                    # v4.12.6: no-cf 但 reSig 仍是 CF_CHALLENGE — widget 可能已消失但页面未更新，继续重试
+                    if ($reSig -match "SITE_DISABLED|SERVER_ERROR") {
+                        Save-DebugSnapshot $SiteName $session "cf_terminal" $DebugDir $SaveDebugSnapshot
+                        return $reSig
+                    }
+                    # v4.13.33: 全屏挑战已过但页面卡在"验证成功，正在等待源站响应"（V2EX 实测），
+                    #   用已拿到的 cf_clearance 重新导航一次，通常可直接落到目标页。
+                    if (-not $cfReNavDone -and $reSig -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
+                        $cfReNavDone = $true
+                        Write-Host "  [WebBridge] $SiteName : CF passed, re-navigate with clearance cookie..."
+                        $navCf = Open-SiteTab -Url $Url -Session $session -NavTimeoutSec $NavTimeoutSec -ForceLayoutViewport $ForceLayoutViewport
+                        if ($navCf -and $navCf.success) {
+                            Wait-PostNavigate -Session $session -SiteName $SiteName -WaitMs $WaitMs -LoadWaitSec $LoadWaitSec -ReadyEval $ReadyEval
+                            $reCfDetect = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $DetectEval } -Session $session -TimeoutSec 15
+                            $reSig = Get-ResultSignal $reCfDetect
+                            Write-Host "  [WebBridge] $SiteName : post-CF re-nav signal=$reSig"
+                            if ($reSig -match "SIGN_OK|ALREADY_SIGNED") {
+                                $cfPassSignal = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
+                                Save-DebugSnapshot $SiteName $session "sign_ok_after_cf_renav" $DebugDir $SaveDebugSnapshot
+                                return $cfPassSignal
+                            }
+                            if ($reSig -match "NEED_SIGN|UNKNOWN") { $signal = $reSig; break }
+                            if ($reSig -match "LOGIN_REQUIRED") {
+                                Save-DebugSnapshot $SiteName $session "login_required" $DebugDir $SaveDebugSnapshot
+                                return "LOGIN_REQUIRED"
+                            }
+                            if ($reSig -match "SITE_DISABLED|SERVER_ERROR") {
+                                Save-DebugSnapshot $SiteName $session "cf_terminal" $DebugDir $SaveDebugSnapshot
+                                return $reSig
+                            }
+                        }
+                    }
+                    # 页面仍在挑战/跳转中 → 继续下一次重试
                 }
-                # CF 仍在验证中（pending:*），继续下一次重试
             }
             if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {
                 Save-DebugSnapshot $SiteName $session "cf_blocked_final" $DebugDir $SaveDebugSnapshot
+                if ($CfFallbackPending) {
+                    # 自动点击/键盘均未通过 → 交人工勾选；不返回 CF_CHALLENGE，避免批处理反复重跑仍失败
+                    Write-Host "  [WebBridge] $SiteName : CF 自动未通过 -> CF_PENDING（需人工勾选）" -ForegroundColor Yellow
+                    return "CF_PENDING"
+                }
                 return $signal
             }
         }
@@ -749,11 +817,91 @@ function Test-WebBridgeSignIn {
     }
 }
 
-# 尝试点击 CF 验证按钮（"请验证您是真人" / "Verify you are human" / turnstile checkbox）
-# 返回点击结果描述，未找到返回 $null
-# v4.12.6: CF Turnstile iframe 在 closed Shadow DOM 中，JS document.querySelectorAll('iframe') 看不到
-# 必须用 CDP DOM.describeNode(pierce=true) 穿透 Shadow DOM，再用 Input.dispatchMouseEvent 点击 iframe checkbox
-# 关键：点击位置是 iframe 左侧 (minX+24, centerY)，不是中心 — checkbox 在左侧
+# v4.13.33: CF 站点焦点仿真。
+# batch 默认 -NoFocus 的后台标签页不渲染 Turnstile iframe（widget 只剩空占位），
+# 这是 vclib "自动点击无效、只能人工勾选" 的真正根因。
+# daemon 的 Page.bringToFront 不抢真实焦点，而是启用 focus emulation（页面可见 + 接受真实输入）。
+function Enable-CfFocus {
+    param([string]$Session)
+    try {
+        $r = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "Page.bringToFront"; params = @{} } -Session $Session -TimeoutSec 10
+        if ($r -and $r.activation) { Write-Host "  [WebBridge] CF focus: $($r.activation)" }
+    } catch {}
+    # 兜底：直接开启焦点仿真（bringToFront 不可用/行为变化时）
+    try { $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "Emulation.setFocusEmulationEnabled"; params = @{ enabled = $true } } -Session $Session -TimeoutSec 10 } catch {}
+    Start-Sleep -Milliseconds 400
+}
+
+# v4.13.33: 通过 CDP DOM(pierce=true) 定位 CF iframe。
+# 全屏 managed challenge（V2EX）的 turnstile iframe 位于 closed shadow DOM 内，页面 JS 的
+# document.querySelectorAll('iframe') 看不到；只有 DOM.getFlattenedDocument(pierce=true) 能拿到。
+# 仅当 JS 侧找不到可点击 widget 时调用，避免正常站点无谓遍历大 DOM。
+function Get-CfIframeViaCdp {
+    param([string]$Session, [int]$MaxNodes = 20000)
+    try {
+        # DOM agent 在导航后需要重新启用；getDocument 会隐式 enable
+        $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "DOM.getDocument"; params = @{ depth = 1; pierce = $true } } -Session $Session -TimeoutSec 15
+        $flat = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "DOM.getFlattenedDocument"; params = @{ depth = -1; pierce = $true } } -Session $Session -TimeoutSec 25
+        if (-not $flat -or -not $flat.nodes) { return $null }
+        if ($flat.nodes.Count -gt $MaxNodes) { return $null }
+        foreach ($n in $flat.nodes) {
+            if ($n.nodeName -ne 'IFRAME') { continue }
+            $attr = if ($n.attributes) { ($n.attributes -join ' ') } else { '' }
+            if ($attr -notmatch 'challenges\.cloudflare\.com|turnstile|hcaptcha|recaptcha') { continue }
+            $box = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "DOM.getBoxModel"; params = @{ nodeId = $n.nodeId } } -Session $Session -TimeoutSec 10
+            if (-not $box -or -not $box.model -or -not $box.model.content -or $box.model.content.Count -lt 8) { continue }
+            $c = $box.model.content
+            $w = $c[2] - $c[0]
+            $h = $c[5] - $c[1]
+            if ($w -le 5 -or $h -le 5) { continue }
+            return @{ nodeId = $n.nodeId; x = [double]$c[0]; y = [double]$c[1]; w = [double]$w; h = [double]$h }
+        }
+    } catch {}
+    return $null
+}
+
+function Send-CfKey {
+    param([string]$Session, [string]$Key, [string]$Code, [int]$VirtualKeyCode)
+    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "Input.dispatchKeyEvent"; params = @{ type = "keyDown"; key = $Key; code = $Code; windowsVirtualKeyCode = $VirtualKeyCode; nativeVirtualKeyCode = $VirtualKeyCode } } -Session $Session -TimeoutSec 10
+    Start-Sleep -Milliseconds 100
+    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "Input.dispatchKeyEvent"; params = @{ type = "keyUp"; key = $Key; code = $Code; windowsVirtualKeyCode = $VirtualKeyCode; nativeVirtualKeyCode = $VirtualKeyCode } } -Session $Session -TimeoutSec 10
+}
+
+function Wait-CfTokenQuick {
+    param([string]$Session, [int]$MaxWaitSec = 4)
+    $steps = [Math]::Max(1, [int][Math]::Ceiling($MaxWaitSec / 2))
+    for ($i = 0; $i -lt $steps; $i++) {
+        Start-Sleep -Seconds 2
+        $state = Test-CfTurnstilePassed -Session $Session
+        if ($state -match "^passed:|^no-cf$") { return $true }
+    }
+    return $false
+}
+
+# v4.13.33: 键盘激活——V2EX 全屏 managed challenge 实测有效：
+# DOM.focus(iframe) → Tab（焦点移到复选框）→ Space（触发验证）。
+# 坐标点击对全屏挑战常被 Cloudflare 判为无效手势，键盘路径是更可靠的兜底。
+function Invoke-CfKeyboardActivate {
+    param([string]$Session, [int]$IframeNodeId)
+    $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "DOM.focus"; params = @{ nodeId = $IframeNodeId } } -Session $Session -TimeoutSec 10
+    Start-Sleep -Milliseconds 300
+    Send-CfKey -Session $Session -Key "Tab" -Code "Tab" -VirtualKeyCode 9
+    Start-Sleep -Milliseconds 200
+    Send-CfKey -Session $Session -Key " " -Code "Space" -VirtualKeyCode 32
+    if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 5) { return "Tab+Space" }
+    Send-CfKey -Session $Session -Key "Enter" -Code "Enter" -VirtualKeyCode 13
+    if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 4) { return "Enter" }
+    Send-CfKey -Session $Session -Key "Tab" -Code "Tab" -VirtualKeyCode 9
+    Start-Sleep -Milliseconds 200
+    Send-CfKey -Session $Session -Key "Tab" -Code "Tab" -VirtualKeyCode 9
+    Start-Sleep -Milliseconds 200
+    Send-CfKey -Session $Session -Key " " -Code "Space" -VirtualKeyCode 32
+    if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 4) { return "Tab+Tab+Space" }
+    return $null
+}
+
+# 尝试通过 CF 验证（坐标点击 inline widget → CDP iframe 坐标点击 → 键盘激活 → 标签点击）
+# 返回尝试结果描述（*:passed 表示 token 已填充），未找到目标返回 no-target
 function Invoke-CfVerifyClick {
     param(
         [string]$Session,
@@ -766,12 +914,12 @@ function Invoke-CfVerifyClick {
     #   与 Input.dispatchMouseEvent 坐标系一致。ForceLayoutViewport 站点重复启用无害（幂等）。
     $null = Enable-LayoutViewport -Session $Session
 
-    # 先滚动 widget 到视口（触发懒加载渲染 iframe）
+    # 先滚动 widget/iframe 到视口（触发懒加载渲染）
     $scrollJS = @'
 (function(){
-  var widget = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]');
-  if(widget){
-    try { widget.scrollIntoView({block:'center'}); } catch(e){ try{ widget.scrollIntoView(); }catch(e2){} }
+  var el = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]') || document.querySelector('iframe[src*="challenges.cloudflare.com"]');
+  if(el){
+    try { el.scrollIntoView({block:'center'}); } catch(e){ try{ el.scrollIntoView(); }catch(e2){} }
     return 'scrolled';
   }
   return 'no_widget';
@@ -781,44 +929,71 @@ function Invoke-CfVerifyClick {
         $null = Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $scrollJS } -Session $Session -TimeoutSec 10
     } catch {}
 
-    # v4.12.7: 用 JS getBoundingClientRect 获取视口相对坐标点击 checkbox
-    # 旧版 DOM.getBoxModel 返回 layout 坐标，滚动页面时 Y 为负导致误点空白（audiences 实测点击坐标 (24,-1003) 越界）
-    # 视口坐标与 CDP Input.dispatchMouseEvent 的 x/y 一致，且天然处理滚动偏移
+    # 1) 页面 JS 可定位的 inline widget（vclib/audiences/xloli 等）
+    # v4.12.7: 视口坐标与 CDP Input 一致；旧版 DOM.getBoxModel 的 layout 坐标滚动后会越界。
     $rect = Get-CfWidgetViewportRect -Session $Session
-    if (-not $rect) { return "cdp:no-rect" }
-    return (Invoke-CfClickFromRect -Rect $rect -Session $Session -Attempt $Attempt)
+    if ($rect) {
+        $click = Invoke-CfClickFromRect -Rect $rect -Session $Session -Attempt $Attempt
+        if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 4) { return "js:$click:passed" }
+    }
+
+    # 2) CDP 穿透 closed shadow，定位全屏挑战 iframe（V2EX）
+    $cdp = Get-CfIframeViaCdp -Session $Session
+    if ($cdp) {
+        $cx = [int]($cdp.x + 26)
+        if ($Attempt % 2 -eq 1) { $cx = [int]($cdp.x + 34) }
+        $cy = [int]($cdp.y + $cdp.h / 2)
+        $null = Invoke-CdpClickAt -X $cx -Y $cy -Session $Session
+        if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 4) { return "cdp:click:($cx,$cy):passed" }
+        $kbd = Invoke-CfKeyboardActivate -Session $Session -IframeNodeId $cdp.nodeId
+        if ($kbd) { return "cdp:kbd:$kbd:passed" }
+        # 最后尝试 iframe 中心（部分 widget 整块可点）
+        $cx2 = [int]($cdp.x + $cdp.w / 2)
+        $cy2 = [int]($cdp.y + $cdp.h / 2)
+        $null = Invoke-CdpClickAt -X $cx2 -Y $cy2 -Session $Session
+        if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 3) { return "cdp:label:($cx2,$cy2):passed" }
+    }
+    return "no-target"
 }
 
 # v4.12.7: 获取 CF widget/iframe 的视口相对坐标（getBoundingClientRect），与 CDP Input 坐标系一致
+# v4.13.33: JS 直接返回 JSON 字符串（daemon 结构化对象经 Get-ResultSignal 序列化也兼容）；
+#   优先 iframe（inline Turnstile 的复选框在 iframe 内），拒绝 0x0 与全屏容器（全屏交给 CDP iframe 路径）。
 function Get-CfWidgetViewportRect {
     param([string]$Session)
     $js = @'
 (function(){
   function rectOf(el){ if(!el||!el.getBoundingClientRect) return null; var r=el.getBoundingClientRect(); return {x:r.x,y:r.y,w:r.width,h:r.height}; }
-  // v4.12.7: 拓宽匹配 hCaptcha / 非标准 CF 控件（audiences 等站点的"人机验证"非 .cf-turnstile）
-  var w = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]') || document.querySelector('[class*="cf-"]') || document.querySelector('#challenge-stage') || document.querySelector('[class*="hcaptcha"]') || document.querySelector('[class*="captcha"]');
-  if(w){ var r=rectOf(w); if(r) return {found:'widget', x:r.x,y:r.y,w:r.w,h:r.h, vw:window.innerWidth, vh:window.innerHeight}; }
-  var ifr = document.querySelector('iframe[src*="challenges.cloudflare.com"]') || document.querySelector('iframe[src*="captcha"]') || document.querySelector('iframe[src*="hcaptcha"]');
-  if(ifr){ var r2=rectOf(ifr); if(r2) return {found:'iframe', x:r2.x,y:r2.y,w:r2.w,h:r2.h, vw:window.innerWidth, vh:window.innerHeight}; }
-  return null;
+  var vw = window.innerWidth, vh = window.innerHeight;
+  function usable(r){ return !!r && r.w>20 && r.h>15 && !(r.w>=vw*0.8 && r.h>=vh*0.6); }
+  var ifr = document.querySelector('iframe[src*="challenges.cloudflare.com"]') || document.querySelector('iframe[src*="turnstile"]') || document.querySelector('iframe[src*="hcaptcha"]') || document.querySelector('iframe[src*="recaptcha"]');
+  if(ifr){ var r1=rectOf(ifr); if(usable(r1)) return JSON.stringify({found:'iframe', x:r1.x,y:r1.y,w:r1.w,h:r1.h, vw:vw, vh:vh}); }
+  var w = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]') || document.querySelector('#challenge-stage') || document.querySelector('[class*="hcaptcha"]') || document.querySelector('[class*="cf-"]') || document.querySelector('[class*="captcha"]');
+  if(w){ var r2=rectOf(w); if(usable(r2)) return JSON.stringify({found:'widget', x:r2.x,y:r2.y,w:r2.w,h:r2.h, vw:vw, vh:vh}); }
+  return JSON.stringify({found:'none'});
 })()
 '@
     try {
         $raw = Get-ResultSignal (Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10)
-        if ($raw) { return ($raw | ConvertFrom-Json -ErrorAction SilentlyContinue) }
+        if ($raw) {
+            $obj = $raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+            if ($obj -and $obj.found -and $obj.found -ne 'none') { return $obj }
+        }
     } catch {}
     return $null
 }
 
 function Invoke-CfClickFromRect {
     param($Rect, [string]$Session, [int]$Attempt = 0)
+    $vw = if ($Rect.vw) { [int]$Rect.vw } else { 1280 }
+    $vh = if ($Rect.vh) { [int]$Rect.vh } else { 800 }
     # 偶数次点左侧 checkbox（x+24），奇数次点中心，提升不同 Turnstile 布局的通过率
     if ($Attempt % 2 -eq 0) {
-        $cx = [math]::Min([math]::Max(2, [int]($Rect.x + 24)), [int]($Rect.vw - 2))
+        $cx = [math]::Min([math]::Max(2, [int]($Rect.x + 24)), [int]($vw - 2))
     } else {
-        $cx = [math]::Min([math]::Max(2, [int]($Rect.x + $Rect.w / 2)), [int]($Rect.vw - 2))
+        $cx = [math]::Min([math]::Max(2, [int]($Rect.x + $Rect.w / 2)), [int]($vw - 2))
     }
-    $cy = [math]::Min([math]::Max(2, [int]($Rect.y + $Rect.h / 2)), [int]($Rect.vh - 2))
+    $cy = [math]::Min([math]::Max(2, [int]($Rect.y + $Rect.h / 2)), [int]($vh - 2))
     return (Invoke-CdpClickAt -X $cx -Y $cy -Session $Session)
 }
 
@@ -958,9 +1133,10 @@ function Test-CfTurnstilePassed {
   if(document.querySelector('iframe[src*="challenges.cloudflare.com"]')){
     return 'pending:cf-iframe-present';
   }
-  // 3. body 文本含 CF 关键字
+  // 3. body 文本含 CF 关键字（全屏挑战常见：正在进行安全验证 / 验证您是否是真人 / 验证成功等待响应）
   var t = document.body ? document.body.innerText : '';
-  if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1) return 'pending:cf-text';
+  if(t.indexOf('正在检查')>-1||t.indexOf('Just a moment')>-1||t.indexOf('安全验证')>-1||
+     t.indexOf('正在进行安全验证')>-1||t.indexOf('验证您是否是真人')>-1||t.indexOf('验证成功，正在等待')>-1) return 'pending:cf-text';
   return 'no-cf';
 })()
 '@
