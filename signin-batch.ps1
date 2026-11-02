@@ -251,7 +251,7 @@ if (Test-Path $WebArticlesDir) {
     Get-ChildItem $WebArticlesDir -File | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-Write-Output "=== PT Sign-in v4.13.33 (self-iterating + baseline + forum click + cleanup + bookmark-sync) ==="
+Write-Output "=== PT Sign-in v4.13.34 (self-iterating + baseline + forum click + cleanup + bookmark-sync) ==="
 Write-Output "Started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 Write-Output "Sites: $($config.sites.Count)"
 Write-Output ""
@@ -382,6 +382,8 @@ foreach ($site in $config.sites) {
         success       = $signals.ok_sites.Count
         failed        = $signals.fail_sites.Count
         skipped       = $signals.skip_sites.Count
+        login_expired = $signals.login_expired
+        no_login      = $signals.login_expired.Count
         iterations    = $script:iterationLog.Count
         baseline_known= $baseline.sites.Count
         new_successes = $tracking.new_sites
@@ -459,6 +461,8 @@ if (-not $NoRecovery) {
             success       = $signals.ok_sites.Count
             failed        = $signals.fail_sites.Count
             skipped       = $signals.skip_sites.Count
+            login_expired = $signals.login_expired
+            no_login      = $signals.login_expired.Count
             iterations    = $script:iterationLog.Count
             baseline_known= $baseline.sites.Count
             new_successes = $tracking.new_sites
@@ -506,6 +510,8 @@ $summary = @{
     success       = $signals.ok_sites.Count
     failed        = $signals.fail_sites.Count
     skipped       = $signals.skip_sites.Count
+    login_expired = $signals.login_expired
+    no_login      = $signals.login_expired.Count
     iterations    = $iterCount
     baseline_known= $baseline.sites.Count
     new_successes = $tracking.new_sites
@@ -522,7 +528,7 @@ $summary | ConvertTo-Json -Depth 4 | Out-File $ResultFile -Encoding UTF8
 
 Write-Output ""
 Write-Output "=== Signal ==="
-Write-Output "PASS: $([string]$signals.ok). AUTO_OK=$($signals.ok_sites.Count) AUTO_FAIL=$($signals.fail_sites.Count) MANUAL_SKIP=$($signals.skip_sites.Count) BASELINE=$($baseline.sites.Count)"
+Write-Output "PASS: $([string]$signals.ok). AUTO_OK=$($signals.ok_sites.Count) AUTO_FAIL=$($signals.fail_sites.Count) MANUAL_SKIP=$($signals.skip_sites.Count) NO_LOGIN=$($signals.login_expired.Count) BASELINE=$($baseline.sites.Count)"
 if ($tracking.new_sites.Count -gt 0) { Write-Output "NEW:  $($tracking.new_sites -join ', ')" }
 if ($tracking.regressions.Count -gt 0) { Write-Output "REGR: $($tracking.regressions -join ', ')" }
 if ($tracking.needs_manual_review.Count -gt 0) { Write-Output "REVIEW: $($tracking.needs_manual_review -join ', ') (需人工确认，不会自动改manual)" }

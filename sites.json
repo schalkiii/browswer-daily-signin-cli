@@ -334,10 +334,10 @@
     },
     {
       "name": "42w",
-      "url": "https://api.42w.shop/profile",
+      "url": "https://api.42x.shop/dashboard",
       "strategy": "browser-open",
       "display_name": "42 API",
-      "note": "auto: 书签同步新增"
+      "note": "v4.13.34: URL 同步为 api.42x.shop/dashboard（与 WebSignInConfigs 一致；登录页 /sign-in），需人工一次性登录。⚠️ 若书签仍为旧域名 api.42w.shop，Sync-Bookmarks 可能把 URL 同步回旧值，需先更新书签"
     },
     {
       "name": "pting",

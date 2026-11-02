@@ -71,7 +71,7 @@ Use the baseline (`baseline.json`) as a reference for which sites _should_ succe
 | `ReadyEval`           | Custom page-ready JS (replaces default body-length + shield-keyword check)           |
 | `ForceLayoutViewport` | Coordinate-click sites (CF Turnstile / SLIDER) set `$true` to enable layout viewport. ALTCHA (Yemapt) is now solved by a direct JS `.click()` on the checkbox (no shadow DOM); `ForceLayoutViewport` is kept only for its CDP fallback. |
 | `NavTimeoutSec`       | Per-site navigation timeout seconds (default 120)                                    |
-| `BringToFront`       | Some popups only render when the tab is focused (e.g. pting's calendar popup). Set `$true` so the framework calls `Page.bringToFront` to grab focus transiently (also used by CF Turnstile). |
+| `BringToFront`       | Some popups only render when the tab is focused (e.g. pting's calendar popup). Set `$true` so the framework calls `Page.bringToFront` transiently. CF sites no longer need it: the framework enables focus emulation automatically on `CF_CHALLENGE`. |
 | `CfRetryCount` / `CfRetryWaitMs` | CF bypass retry count / interval                                       |
 
 ---
@@ -189,7 +189,7 @@ Some sites hide sign-in behind an **avatar dropdown** or a **popup opened by a t
 - **⚠️ The trigger is a toggle — never blindly re-click**: clicking an already-expanded trigger **closes** the menu. When waiting for the panel, always check `aria-expanded` first; if already expanded, only wait. Otherwise a "panel slower than the wait" retry click turns the menu open→closed, showing up as *intermittent* `UNKNOWN` (fcloudpan passed 3 runs, then failed the 4th).
 - **Signal**: read real state inside the panel (button `disabled`, "今日已签到" text, …) rather than a "clicked ⇒ success" flag.
 
-> Focus & `-NoFocus`: `navigate newTab=true` alone doesn't raise the window; the focus grabber is `Page.bringToFront`, needed by CF Turnstile **and by sites whose popup only renders when focused** (e.g. pting). Background batch defaults to `-NoFocus:$true` globally; focus is borrowed transiently per-site when `BringToFront=$true`.
+> Focus & `-NoFocus`: `navigate newTab=true` alone doesn't raise the window; CF sites are handled automatically by the framework's `Page.bringToFront` focus emulation on `CF_CHALLENGE` (no real focus steal), while sites whose popup only renders when focused (e.g. pting) still declare `BringToFront=$true`. Background batch defaults to `-NoFocus:$true`.
 
 ---
 
@@ -241,6 +241,7 @@ All debug/temp scripts (`debug-*.ps1`, `_tmp_*.ps1`, `fix-encoding.ps1`, `test-b
 - **Single session, single tab**: the root invariant preventing leaks and `has no tab` storms.
 - **`domcontentloaded` navigation**: avoids the extension's 30s `load` hard-timeout tab destruction and retry avalanche.
 - **visit-only slow sites don't retry**: a created tab is treated as success, avoiding repeated cleanup/reopen.
-- **Background-first**: `-NoFocus:$true` globally avoids focus grab; CF handling borrows focus transiently.
+- **Background-first**: `-NoFocus:$true` globally avoids focus grab; CF handling uses the framework's automatic focus emulation (no real focus steal), while popup sites such as pting opt into `BringToFront`.
 - **No auto `manual`**: failed sites only go into the "needs human review" list; the user confirms before manually editing `sites.json`.
 - **Pre-run config consistency**: `Test-SigninConfigConsistency` checks inconsistencies like "non-manual site missing `$WebSignInConfigs`" before running, avoiding silent skips.
+- **Separate diagnostics from return values**: use `Write-Host` for diagnostics inside functions; `Write-Output` is captured as part of the return value and gets matched element-by-element by `switch -Wildcard`, which once made `NO_CONFIG` count as both failure and skip (reproduced by SunnyPT, fixed in v4.13.34).

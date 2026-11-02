@@ -1675,7 +1675,9 @@ function Invoke-WebSignIn {
     )
     $cfg = $WebSignInConfigs[$SiteName]
     if (-not $cfg) {
-        Write-Output "  [WebSignIn] $SiteName : no config, skip"
+        # ⚠️ 诊断信息必须走 Write-Host：Write-Output 会与返回值一起被批处理的 switch 逐个匹配，
+        #    导致 NO_CONFIG 同时落入 default(失败) 和 NO_CONFIG(跳过) 两个分支（sunnypt 曾重复计数）。
+        Write-Host "  [WebSignIn] $SiteName : no config, skip"
         return "NO_CONFIG"
     }
 

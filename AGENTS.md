@@ -20,7 +20,7 @@ PT 每日签到 CLI — 通过本地 kimi WebBridge daemon 操控已登录浏览
 - 核心不变量：所有站点共用 daemon 会话 `daily-signin`，任意时刻 ≤ 1 个 tab（`Close-SiteTabs-Verified` 强关）。
 - 导航统一 `navigate + waitUntil=domcontentloaded`，单次直达，不在扩展 30s `load` 超时上赌命。
 - 检测/点击全在浏览器内 JS（UTF-8 原生处理中文），返回 ASCII 信号给 PowerShell。
-- 后台默认 `-NoFocus`；CF Turnstile 与「弹窗需聚焦才渲染」的站点（如 pting 日历弹窗）声明 `BringToFront=$true` 瞬时借焦点。
+- 后台默认 `-NoFocus`；检测到 CF 时框架自动 `Page.bringToFront` 焦点仿真（daemon 不抢真实焦点）让 Turnstile iframe 渲染；「弹窗需聚焦才渲染」的站点（如 pting 日历弹窗）仍声明 `BringToFront=$true`。
 - 失败站点只进 `needs_manual_review`，**禁止**自动改 `manual`。
 - 运行时产物（`config.json` / `signin-log.json` / `debug-snapshots/` 等）已被 `.gitignore` 排除，勿提交。
 
@@ -36,6 +36,7 @@ PT 每日签到 CLI — 通过本地 kimi WebBridge daemon 操控已登录浏览
 - **YemaPT**：签到页 `/#/user/growth?tab=checkIn`；登录页 ALTCHA + Ant Design 按钮可在浏览器预填凭据时自动登录，随后自动签到。
 - **SunnyPT**：自研 SPA 签到日历（`/user/attendance`），以状态「今日 未/已签到」+ 按钮「立即签到/已签到」为判据；已接入 `webbridge`，2026-11-02 实测签到成功（+16 魔力）。
 - 需一次性人工登录：**42w**（域名 `api.42x.shop`，路由 `/dashboard`）、**xt-url**（LinuxDO OAuth 落 CF 质询，后台无法通过）；登录态建立后自动签到。
-- 站点易变：**pting** 已迁至 `fengchao.chat`；**521** 站方临时停签（`SITE_DISABLED` → 记 SKIPPED）；**HDVideo** 维护页同样归 `SITE_DISABLED`；**SBPT**（502）为源站/Cloudflare 错误，归 `SERVER_ERROR`。**HDDolby**（421）当前已不在书签/`sites.json`（书签同步移除），如恢复需重新加回。
+- 站点易变：**pting** 已迁至 `fengchao.chat`；**HDVideo** 2026-11-02 已恢复并签到成功（维护页仍归 `SITE_DISABLED`）；**SBPT**（502）为源站/Cloudflare 错误，归 `SERVER_ERROR`。**521 / HDDolby** 当前已不在书签/`sites.json`（书签同步移除），如恢复需重新加回。
+- **最近运行态（2026-11-02 02:34 定时批量，v4.13.33）**：vclib 自动过盾 `SIGN_OK`、Yemapt `ALREADY_DONE`、HDVideo 恢复；V2EX `CF_PENDING`、audiences `REDIRECTING`、SBPT `SERVER_ERROR`、PigGo/Moment `UNKNOWN`、42w/xt-url `NO_LOGIN`；sunnypt 当时 `NO_CONFIG`（v4.13.34 已接入）。计划任务动作路径正常；脚本按失败站数返回 1，`LastTaskResult=1` 与 6 个失败站一致。
 - 新站接入：`scan-bookmarks.ps1` 生成 `sites.json` 条目 → 在 `signin-web.ps1` 补 `$WebSignInConfigs` → `signin-single.ps1` 现场核验。
 - ⚠️ PowerShell 预览版升级会使计划任务 exe 路径失效（任务静默不跑）；升级后重跑 `setup-daily-task.ps1`。

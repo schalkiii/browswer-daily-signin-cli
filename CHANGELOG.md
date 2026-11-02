@@ -17,6 +17,15 @@
 **框架修正（`kimi-webbridge.ps1`）**
 - 首检 `UNKNOWN`、5s 后重试才看到 `SIGN_OK` 时，签到状态是页面自带的，本次尚未点击 → 与首检 `SIGN_OK` 同义，返回 `ALREADY_SIGNED`（有 Click）或 `SIGN_OK`（无 Click），不再多跑一次 Click。修复慢水合 SPA 出现「已签到却仍点一次（NO_BTN）+ 多等 PostClick」的浪费，也避免语义上把自带签到误报为本次点击成功。
 
+**配置同步（`sites.json`）**
+- `42w` URL 从旧 `https://api.42w.shop/profile` 同步为 `https://api.42x.shop/dashboard`（与 `$WebSignInConfigs` 一致；登录页 `/sign-in`），避免飞书链接/书签同步继续指向旧域。⚠️ 若浏览器书签仍是旧域名，请先更新书签，否则 `Sync-Bookmarks` 可能把 URL 同步回旧值。
+
+**运行态核对（2026-11-02 02:34 定时批量，运行 v4.13.33 代码）**
+- 43 成功 / 6 失败 / 4 跳过（54 站）；vclib 自动过盾 `SIGN_OK`（67.2s），CF 重构在真实批量中生效；Yemapt `ALREADY_DONE`；HDVideo 已从维护恢复 `SIGN_OK`。
+- 失败：V2EX `CF_PENDING`（216.5s）、audiences `REDIRECTING`（419.2s）、SBPT `SERVER_ERROR`、PigGo/Moment `UNKNOWN`；42w/xt-url `NO_LOGIN`（需人工登录）；sunnypt 当时 `NO_CONFIG`（v4.13.34 已接入，待下批验证）。
+- 修复同批暴露的统计 bug：`Invoke-WebSignIn` 的 `NO_CONFIG` 诊断原用 `Write-Output`，被批处理 `switch -Wildcard` 当作第二个返回值处理，导致 sunnypt 同时计入失败和跳过；改为 `Write-Host`，并在 `signin-log.json` 汇总补 `login_expired`/`no_login`。下一次批量统计将自洽。
+- 计划任务动作路径为稳定别名；脚本按失败站数返回 1，`LastTaskResult=1` 与当日 6 个失败站一致，非任务故障。
+
 **验证边界（诚实说明）**
 - SunnyPT 今日已由适配调试时为完成验证实际签到；因此框架内真实 `NEED_SIGN → Click → SIGN_OK` 全链路未在今日复跑，待明日批量验证。
 - 已用**纯 DOM 模拟**（把状态/按钮改回未签到并拦截点击，不触达服务器）验证：`Detect = NEED_SIGN`（不被日历图例误判）、`Click = CLICKED` 且命中一次；真实点击机制与状态变化已在此前实测确认。

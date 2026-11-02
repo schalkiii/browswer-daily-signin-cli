@@ -75,7 +75,7 @@ cd d:\workspace\browswer-daily-signin-cli
 | `ReadyEval`         | 自定义页面就绪判定 JS（替代默认 body 文本长度 + 盾关键词判定）              |
 | `ForceLayoutViewport` | 坐标点击站（CF Turnstile / SLIDER）声明 `$true`，启用布局视口。ALTCHA（Yemapt）已改为直接 JS 点击复选框（无 shadow DOM），`ForceLayoutViewport` 仅其 CDP 兜底保留。 |
 | `NavTimeoutSec`     | 该站导航超时秒数（默认 120）                                               |
-| `BringToFront`     | 部分站点弹窗需标签页聚焦才渲染（如 pting 日历弹窗）。声明 `$true`，框架调用 `Page.bringToFront` 瞬时抢焦点（CF Turnstile 同理）。 |
+| `BringToFront`     | 部分站点弹窗需标签页聚焦才渲染（如 pting 日历弹窗）。声明 `$true`，框架调用 `Page.bringToFront` 瞬时借焦点。CF 站不再需要此项：框架检测到 `CF_CHALLENGE` 时自动启用焦点仿真。 |
 | `CfRetryCount` / `CfRetryWaitMs` | CF 绕过重试次数 / 间隔                                                  |
 
 ---
@@ -193,7 +193,7 @@ PowerShell 侧按信号映射到 `SUCCESS` / `ALREADY_DONE` / `NO_DETECT` / `CF_
 - **⚠️ 触发器是 toggle，别盲目补点**：已展开时再点一次会把菜单**关掉**。等待面板时必须先判 `aria-expanded`——已展开则只等不点；否则「面板渲染慢于等待」时补点第二下恰成「开→关」，表现为**间歇性** `UNKNOWN`（fcloudpan 曾前 3 次成功、第 4 次失败）。
 - **判定依据**：优先读面板内的真实状态（按钮 `disabled`、「今日已签到」等），而非「点过就算成功」的标志位。
 
-> 焦点与 `-NoFocus`：`navigate newTab=true` 本身不抬窗口；抢焦点的是 `Page.bringToFront`，除 CF 站外，部分站点弹窗需聚焦才渲染（如 pting 日历弹窗）也需要。后台批处理默认 `-NoFocus:$true` 全局不抢焦点；仅当站点声明 `BringToFront=$true` 时瞬时借焦点。
+> 焦点与 `-NoFocus`：`navigate newTab=true` 本身不抬窗口；CF 站由框架在 `CF_CHALLENGE` 时自动 `Page.bringToFront` 焦点仿真（daemon 不抢真实焦点）；部分站点弹窗（如 pting 日历弹窗）仍需声明 `BringToFront=$true`。后台批处理默认 `-NoFocus:$true`。
 
 ---
 
@@ -245,6 +245,7 @@ $config = $configRaw | ConvertFrom-Json
 - **单一会话单 tab**：防泄漏与防 `has no tab` 风暴的根本不变量。
 - **`domcontentloaded` 导航**：规避扩展 30s `load` 硬超时导致的 tab 销毁与重试雪崩。
 - **visit-only 慢站不重试**：tab 已建立即判成功，避免反复清场重开。
-- **后台优先**：`-NoFocus:$true` 全局不抢焦点，CF 处理瞬时借焦点。
+- **后台优先**：`-NoFocus:$true` 全局不抢焦点；CF 处理由框架自动焦点仿真（不抢真实焦点），pting 等弹窗站按需 `BringToFront`。
 - **禁止自动改 manual**：失败站点仅记入「需人工审核」列表，由用户确认后手动改 `sites.json`。
 - **配置一致性前置校验**：运行前 `Test-SigninConfigConsistency` 检查「非 manual 站点缺 `$WebSignInConfigs`」等不一致，避免静默跳过。
+- **诊断输出与返回值分离**：函数内诊断信息用 `Write-Host`；`Write-Output` 会被调用方当作返回值，并被 `switch -Wildcard` 逐个元素匹配，曾使 `NO_CONFIG` 同时计入失败和跳过（SunnyPT 复现，v4.13.34 修复）。
