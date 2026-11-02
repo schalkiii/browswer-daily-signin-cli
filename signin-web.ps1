@@ -402,13 +402,6 @@ $WebSignInConfigs = @{
         Click = $NexusPHPExactClick
     }
 
-    "HDDolby" = @{
-        Url = "https://www.hddolby.com/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
-        Detect = $NexusPHPSignInDetect
-        Click = $NexusPHPExactClick
-    }
 
     "HDHome" = @{
         Url = "https://hdhome.org/attendance.php"
@@ -663,13 +656,6 @@ $WebSignInConfigs = @{
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPCfSignInClick
     }
-    "YHPP" = @{
-        Url = "https://www.yhpp.cc/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
-        Detect = $NexusPHPSignInDetect
-        Click = $null
-    }
     "musopia" = @{
         Url = "https://www.musopia.vip/attendance.php"
         WaitMs = 12000
@@ -690,41 +676,6 @@ $WebSignInConfigs = @{
         ForceLayoutViewport = $true
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPCfSignInClick
-    }
-    "521" = @{
-        Url = "https://pt.521.best/attendance.php"
-        WaitMs = 15000
-        PostClickMs = 30000
-        # v4.13.31: 站方可临时关闭签到（页面显示 "Attendance has been temporarily disabled."，
-        #   2026-10-18 实测）。该判据已加入共享 $NexusPHPSignInDetect，返回 SITE_DISABLED，
-        #   由 batch 归类为 SKIPPED（站点侧状态，不计失败/回归）。
-        Detect = $NexusPHPSignInDetect
-        Click = @'
-(function(){
-  var form = document.querySelector('form[action*="attendance"]');
-  if(!form) return 'NO_FORM';
-  var input = form.querySelector('input[name="imagestring"]');
-  if(!input) return 'NO_INPUT';
-  var submit = form.querySelector('input[type=submit][value*="签到"]') || form.querySelector('input[type=submit]');
-  if(!submit) return 'NO_SUBMIT';
-  if(input.value && input.value.length > 0){
-    submit.click();
-    return 'CLICKED_NOW:'+input.value;
-  }
-  // v4.12.1: 扩展填入验证码可能需要较长时间，轮询窗口扩到 28 秒
-  var elapsed = 0;
-  var timer = setInterval(function(){
-    elapsed += 1000;
-    if(input.value && input.value.length > 0){
-      clearInterval(timer);
-      submit.click();
-    } else if(elapsed >= 28000){
-      clearInterval(timer);
-    }
-  }, 1000);
-  return 'CLICK_SCHEDULED';
-})()
-'@
     }
     "audiences" = @{
         Url = "https://audiences.me/attendance.php"
@@ -977,50 +928,10 @@ $WebSignInConfigs = @{
         Click = $null
     }
 
-    # v4.12.26: cdy（传道院）补配置（原 web-read 策略但 $WebSignInConfigs 缺条目 → NO_CONFIG 被跳过）。
-    #   pt.cdy.pics/attendance.php 为 NexusPHP 通用签到页。Click 用 $NexusPHPCfSignInClick：
-    #   既能兼容"访问即签到"（Detect 直接 SIGN_OK/ALREADY_SIGNED），也能在需要提交表单时点击 submit，
-    #   比 Click=$null 更稳妥（避免 NEED_SIGN 无点击 → NO_DETECT）。
-    "cdy" = @{
-        Url = "https://pt.cdy.pics/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
-        Detect = $NexusPHPSignInDetect
-        Click = $NexusPHPCfSignInClick
-    }
 
     # === v4.10: browser-visit 站点迁移（visit-only，无 Detect/Click）===
     # kimi-webbridge.ps1 的 visit-only 分支：navigate + wait + close_tab，返回 "VISITED"。
 
-    # v4.12.26: CHY（公益订阅）/ 蜂巢（pting）实际都有「签到/领取」按钮，需真正点击。
-    #   CHY: 主页 <a class="btn btn-primary" href="/claim">领取今日 5GB</a>；点击跳 /?msg= 并显示 .banner。
-    #        banner 含「领取成功」→ SIGN_OK；含「今日已领取过奖励」→ ALREADY_SIGNED；按钮常驻，首页无 banner 即 NEED_SIGN。
-    #   蜂巢: Flarum 论坛，<button id="checkInButton">签到</button>；点击后按钮消失（被连续签到天数取代）→ 按钮存在=未签(NEED_SIGN)，消失=已签(ALREADY_SIGNED)。
-    "chybenzun" = @{
-        Url = "https://dy.chybenzun.top/"
-        WaitMs = 8000
-        PostClickMs = 5000
-        Detect = @'
-(function(){
-  var full = document.body.innerText || '';
-  var b = document.querySelector('.banner');
-  var banner = b ? (b.innerText || '').trim() : '';
-  if (banner.indexOf('领取成功') > -1 || full.indexOf('领取成功') > -1) return 'SIGN_OK';
-  if (banner.indexOf('今日已领取') > -1 || banner.indexOf('已领取') > -1 || full.indexOf('今日已领取过奖励') > -1) return 'ALREADY_SIGNED';
-  if (full.indexOf('领取今日 5GB') > -1) return 'NEED_SIGN';
-  return 'UNKNOWN';
-})()
-'@
-        Click = @'
-(function(){
-  var els = document.querySelectorAll('a');
-  for (var i = 0; i < els.length; i++) {
-    if ((els[i].innerText || '').indexOf('领取今日 5GB') > -1) { els[i].click(); return 'CLICKED'; }
-  }
-  return 'NO_BTN';
-})()
-'@
-    }
     # v4.13.21: pting（蜂巢）真实签到适配 —— 站点于 2026-09 改版后重新实测修正。
     #   站点为 Next.js SPA，侧边栏签到控件三态：未签=按钮「去签到」，已签=按钮/侧边栏文本「已签到」。
     #   点「去签到」弹出日历弹窗（Radix portal），弹窗内出现第二个按钮「签到」，点它才真正签到。
@@ -1366,191 +1277,7 @@ $WebSignInConfigs = @{
 '@
     }
 
-    # v4.13.23: fcloudpan（F-Cloudpan 云盘）真实签到适配 —— 经 daemon 上线后现场 DOM 核验。
-    #   签到入口不在页面正文：须先点右上角头像按钮（aria-label="打开云盘个人菜单"）展开 Base UI 下拉，
-    #   下拉内的 [data-slot="avatar-check-in-panel"] 才是签到面板。
-    #   ⚠️ Base UI 下拉仅在标签页聚焦时才渲染：后台 -NoFocus 下 JS .click() 打不开（实测面板为空），
-    #      故必须 BringToFront=$true（与 pting 日历弹窗同一类问题、同一处理方式）。
-    #   判定依据（真实 DOM 信号，均经现场核验）：面板内两个签到按钮 fcloud-standard-check-in（固定 +5）
-    #      与 fcloud-las-vegas-check-in（1~20）在签到后被置 disabled（样式含 disabled:opacity-45）；
-    #      同时面板底部由「每日二选一 · 当前 N 网盘积分」变为「今日已签到 · +N 网盘积分」（N 为实得奖励）。
-    #      实测（v4.13.23，当时走标准签到）：签到前「连续 1 天 · 累计 1 天 / 当前 11 积分 / 两按钮 enabled」→
-    #            签到后「连续 2 天 · 累计 2 天 / 今日已签到 · +5 网盘积分 / 两按钮 disabled」。
-    #   每日二选一：v4.13.24 起走「幸运签到」（1~20，期望值 ≈10.5，高于标准签到的固定 +5）；
-    #      奖励随机，故文案为「今日已签到 · +N 网盘积分」。想改回确定收益，把 Click 里的
-    #      data-slot 换成 fcloud-standard-check-in 即可。
-    "fcloudpan" = @{
-        Url = "https://fcloudpan.com/cloud"
-        WaitMs = 12000
-        PostClickMs = 6000
-        # v4.13.29: 站点间歇性 30s 负载超时（10/13 批量 NAV_FAIL；SPA 子资源多）→ 导航超时加宽到 120s
-        NavTimeoutSec = 120
-        Detect = @'
-(async function(){
-  function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
-  // Base UI 触发器对合成 click 不敏感，补发完整指针事件序列
-  function fire(el){
-    try {
-      var r = el.getBoundingClientRect();
-      var o = {bubbles:true, cancelable:true, view:window, clientX:r.x+r.width/2, clientY:r.y+r.height/2,
-               button:0, buttons:1, pointerId:1, pointerType:'mouse', isPrimary:true};
-      el.dispatchEvent(new PointerEvent('pointerdown', o));
-      el.dispatchEvent(new MouseEvent('mousedown', o));
-      el.dispatchEvent(new PointerEvent('pointerup', o));
-      el.dispatchEvent(new MouseEvent('mouseup', o));
-      el.dispatchEvent(new MouseEvent('click', o));
-    } catch(e){ try { el.click(); } catch(e2){} }
-  }
-  // 头像触发器仅已登录态才渲染，等 SPA 水合
-  var trig = null;
-  for (var i=0;i<12;i++){
-    trig = document.querySelector('[aria-label="打开云盘个人菜单"]');
-    if (trig) break;
-    await sleep(500);
-  }
-  if (!trig){
-    var t = document.body ? (document.body.textContent||'') : '';
-    if (t.indexOf('登录')>-1 || t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
-    return 'UNKNOWN';
-  }
-  // 展开下拉并等面板出现。⚠️ 触发器是 toggle：再点一次会把已展开的菜单关掉。
-  //   故每轮先判 aria-expanded——已展开则只等不点；否则"面板渲染慢于等待"时盲目补点一下
-  //   会把它关掉（曾致间歇性 UNKNOWN：连点两次恰好开→关，面板始终读不到）。
-  var panel = null;
-  for (var k=0;k<5;k++){
-    panel = document.querySelector('[data-slot="avatar-check-in-panel"]');
-    if (panel) break;
-    if (trig.getAttribute('aria-expanded') !== 'true') { fire(trig); }
-    await sleep(1500);
-  }
-  if (!panel) panel = document.querySelector('[data-slot="avatar-check-in-panel"]');
-  if (!panel) return 'UNKNOWN';
-  var std = panel.querySelector('[data-slot="fcloud-standard-check-in"]');
-  var lvs = panel.querySelector('[data-slot="fcloud-las-vegas-check-in"]');
-  if (!std && !lvs) return 'UNKNOWN';
-  // 已签的两种表现（均已现场核验）：签到按钮被置 disabled；面板底部由「每日二选一 · 当前 N」
-  //   变为「今日已签到 · +5 网盘积分」。二者互为佐证，任一命中即判已签。
-  if ((std && std.disabled) || (lvs && lvs.disabled)) return 'ALREADY_SIGNED';
-  if ((panel.textContent || '').indexOf('今日已签到') > -1) return 'ALREADY_SIGNED';
-  return 'NEED_SIGN';
-})()
-'@
-        Click = @'
-(async function(){
-  function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
-  function fire(el){
-    try {
-      var r = el.getBoundingClientRect();
-      var o = {bubbles:true, cancelable:true, view:window, clientX:r.x+r.width/2, clientY:r.y+r.height/2,
-               button:0, buttons:1, pointerId:1, pointerType:'mouse', isPrimary:true};
-      el.dispatchEvent(new PointerEvent('pointerdown', o));
-      el.dispatchEvent(new MouseEvent('mousedown', o));
-      el.dispatchEvent(new PointerEvent('pointerup', o));
-      el.dispatchEvent(new MouseEvent('mouseup', o));
-      el.dispatchEvent(new MouseEvent('click', o));
-    } catch(e){ try { el.click(); } catch(e2){} }
-  }
-  // 「已签」判定：与 Detect 同一套真实 DOM 依据——任一签到按钮被置 disabled，
-  //   或面板底部出现「今日已签到」（幸运签到奖励随机 1~20，不能按固定 +5 校验）
-  function isDone(){
-    var s = document.querySelector('[data-slot="fcloud-standard-check-in"]');
-    var l = document.querySelector('[data-slot="fcloud-las-vegas-check-in"]');
-    if ((s && s.disabled) || (l && l.disabled)) return true;
-    var p = document.querySelector('[data-slot="avatar-check-in-panel"]');
-    return !!(p && (p.textContent||'').indexOf('今日已签到') > -1);
-  }
-  var trig = document.querySelector('[aria-label="打开云盘个人菜单"]');
-  if (!trig) return 'NO_TRIGGER';
-  // 同 Detect：触发器是 toggle，已展开则不再点，避免把菜单关掉
-  var panel = null;
-  for (var k=0;k<4;k++){
-    panel = document.querySelector('[data-slot="avatar-check-in-panel"]');
-    if (panel) break;
-    if (trig.getAttribute('aria-expanded') !== 'true') { fire(trig); }
-    await sleep(1500);
-  }
-  if (!panel) panel = document.querySelector('[data-slot="avatar-check-in-panel"]');
-  if (!panel) return 'NO_PANEL';
-  // v4.13.24: 走「幸运签到」（1~20）；要改回确定收益用 fcloud-standard-check-in
-  var btn = panel.querySelector('[data-slot="fcloud-las-vegas-check-in"]');
-  if (!btn) return 'NO_BTN';
-  if (btn.disabled) return 'ALREADY';
-  fire(btn);
-  // 轮询确认：按 isDone() 判定真的签上（真实 DOM，非"点过就算"）
-  await sleep(2500);
-  var reopened = 0;
-  // 轮询上限刻意压在 ~5s：连同前面的开菜单(≤6s)与观察窗(2.5s)，
-  //   最坏情况仍低于框架 Click 的 15s evaluate 超时
-  for (var i=0;i<6;i++){
-    if (isDone()) return 'CLICKED';
-    var b2 = document.querySelector('[data-slot="fcloud-las-vegas-check-in"]');
-    if (!b2 && reopened < 2){
-      reopened++;
-      if (trig.getAttribute('aria-expanded') !== 'true'){ fire(trig); await sleep(1200); }
-      continue;
-    }
-    await sleep(500);
-  }
-  return 'CLICKED_UNCONFIRMED';
-})()
-'@
-        # 头像下拉菜单仅在标签页聚焦时渲染（后台模式下打不开），需强制聚焦
-        BringToFront = $true
-    }
 
-    # v4.13.25: linuxsb-gacha（Linux.SB 烧饼社区 · 称号抽取）真实适配 —— 经 daemon 上线后现场 DOM 核验。
-    #   页面 /gacha 的动作区 .gacha-actions 内含 3 个 form（均 data-no-ajax="1" → 整页 POST，非 AJAX）：
-    #     .gacha-pull-1   → /gacha_pull     免费额内：文本「今日免费一抽」、data-cost="0"
-    #     .gacha-pull-10  → /gacha_pull_10  「十连抽 (90 积分)」  data-cost="90"
-    #     .gacha-pull-100 → /gacha_pull_100 「百连抽 (800 积分)」 data-cost="800"
-    #   ⚠️ 判定依据（唯一可靠信号，实测）：免费额用掉后 .gacha-pull-1 **既不 disabled 也不消失**，
-    #      仅是文本变「抽一次 (10 积分)」、data-cost 由 "0" 变 "10"；页面也不会出现「已抽/明日再来」
-    #      之类字样。故只能按 data-cost（或「免费」文本）判别，不能按 disabled / 按钮消失判断。
-    #   ⚠️ 提交后整页跳转到结果页 /gacha_pull?result=<hash>（该页无 .gacha-actions），
-    #      Detect 必须把「处于结果页」也判为已抽，否则点击后的复检会落 UNKNOWN。
-    "linuxsb-gacha" = @{
-        Url = "https://linux.sb/gacha"
-        WaitMs = 10000
-        PostClickMs = 5000
-        Detect = @'
-(function(){
-  // 结果页 /gacha_pull?result=<hash>：说明今日免费一抽已消耗（刚抽完或此前已抽）
-  if (location.pathname.indexOf('/gacha_pull') === 0) return 'ALREADY_SIGNED';
-  var b = document.querySelector('.gacha-pull-1');
-  if (!b) {
-    // 未登录时 /gacha 无抽卡按钮，页头常驻 登录/注册
-    var t = document.body ? (document.body.textContent || '') : '';
-    if (t.indexOf('登录') > -1 || t.indexOf('注册') > -1) return 'LOGIN_REQUIRED';
-    return 'UNKNOWN';
-  }
-  var cost = b.getAttribute('data-cost');
-  var txt = (b.textContent || '').trim();
-  // 免费额可用：data-cost="0" 且文本含「免费」
-  if (cost === '0' || txt.indexOf('免费') > -1) return 'NEED_SIGN';
-  // 免费额已用：data-cost 变 "10"、文本「抽一次 (10 积分)」
-  return 'ALREADY_SIGNED';
-})()
-'@
-        Click = @'
-(async function(){
-  function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
-  var b = document.querySelector('.gacha-pull-1');
-  if (!b) return 'NO_BTN';
-  // 只点免费档（data-cost="0"），绝不碰收费的十连/百连
-  if (b.getAttribute('data-cost') !== '0' && (b.textContent || '').indexOf('免费') === -1) return 'ALREADY';
-  b.click();
-  // 整页 POST 跳转：轮询确认已进入结果页或按钮已转为收费态，避免"点过就算"
-  // 上限 8s（16×500ms），连同后续复检仍远低于框架 Click 的 15s evaluate 超时
-  for (var i = 0; i < 16; i++) {
-    await sleep(500);
-    if (location.pathname.indexOf('/gacha_pull') === 0) return 'CLICKED';
-    var b2 = document.querySelector('.gacha-pull-1');
-    if (b2 && b2.getAttribute('data-cost') !== '0') return 'CLICKED';
-  }
-  return 'CLICKED_UNCONFIRMED';
-})()
-'@
-    }
 
     # v4.13.34: SunnyPT（sunnypt.top）—— 自研 SPA 签到日历，非 NexusPHP。
     #   页面结构（2026-11-02 实测）：状态区「今日 未签到」+ 黄色「立即签到」按钮；

@@ -26,6 +26,11 @@
 - 修复同批暴露的统计 bug：`Invoke-WebSignIn` 的 `NO_CONFIG` 诊断原用 `Write-Output`，被批处理 `switch -Wildcard` 当作第二个返回值处理，导致 sunnypt 同时计入失败和跳过；改为 `Write-Host`，并在 `signin-log.json` 汇总补 `login_expired`/`no_login`。下一次批量统计将自洽。
 - 计划任务动作路径为稳定别名；脚本按失败站数返回 1，`LastTaskResult=1` 与当日 6 个失败站一致，非任务故障。
 
+**收尾清理（用户确认后执行）**
+- 移除 7 个孤儿 `$WebSignInConfigs`：HDDolby / 521 / fcloudpan / cdy / chybenzun / YHPP / linuxsb-gacha（均不在 `sites.json`）；配置键 58 → 51，与 54 站（含 3 个 manual）对齐；如书签恢复需重新补配置。
+- 删除 `.trae/documents` 两份已完成的历史计划与空 `.uploads/`。
+- 修正 `.codebuddy` / `.workbuddy` 项目记忆中与 v4.13.33/34 冲突的旧结论（vclib 人工勾盾、seed 导航、pbh-btn Flarum、pting `#checkInButton`、imagestring 等）；这些文件为本地忽略目录，未纳入 Git。
+
 **验证边界（诚实说明）**
 - SunnyPT 今日已由适配调试时为完成验证实际签到；因此框架内真实 `NEED_SIGN → Click → SIGN_OK` 全链路未在今日复跑，待明日批量验证。
 - 已用**纯 DOM 模拟**（把状态/按钮改回未签到并拦截点击，不触达服务器）验证：`Detect = NEED_SIGN`（不被日历图例误判）、`Click = CLICKED` 且命中一次；真实点击机制与状态变化已在此前实测确认。
