@@ -172,6 +172,12 @@ Some NexusPHP sites (the `NexusPHPCfSignInClick` family) need CF Turnstile clear
 
 - **ALTCHA** (e.g. Yemapt): `ClickEval` solves ALTCHA first, then clicks sign-in. The primary solver does a direct JS `.click()` on the `input[type=checkbox]` (the widget has **no shadow DOM**); CDP coordinate-click stays only as a fallback when the checkbox isn't directly reachable. Verification reuses `Test-AltchaVerified`.
 - **YemaPT login recovery**: when the login page has browser-prefilled username/password, Click solves ALTCHA → clicks the Ant Design login button (text is actually "登 录"; whitespace must be normalized) → waits for the SPA to route to `/user/growth?tab=checkIn` → solves ALTCHA again → clicks "立即签到". Login errors (password wrong / login failed) map to `LOGIN_REQUIRED` to avoid retry-driven account lockout.
+
+### Custom SPA sign-in (SunnyPT)
+
+- Use **data-driven state/button text** as the only signal: SunnyPT shows "今日 未签到/已签到" in the status area plus a "立即签到/已签到" button; the calendar legend's "已签到" is a static span and must never be used as the signed-state signal.
+- `ReadyEval` must wait for the real status text (`/今日\s*[未已]签到/`) or a **visible** sign-in button, not just body length or the static legend; otherwise the first detect returns UNKNOWN.
+- Framework fix (v4.13.34): when the first detect is UNKNOWN but a 5s retry sees SIGN_OK, the signed state is page-provided; return `ALREADY_SIGNED` (with Click) / `SIGN_OK` (no Click) instead of running an extra Click.
 - **SLIDER**: coordinate-click the slider with `ForceLayoutViewport=$true`; failure ⇒ `SLIDER_FAIL` enters batch retry.
 
 ### Two-step sign-in behind an avatar / dropdown menu (pting / fcloudpan)

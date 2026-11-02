@@ -1551,6 +1551,74 @@ $WebSignInConfigs = @{
 })()
 '@
     }
+
+    # v4.13.34: SunnyPT（sunnypt.top）—— 自研 SPA 签到日历，非 NexusPHP。
+    #   页面结构（2026-11-02 实测）：状态区「今日 未签到」+ 黄色「立即签到」按钮；
+    #   点击约 4s 后状态变「今日 已签到」、按钮变「已签到」并 disabled，同时弹「签到成功，获得 N 魔力」。
+    #   判定必须用状态文本/按钮文本，不能按日历底部的「已签到」图例（静态文本会误判）。
+    "sunnypt" = @{
+        Url = "https://sunnypt.top/user/attendance"
+        WaitMs = 10000
+        PostClickMs = 10000
+        # SPA 水合后先渲染壳、后拉签到状态；等「签到日历 + 未/已签到」真实出现再检测
+        ReadyEval = @'
+(function(){
+  if(location.pathname.indexOf('/login')>-1||location.pathname.indexOf('/signin')>-1) return true;
+  if(document.querySelector('input[type="password"]')) return true;
+  if(!document.body) return false;
+  var t = document.body.innerText||'';
+  // ⚠️ 页面底部日历图例也含「已签到」静态文本，不能作为就绪判据；必须等状态区「今日 未/已签到」
+  if(/今日\s*[未已]签到/.test(t)) return true;
+  var bs = document.querySelectorAll('button');
+  for(var i=0;i<bs.length;i++){
+    var v = (bs[i].textContent||'').replace(/\s+/g,' ').trim();
+    if(v==='立即签到'||v==='已签到'||v==='今日已签到'){
+      var r = bs[i].getBoundingClientRect();
+      if(r.width>0&&r.height>0) return true;
+    }
+  }
+  return false;
+})()
+'@
+        Detect = @'
+(function(){
+  if(!document.body) return 'BODY_NULL';
+  var p = location.pathname||'';
+  if(p.indexOf('/login')>-1||p.indexOf('/signin')>-1||p.indexOf('/auth')>-1) return 'LOGIN_REQUIRED';
+  var t = document.body.innerText||'';
+  var btns = document.querySelectorAll('button');
+  var hasSign = false;
+  for(var i=0;i<btns.length;i++){
+    var v = (btns[i].textContent||'').replace(/\s+/g,' ').trim();
+    if(v==='立即签到' && !btns[i].disabled) hasSign = true;
+    // 已签到后按钮文本变「已签到」并禁用（日历底部图例是 span，不是 button，不会被这里误判）
+    if(v==='已签到'||v==='今日已签到'||v==='明日再来') return 'SIGN_OK';
+  }
+  var m = t.match(/今日\s*([未已]签到)/);
+  if(m && m[1]==='已签到') return 'SIGN_OK';
+  if(m && m[1]==='未签到') return 'NEED_SIGN';
+  if(hasSign) return 'NEED_SIGN';
+  // 登录态判定放在签到状态之后：避免隐藏的登录弹窗（含 password 输入）覆盖已渲染的签到状态
+  if(document.querySelector('input[type="password"]')) return 'LOGIN_REQUIRED';
+  if(t.indexOf('登录')>-1 && t.indexOf('注册')>-1) return 'LOGIN_REQUIRED';
+  if(t.length<50) return 'BODY_NULL';
+  return 'UNKNOWN';
+})()
+'@
+        Click = @'
+(function(){
+  var btns = document.querySelectorAll('button');
+  for(var i=0;i<btns.length;i++){
+    var v = (btns[i].textContent||'').replace(/\s+/g,' ').trim();
+    if(v.indexOf('立即签到')>-1 && !btns[i].disabled){
+      var r = btns[i].getBoundingClientRect();
+      if(r.width>0 && r.height>0){ btns[i].click(); return 'CLICKED'; }
+    }
+  }
+  return 'NO_BTN';
+})()
+'@
+    }
 }
 
 # v4.13.0: 配置一致性校验

@@ -1,5 +1,5 @@
 {
-  "version": "v4.13.33",
+  "version": "v4.13.34",
   "total": 54,
   "baseline_file": "baseline.json",
   "sites": [
@@ -100,12 +100,6 @@
       "url": "https://pt.hdclone.top/attendance.php",
       "strategy": "webbridge",
       "note": "书签同步: HDClone签到"
-    },
-    {
-      "name": "HDDolby",
-      "url": "https://www.hddolby.com/attendance.php",
-      "strategy": "webbridge",
-      "note": "v4.13.33: 2026-10-26 现场为 Cloudflare「421 Misdirected Request」（源站/域名配置故障），归 SERVER_ERROR；非登录失效，待站点侧恢复"
     },
     {
       "name": "HDHome",
@@ -351,6 +345,13 @@
       "strategy": "browser-open",
       "display_name": "全部主题 - 蜂巢",
       "note": "auto: 书签同步新增"
+    },
+    {
+      "name": "sunnypt",
+      "url": "https://sunnypt.top/user/attendance",
+      "strategy": "webbridge",
+      "display_name": "SUNNYPT",
+      "note": "v4.13.34: 自研 SPA 签到日历适配——检测「今日 未签到」+ 可用的「立即签到」按钮；点击后状态变「今日 已签到」、按钮变「已签到」并禁用。2026-11-02 实测签到成功（+16 魔力，连续 3 天）"
     }
   ],
   "batch": {

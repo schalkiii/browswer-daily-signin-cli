@@ -597,6 +597,13 @@ function Test-WebBridgeSignIn {
                     }
                 }
             }
+            # v4.13.34: 首检 UNKNOWN、重试才看到已签到 —— 这是 SPA 水合慢，签到状态是页面自带的，
+            #   本次尚未点击 → 与首检 SIGN_OK 同义，必须返回 ALREADY_SIGNED，不能再跑一次 Click。
+            if ($signal -match "SIGN_OK|ALREADY_SIGNED") {
+                $unkSignal = if ($ClickEval) { "ALREADY_SIGNED" } else { "SIGN_OK" }
+                Save-DebugSnapshot $SiteName $session "sign_ok_after_unknown" $DebugDir $SaveDebugSnapshot
+                return $unkSignal
+            }
         }
 
         if ($signal -match "CF_CHALLENGE|BODY_NULL|REDIRECTING") {

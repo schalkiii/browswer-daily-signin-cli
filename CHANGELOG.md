@@ -1,5 +1,26 @@
 # Changelog
 
+## [v4.13.34] - 2026-11-02
+
+### SunnyPT 适配 + SPA「首检 UNKNOWN、重试已签到」状态机修正
+
+**SunnyPT（sunnypt.top/user/attendance）**
+- 站点为自研 SPA 签到日历（非 NexusPHP）：状态区「今日 未签到」+ 黄色「立即签到」按钮；点击后约 4s 状态变「今日 已签到」、按钮变「已签到」并 disabled，同时弹「签到成功，获得 N 魔力」。
+- 新增专属 `$WebSignInConfigs["sunnypt"]`：
+  - `Detect` 以**按钮文本/状态文本**为准（按钮变「已签到」或正则 `/今日\s*[未已]签到/`）；页面底部日历图例的「已签到」是静态 span，**不能**作为已签判据。
+  - `ReadyEval` 等状态区真实出现（或可见「立即签到/已签到」按钮）再检测，避免 SPA 只渲染壳时首检 UNKNOWN。
+  - `Click` 只点未禁用的「立即签到」按钮；已签状态下返回 `NO_BTN`，不会误点。
+- `sites.json`：strategy `browser-open` → `webbridge`，补 `display_name: SUNNYPT` 与实测备注。
+- 2026-11-02 实测：点击后状态 `今日 未签到 → 今日 已签到`，连续 3 天、累计 +1（+16 魔力）；`signin-single sunnypt` 返回 `ALREADY_SIGNED`。
+- 备注：本次工作区的书签同步已将 **HDDolby** 从 `sites.json` 移除（当前书签中不存在该域），故一并提交该列表变化；如站点/书签恢复，重新加回即可（基线中仍保留其历史记录）。
+
+**框架修正（`kimi-webbridge.ps1`）**
+- 首检 `UNKNOWN`、5s 后重试才看到 `SIGN_OK` 时，签到状态是页面自带的，本次尚未点击 → 与首检 `SIGN_OK` 同义，返回 `ALREADY_SIGNED`（有 Click）或 `SIGN_OK`（无 Click），不再多跑一次 Click。修复慢水合 SPA 出现「已签到却仍点一次（NO_BTN）+ 多等 PostClick」的浪费，也避免语义上把自带签到误报为本次点击成功。
+
+**验证边界（诚实说明）**
+- SunnyPT 今日已由适配调试时为完成验证实际签到；因此框架内真实 `NEED_SIGN → Click → SIGN_OK` 全链路未在今日复跑，待明日批量验证。
+- 已用**纯 DOM 模拟**（把状态/按钮改回未签到并拦截点击，不触达服务器）验证：`Detect = NEED_SIGN`（不被日历图例误判）、`Click = CLICKED` 且命中一次；真实点击机制与状态变化已在此前实测确认。
+
 ## [v4.13.33] - 2026-10-26
 
 ### CF 验证鲁棒性重构 + vclib 自动过盾 + Yema 自动登录 + 失败站归类

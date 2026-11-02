@@ -34,7 +34,8 @@ PT 每日签到 CLI — 通过本地 kimi WebBridge daemon 操控已登录浏览
 - `manual` 仅剩 3 站：**FreeFarm**（真滑块）、**TJUPT**（图片验证码，且站点明令禁止自动化）、**zxiaoruan**（站点不可达）；其余历史人工站已全部接入 `webbridge`。
 - **CF 站点（V2EX/audiences/vclib/DepthStudio/xloli/UBits）**：框架在 `CF_CHALLENGE` 时自动焦点仿真（daemon 为 focus emulation，不抢焦点）→ JS 坐标点击 → CDP 穿透 closed shadow → 键盘激活。自动失败且站点声明 `CfFallbackPending` 时返回 `CF_PENDING`（需人工勾选，不进可重试列表）。
 - **YemaPT**：签到页 `/#/user/growth?tab=checkIn`；登录页 ALTCHA + Ant Design 按钮可在浏览器预填凭据时自动登录，随后自动签到。
+- **SunnyPT**：自研 SPA 签到日历（`/user/attendance`），以状态「今日 未/已签到」+ 按钮「立即签到/已签到」为判据；已接入 `webbridge`，2026-11-02 实测签到成功（+16 魔力）。
 - 需一次性人工登录：**42w**（域名 `api.42x.shop`，路由 `/dashboard`）、**xt-url**（LinuxDO OAuth 落 CF 质询，后台无法通过）；登录态建立后自动签到。
-- 站点易变：**pting** 已迁至 `fengchao.chat`；**521** 站方临时停签（`SITE_DISABLED` → 记 SKIPPED）；**HDVideo** 维护页同样归 `SITE_DISABLED`；**HDDolby**（421）/ **SBPT**（502）为源站/Cloudflare 错误，归 `SERVER_ERROR`。
+- 站点易变：**pting** 已迁至 `fengchao.chat`；**521** 站方临时停签（`SITE_DISABLED` → 记 SKIPPED）；**HDVideo** 维护页同样归 `SITE_DISABLED`；**SBPT**（502）为源站/Cloudflare 错误，归 `SERVER_ERROR`。**HDDolby**（421）当前已不在书签/`sites.json`（书签同步移除），如恢复需重新加回。
 - 新站接入：`scan-bookmarks.ps1` 生成 `sites.json` 条目 → 在 `signin-web.ps1` 补 `$WebSignInConfigs` → `signin-single.ps1` 现场核验。
 - ⚠️ PowerShell 预览版升级会使计划任务 exe 路径失效（任务静默不跑）；升级后重跑 `setup-daily-task.ps1`。

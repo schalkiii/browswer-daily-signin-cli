@@ -176,6 +176,12 @@ PowerShell 侧按信号映射到 `SUCCESS` / `ALREADY_DONE` / `NO_DETECT` / `CF_
 
 - **ALTCHA**（如 Yemapt）：`ClickEval` 先解 ALTCHA 再点击签到。主路径直接对 `input[type=checkbox]` 执行 JS `.click()`（该 widget **无 shadow DOM**）；仅当复选框取不到时才退回 CDP 坐标点击兜底。校验复用 `Test-AltchaVerified`。
 - **YemaPT 登录恢复**：登录页若用户名/密码已由浏览器预填，Click 先解 ALTCHA → 点 Ant Design「登 录」（文本实际为「登 录」，需归一化空白）→ 等 SPA 跳到 `/user/growth?tab=checkIn` → 再解一次 ALTCHA → 立即签到；登录错误（密码错误/登录失败等）判 `LOGIN_REQUIRED`，避免反复重试锁号。
+
+### 自研 SPA 签到（SunnyPT）
+
+- 以**数据驱动的状态/按钮文本**为唯一信号：SunnyPT 状态区「今日 未签到/已签到」+ 按钮「立即签到/已签到」；日历底部图例的「已签到」是静态 span，不能作为已签判据。
+- `ReadyEval` 必须等状态区真实出现（`/今日\s*[未已]签到/`）或**可见**的签到按钮，不能只看 body 长度，也不能用静态图例；否则首检会 UNKNOWN。
+- 框架修正（v4.13.34）：首检 UNKNOWN、5s 重试才 SIGN_OK 时，签到状态是页面自带的，应返回 `ALREADY_SIGNED`（有 Click）/`SIGN_OK`（无 Click），不再执行一次 Click。
 - **SLIDER**：坐标点击滑块，`ForceLayoutViewport=$true`，失败归 `SLIDER_FAIL` 进入批处理重试。
 
 ### 头像 / 下拉菜单类两步签到（pting / fcloudpan）
