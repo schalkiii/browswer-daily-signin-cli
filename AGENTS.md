@@ -32,11 +32,11 @@ PT 每日签到 CLI — 通过本地 kimi WebBridge daemon 操控已登录浏览
 ## 当前状态与下一步
 - 已知成功站点基线见 `baseline.json`（回归参考，失败即真 bug）。
 - `manual` 仅剩 3 站：**FreeFarm**（真滑块）、**TJUPT**（图片验证码，且站点明令禁止自动化）、**zxiaoruan**（站点不可达）；其余历史人工站已全部接入 `webbridge`。
-- **CF 站点（V2EX/audiences/vclib/DepthStudio/xloli/UBits）**：框架在 `CF_CHALLENGE` 时自动焦点仿真（daemon 为 focus emulation，不抢焦点）→ JS 坐标点击 → CDP 穿透 closed shadow → 键盘激活。自动失败且站点声明 `CfFallbackPending` 时返回 `CF_PENDING`（需人工勾选，不进可重试列表）。
+- **CF 站点（V2EX/vclib/DepthStudio/xloli/UBits 等；PigGo 2026-11-03 出现 `CF_BLOCKED`）**：框架在 `CF_CHALLENGE` 时自动焦点仿真（daemon 为 focus emulation，不抢焦点）→ JS 坐标点击 → CDP 穿透 closed shadow → 键盘激活（仅 `focus(iframe)→Tab→Space`；每次坐标点击前拒绝 `cloudflare.com` 链接落点，避免误开 Cloudflare 徽标/隐私页）。自动失败且站点声明 `CfFallbackPending` 时返回 `CF_PENDING`（需人工勾选，不进可重试列表）。
 - **YemaPT**：签到页 `/#/user/growth?tab=checkIn`；登录页 ALTCHA + Ant Design 按钮可在浏览器预填凭据时自动登录，随后自动签到。
-- **SunnyPT**：自研 SPA 签到日历（`/user/attendance`），以状态「今日 未/已签到」+ 按钮「立即签到/已签到」为判据；已接入 `webbridge`，2026-11-02 实测签到成功（+16 魔力）。
-- 需一次性人工登录：**42w**（域名 `api.42x.shop`，路由 `/dashboard`）、**xt-url**（LinuxDO OAuth 落 CF 质询，后台无法通过）；登录态建立后自动签到。
-- 站点易变：**pting** 已迁至 `fengchao.chat`；**HDVideo** 2026-11-02 已恢复并签到成功（维护页仍归 `SITE_DISABLED`）；**SBPT**（502）为源站/Cloudflare 错误，归 `SERVER_ERROR`。**521 / HDDolby** 当前已不在书签/`sites.json`（书签同步移除），如恢复需重新加回。
-- **最近运行态（2026-11-02 02:34 定时批量，v4.13.33）**：vclib 自动过盾 `SIGN_OK`、Yemapt `ALREADY_DONE`、HDVideo 恢复；V2EX `CF_PENDING`、audiences `REDIRECTING`、SBPT `SERVER_ERROR`、PigGo/Moment `UNKNOWN`、42w/xt-url `NO_LOGIN`；sunnypt 当时 `NO_CONFIG`（v4.13.34 已接入）。计划任务动作路径正常；脚本按失败站数返回 1，`LastTaskResult=1` 与 6 个失败站一致。
+- **SunnyPT**：自研 SPA 签到日历（`/user/attendance`），以状态「今日 未/已签到」+ 按钮「立即签到/已签到」为判据；已接入 `webbridge`，2026-11-03 定时批量实测 `SIGN_OK`（22.9s）。
+- 需一次性人工登录：**42w**（域名 `api.42x.shop`，登录页 `/sign-in`、控制台 `/dashboard`）。**xt-url** 当前已不在 `sites.json`（2026-11-03 书签同步移除），如恢复需重新加回并补配置。
+- 站点易变：**pting** 已迁至 `fengchao.chat`；**HDVideo** 2026-11-02 已恢复并签到成功（维护页仍归 `SITE_DISABLED`）。**SBPT / audiences / xt-url / 521 / HDDolby** 当前已不在书签/`sites.json`（书签同步移除），对应孤儿配置已清理；如恢复需重新加回书签并补配置。
+- **最近运行态（2026-11-03 02:36 定时批量，v4.13.34）**：51 站，43 成功 / 4 失败 / 3 跳过；vclib 自动过盾 `SIGN_OK`（70.6s）、SunnyPT `SIGN_OK`（22.9s）、Yemapt `ALREADY_DONE`、HDVideo `SIGN_OK`；PigGo `CF_BLOCKED`、V2EX `CF_PENDING`、Moment/naturept 失败、42w `NO_LOGIN`；`LastTaskResult=1` 与 4 个失败站一致。书签同步已移除 SBPT/audiences/xt-url，并把 42w 旧 URL `api.42w.shop/profile` 重新加回（配置仍用 `api.42x.shop/dashboard`，需更新书签）。
 - 新站接入：`scan-bookmarks.ps1` 生成 `sites.json` 条目 → 在 `signin-web.ps1` 补 `$WebSignInConfigs` → `signin-single.ps1` 现场核验。
 - ⚠️ PowerShell 预览版升级会使计划任务 exe 路径失效（任务静默不跑）；升级后重跑 `setup-daily-task.ps1`。

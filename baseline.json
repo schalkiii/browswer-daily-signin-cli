@@ -1,6 +1,6 @@
 {
-  "version": "v4.13.34",
-  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v4.13.34: 新增 SunnyPT（自研 SPA 签到日历）适配，点击「立即签到」后以「今日 已签到/按钮已签到」为成功判据；框架修正首检 UNKNOWN、重试才 SIGN_OK 的慢水合场景，直接返回 ALREADY_SIGNED 不再多余点击。v4.13.33: 修复 evaluate 对象信号序列化，CF 流程新增焦点仿真/CDP 穿透/键盘激活，vclib 恢复自动过盾，Yemapt 支持登录页 ALTCHA 自动登录，HDVideo/HDDolby/SBPT 站点侧状态归类。manual 仅剩 FreeFarm/TJUPT/zxiaoruan。",
+  "version": "v4.13.35",
+  "description": "Baseline of sites that have successfully signed in at least once. Used to detect regressions (baseline site failing = real issue) and track new successes (site not in baseline succeeding = celebrate). Manual sites excluded by definition. v4.13.35: 修复 CF 键盘兜底误触 Cloudflare 徽标/隐私/帮助链接打开 cloudflare.com；键盘仅 focus(iframe)→Tab→Space，坐标点击前用 elementFromPoint 拒绝 cloudflare.com 落点。v4.13.34: 新增 SunnyPT（自研 SPA 签到日历）适配，点击「立即签到」后以「今日 已签到/按钮已签到」为成功判据；框架修正首检 UNKNOWN、重试才 SIGN_OK 的慢水合场景，直接返回 ALREADY_SIGNED 不再多余点击。v4.13.33: 修复 evaluate 对象信号序列化，CF 流程新增焦点仿真/CDP 穿透/键盘激活，vclib 恢复自动过盾，Yemapt 支持登录页 ALTCHA 自动登录，HDVideo/HDDolby/SBPT 站点侧状态归类。manual 仅剩 FreeFarm/TJUPT/zxiaoruan。",
   "sites": [
     "GGPT",
     "V2EX",
@@ -75,5 +75,5 @@
   ],
   "auto_total": 65,
   "manual_total": 3,
-  "last_updated": "2026-11-02 22:53:00"
+  "last_updated": "2026-11-03 08:22:00"
 }

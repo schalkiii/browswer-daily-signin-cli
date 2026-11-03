@@ -620,13 +620,6 @@ $WebSignInConfigs = @{
         Detect = $NexusPHPSignInDetect
         Click = $null
     }
-    "SBPT" = @{
-        Url = "https://sbpt.link/attendance.php"
-        WaitMs = 12000
-        PostClickMs = 5000
-        Detect = $NexusPHPSignInDetect
-        Click = $null
-    }
     "Tokyo" = @{
         Url = "https://www.tokyo-manga.top/attendance.php"
         WaitMs = 12000
@@ -673,19 +666,6 @@ $WebSignInConfigs = @{
         CfRetryCount = 3
         CfRetryWaitMs = 15000
         CfFallbackPending = $true
-        ForceLayoutViewport = $true
-        Detect = $NexusPHPSignInDetect
-        Click = $NexusPHPCfSignInClick
-    }
-    "audiences" = @{
-        Url = "https://audiences.me/attendance.php"
-        # v4.12.5: CF 站点需要更长等待 + 多次 CF 重试 + CF 通过后提交表单
-        # v4.13.33: 坐标解析修复 + 焦点仿真后，点击通常数秒内填充 token；收敛为 3×20s 自适应轮询。
-        WaitMs = 24000
-        PostClickMs = 8000
-        CfRetryCount = 3
-        CfRetryWaitMs = 20000
-        # v4.13.6: CF Turnstile 坐标点击站——必须导航后即固定 1280x800 视口（默认已改为自然分辨率）
         ForceLayoutViewport = $true
         Detect = $NexusPHPSignInDetect
         Click = $NexusPHPCfSignInClick
@@ -1229,53 +1209,6 @@ $WebSignInConfigs = @{
         Click = $null
     }
 
-    # v4.13.30: xt-url（小天公益站签到系统，NewAPI checkin 子站）—— ⚠️ 需人工一次性登录：
-    #   入口是 LinuxDO OAuth，授权会落 connect.linux.do 的 CF 托管质询（后台窗口 60s+ 不自动放行，
-    #   与 V2EX/audiences 同类），无法全自动。登录态有效后：未签显示可见「立即签到 ☀️」按钮，
-    #   已签显示「明天再来签到吧」（二者均常驻 DOM 但按状态 display 切换，故 Detect 按可见性判定）。
-    "xt-url" = @{
-        Url = "https://checkin.new-api.xt-url.com/"
-        WaitMs = 10000
-        PostClickMs = 8000
-        Detect = @'
-(function(){
-  if(!document.body) return 'BODY_NULL';
-  function vis(el){
-    if(!el) return false;
-    var r = el.getBoundingClientRect(); var s = getComputedStyle(el);
-    return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && s.opacity!=='0';
-  }
-  // ⚠️ 必须纯可见性判定：页面在未登录态也常驻隐藏的「退出登录」「明天再来」等元素，
-  //   任何基于 textContent 的兜底都会把未登录误判为已签（2026-10-18 实测踩坑）。
-  var sign=null, done=null, linuxdo=null;
-  var els=[].slice.call(document.querySelectorAll('button,a'));
-  for(var i=0;i<els.length;i++){
-    var x=(els[i].innerText||'').trim();
-    if(/立即签到/.test(x)) sign=els[i];
-    if(/明天再来/.test(x)) done=els[i];
-    if(/使用 Linux ?Do 登录/i.test(x)) linuxdo=els[i];
-  }
-  if(linuxdo && vis(linuxdo)) return 'LOGIN_REQUIRED';
-  if(sign && vis(sign)) return 'NEED_SIGN';
-  if(done && vis(done)) return 'SIGN_OK';
-  return 'UNKNOWN';
-})()
-'@
-        Click = @'
-(function(){
-  function vis(el){
-    var r = el.getBoundingClientRect(); var s = getComputedStyle(el);
-    return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden';
-  }
-  var els=[].slice.call(document.querySelectorAll('button,a'));
-  for(var i=0;i<els.length;i++){
-    var x=(els[i].innerText||'').trim();
-    if(/立即签到/.test(x) && vis(els[i])){ els[i].click(); return 'CLICKED'; }
-  }
-  return 'NO_BTN';
-})()
-'@
-    }
 
 
 

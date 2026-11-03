@@ -888,6 +888,10 @@ function Wait-CfTokenQuick {
 # v4.13.33: 键盘激活——V2EX 全屏 managed challenge 实测有效：
 # DOM.focus(iframe) → Tab（焦点移到复选框）→ Space（触发验证）。
 # 坐标点击对全屏挑战常被 Cloudflare 判为无效手势，键盘路径是更可靠的兜底。
+# v4.13.35: ⚠️ 只保留这一组。Turnstile 控件内还有 Cloudflare 徽标/隐私/帮助链接
+#   （均指向 https://www.cloudflare.com/...）；旧版在 Tab+Space 失败后补发
+#   Enter / Tab+Tab+Space，焦点落在那类链接上会把 cloudflare.com 打开到新标签页。
+#   键盘不成功就返回 $null，交外层重试/CF_PENDING，绝不盲目激活更多焦点元素。
 function Invoke-CfKeyboardActivate {
     param([string]$Session, [int]$IframeNodeId)
     $null = Invoke-WebBridgeCommand -Action "cdp" -CmdArgs @{ method = "DOM.focus"; params = @{ nodeId = $IframeNodeId } } -Session $Session -TimeoutSec 10
@@ -896,19 +900,13 @@ function Invoke-CfKeyboardActivate {
     Start-Sleep -Milliseconds 200
     Send-CfKey -Session $Session -Key " " -Code "Space" -VirtualKeyCode 32
     if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 5) { return "Tab+Space" }
-    Send-CfKey -Session $Session -Key "Enter" -Code "Enter" -VirtualKeyCode 13
-    if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 4) { return "Enter" }
-    Send-CfKey -Session $Session -Key "Tab" -Code "Tab" -VirtualKeyCode 9
-    Start-Sleep -Milliseconds 200
-    Send-CfKey -Session $Session -Key "Tab" -Code "Tab" -VirtualKeyCode 9
-    Start-Sleep -Milliseconds 200
-    Send-CfKey -Session $Session -Key " " -Code "Space" -VirtualKeyCode 32
-    if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 4) { return "Tab+Tab+Space" }
     return $null
 }
 
-# 尝试通过 CF 验证（坐标点击 inline widget → CDP iframe 坐标点击 → 键盘激活 → 标签点击）
+# 尝试通过 CF 验证（坐标点击 inline widget → CDP iframe 坐标点击 → 键盘激活）
 # 返回尝试结果描述（*:passed 表示 token 已填充），未找到目标返回 no-target
+# v4.13.35: 所有坐标点击前先用 Test-CfClickPointSafe 拒绝 cloudflare.com 链接落点，
+#   避免把 Turnstile 控件里的 Cloudflare 徽标/隐私/帮助链接点开成新标签页。
 function Invoke-CfVerifyClick {
     param(
         [string]$Session,
@@ -950,15 +948,14 @@ function Invoke-CfVerifyClick {
         $cx = [int]($cdp.x + 26)
         if ($Attempt % 2 -eq 1) { $cx = [int]($cdp.x + 34) }
         $cy = [int]($cdp.y + $cdp.h / 2)
-        $null = Invoke-CdpClickAt -X $cx -Y $cy -Session $Session
-        if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 4) { return "cdp:click:($cx,$cy):passed" }
+        if (Test-CfClickPointSafe -Session $Session -X $cx -Y $cy) {
+            $null = Invoke-CdpClickAt -X $cx -Y $cy -Session $Session
+            if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 4) { return "cdp:click:($cx,$cy):passed" }
+        } else {
+            Write-Host "  [WebBridge] $SiteName : skip CF click at ($cx,$cy) — point is a cloudflare.com link"
+        }
         $kbd = Invoke-CfKeyboardActivate -Session $Session -IframeNodeId $cdp.nodeId
         if ($kbd) { return "cdp:kbd:$kbd:passed" }
-        # 最后尝试 iframe 中心（部分 widget 整块可点）
-        $cx2 = [int]($cdp.x + $cdp.w / 2)
-        $cy2 = [int]($cdp.y + $cdp.h / 2)
-        $null = Invoke-CdpClickAt -X $cx2 -Y $cy2 -Session $Session
-        if (Wait-CfTokenQuick -Session $Session -MaxWaitSec 3) { return "cdp:label:($cx2,$cy2):passed" }
     }
     return "no-target"
 }
@@ -975,7 +972,10 @@ function Get-CfWidgetViewportRect {
   function usable(r){ return !!r && r.w>20 && r.h>15 && !(r.w>=vw*0.8 && r.h>=vh*0.6); }
   var ifr = document.querySelector('iframe[src*="challenges.cloudflare.com"]') || document.querySelector('iframe[src*="turnstile"]') || document.querySelector('iframe[src*="hcaptcha"]') || document.querySelector('iframe[src*="recaptcha"]');
   if(ifr){ var r1=rectOf(ifr); if(usable(r1)) return JSON.stringify({found:'iframe', x:r1.x,y:r1.y,w:r1.w,h:r1.h, vw:vw, vh:vh}); }
-  var w = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]') || document.querySelector('#challenge-stage') || document.querySelector('[class*="hcaptcha"]') || document.querySelector('[class*="cf-"]') || document.querySelector('[class*="captcha"]');
+  // v4.13.35: 不再用宽泛的 [class*="cf-"]/[class*="captcha"]——它们可能命中包裹层/页脚，
+  //   点进去会点到 Cloudflare 徽标/隐私/帮助链接。真实 CF 控件由 .cf-turnstile/turnstile/#challenge-stage
+  //   或下方 iframe 匹配；全屏挑战走 CDP iframe 路径。
+  var w = document.querySelector('.cf-turnstile') || document.querySelector('[class*="turnstile"]') || document.querySelector('#challenge-stage') || document.querySelector('[class*="hcaptcha"]');
   if(w){ var r2=rectOf(w); if(usable(r2)) return JSON.stringify({found:'widget', x:r2.x,y:r2.y,w:r2.w,h:r2.h, vw:vw, vh:vh}); }
   return JSON.stringify({found:'none'});
 })()
@@ -990,6 +990,29 @@ function Get-CfWidgetViewportRect {
     return $null
 }
 
+# v4.13.35: 点击落点安全检查。Turnstile/全屏 challenge 的 Cloudflare 徽标、隐私、帮助
+# 都是 https://www.cloudflare.com/... 链接；坐标点击若落到这类 <a> 上会打开新标签页。
+# elementFromPoint 命中 iframe 本身是正常的（点在复选框区域）；只有命中 cloudflare.com 链接才拒绝。
+function Test-CfClickPointSafe {
+    param([string]$Session, [int]$X, [int]$Y)
+    $js = @"
+(function(){
+  var el = document.elementFromPoint($X, $Y);
+  if(!el) return true;
+  var a = el.closest ? el.closest('a') : null;
+  if(a){
+    var h = a.getAttribute('href') || a.href || '';
+    if(h.indexOf('cloudflare.com') > -1) return false;
+  }
+  return true;
+})()
+"@
+    $sig = Get-ResultSignal (Invoke-WebBridgeCommand -Action "evaluate" -CmdArgs @{ code = $js } -Session $Session -TimeoutSec 10)
+    # 无法确认安全时不点击，避免误开外站；外层会重试或落 CF_PENDING
+    if (-not $sig) { return $false }
+    return ($sig -notmatch '^false$')
+}
+
 function Invoke-CfClickFromRect {
     param($Rect, [string]$Session, [int]$Attempt = 0)
     $vw = if ($Rect.vw) { [int]$Rect.vw } else { 1280 }
@@ -1001,6 +1024,10 @@ function Invoke-CfClickFromRect {
         $cx = [math]::Min([math]::Max(2, [int]($Rect.x + $Rect.w / 2)), [int]($vw - 2))
     }
     $cy = [math]::Min([math]::Max(2, [int]($Rect.y + $Rect.h / 2)), [int]($vh - 2))
+    if (-not (Test-CfClickPointSafe -Session $Session -X $cx -Y $cy)) {
+        Write-Host "  [WebBridge] skip CF click at ($cx,$cy): point is a cloudflare.com link"
+        return "skip:cloudflare-link"
+    }
     return (Invoke-CdpClickAt -X $cx -Y $cy -Session $Session)
 }
 

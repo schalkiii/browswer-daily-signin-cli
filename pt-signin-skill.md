@@ -161,12 +161,14 @@ Some NexusPHP sites (the `NexusPHPCfSignInClick` family) need CF Turnstile clear
 
 1. `Wait-PostNavigate` polls; when `cf-turnstile` is not yet passed it enters CF handling;
 2. **Focus emulation**: `Page.bringToFront` (the current daemon implements it as focus emulation — the page becomes visible and accepts real input without stealing the user's focus). A background tab does not render the Turnstile iframe (the widget is an empty 300×65 placeholder), which is the real root cause of "auto-click never works, must tick by hand";
-3. **Layered click strategy**: ① JS `Get-CfWidgetViewportRect` reads visible widget/iframe viewport coords (rejects 0×0 and full-page containers) → coordinate click; ② CDP `DOM.getFlattenedDocument(pierce=true)` pierces the closed shadow to locate a full-page challenge iframe → `DOM.getBoxModel` coordinate click; ③ **keyboard activation**: `DOM.focus(iframe)` → Tab → Space (verified on V2EX's full-page managed challenge, token filled); ④ iframe-center fallback;
+3. **Layered click strategy**: ① JS `Get-CfWidgetViewportRect` reads visible widget/iframe viewport coords (rejects 0×0 and full-page containers) → coordinate click; ② CDP `DOM.getFlattenedDocument(pierce=true)` pierces the closed shadow to locate a full-page challenge iframe → `DOM.getBoxModel` coordinate click; ③ **keyboard activation**: `DOM.focus(iframe)` → Tab → Space (verified on V2EX's full-page managed challenge, token filled); no iframe-center/label click;
 4. Polls `Test-CfTurnstilePassed` every 2s (token filled / challenge gone), exits immediately when passed; if the page stays at "验证成功，正在等待源站响应", re-navigates once with the `cf_clearance` cookie;
 5. After passing, submits the attendance form (`ClickEval` clicks sign-in), retrying up to `CfRetryCount`;
 6. If every automatic attempt fails and the site declares `CfFallbackPending=$true`, returns `CF_PENDING` (manual tick required) instead of `CF_CHALLENGE` so the batch does not re-run hopelessly.
 
 > ⚠️ **Object signals must be JSON-serialized**: when `evaluate` returns a JS object, the daemon hands back a structured `value`; `Get-ResultSignal` must run `ConvertTo-Json`, otherwise `"$value"` becomes PowerShell's `@{x=...; y=...}`, `ConvertFrom-Json` fails downstream, and the CF rect is always null (the long-standing root cause fixed in v4.13.33).
+>
+> ⚠️ **Never activate Cloudflare links**: the Turnstile/full-page challenge contains Cloudflare logo/privacy/help links (cloudflare.com). The keyboard fallback must only send `DOM.focus(iframe) → Tab → Space`; never add Enter/Tab+Tab+Space. Guard every coordinate click with `Test-CfClickPointSafe` and skip points that hit a cloudflare.com link (v4.13.35).
 
 ### ALTCHA / SLIDER
 

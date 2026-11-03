@@ -1,5 +1,23 @@
 # Changelog
 
+## [v4.13.35] - 2026-11-03
+
+### 修复 CF 验证误开 cloudflare.com 标签页
+
+- **现象**：签到过 CF 时偶尔新开 `https://www.cloudflare.com/` 标签页。
+- **根因**：Turnstile/全屏 challenge 内含 Cloudflare 徽标/隐私/帮助链接（均指向 cloudflare.com）。旧键盘兜底在 `Tab+Space` 失败后补发 `Enter` / `Tab+Tab+Space`，焦点落在这些链接上即打开新标签页；宽泛 `[class*="cf-"]`/`[class*="captcha"]` 选择器和 iframe 中心点击也可能命中外层链接/包裹层。
+- **修复**（`kimi-webbridge.ps1`）：
+  - 键盘激活只保留 `DOM.focus(iframe) → Tab → Space`；删除 Enter / Tab+Tab+Space 与 iframe 中心/标签点击兜底。
+  - `Get-CfWidgetViewportRect` 移除宽泛 `[class*="cf-"]`/`[class*="captcha"]`，只匹配 `.cf-turnstile` / `turnstile` / `#challenge-stage` / `hcaptcha` 与 CF iframe。
+  - 新增 `Test-CfClickPointSafe`：每次坐标点击前用 `elementFromPoint` 检查落点，命中 `cloudflare.com` 链接则跳过；无法确认安全时不点。
+- **验证**：Parser 0；落点守卫单测（cloudflare.com 链接点=false、普通点=true）；xloli/UBits/DepthStudio 当前未渲染 CF widget（有 clearance/无挑战），无法现场复测点击，但 CF 点击路径此前已在 xloli 实测通过；V2EX 全屏路径保持 `Tab+Space`，失败落 `CF_PENDING` 而非打开外站。2026-11-03 夜间批量 PigGo `CF_BLOCKED` 即此类 CF 重试场景，本版修复后不会再误开外站。
+
+**运行态与书签同步（2026-11-03）**
+- 02:00 Sync-Bookmarks：移除 SBPT/audiences/xt-url（书签已无），并把 42w 旧书签 URL `api.42w.shop/profile` 重新加回；`sites.json` 51 站。
+- 按“移除孤儿配置”规则移除这三个新配置（配置键 48，与 51 站 = 48 自动 + 3 manual 对齐）。
+- 02:36 定时批量（运行 v4.13.34 代码）：51 站，43 成功 / 4 失败 / 3 跳过；vclib `SIGN_OK` 70.6s、SunnyPT `SIGN_OK` 22.9s、Yemapt `ALREADY_DONE`、HDVideo `SIGN_OK`；PigGo `CF_BLOCKED`、V2EX `CF_PENDING`、Moment/naturept 失败、42w `NO_LOGIN`；`LastTaskResult=1` 与 4 个失败站一致。
+- 42w 配置 URL 仍为 `api.42x.shop/dashboard`；书签同步会把 `sites.json` 的 42w 显示 URL 拉回旧域，需更新浏览器书签。
+
 ## [v4.13.34] - 2026-11-02
 
 ### SunnyPT 适配 + SPA「首检 UNKNOWN、重试已签到」状态机修正

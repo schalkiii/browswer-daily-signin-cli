@@ -1,6 +1,6 @@
 {
-  "version": "v4.13.34",
-  "total": 54,
+  "version": "v4.13.35",
+  "total": 51,
   "baseline_file": "baseline.json",
   "sites": [
     {
@@ -157,12 +157,6 @@
       "note": "书签同步: Rousi签到 - webbridge"
     },
     {
-      "name": "SBPT",
-      "url": "https://sbpt.link/attendance.php",
-      "strategy": "webbridge",
-      "note": "v4.13.33: 2026-10-26 现场为 Cloudflare 502 Bad Gateway / Host Error（源站宕机），Detect 新增 50x/421 判据归 SERVER_ERROR；待站点恢复"
-    },
-    {
       "name": "SpeedApp",
       "url": "https://speedapp.io/adult",
       "strategy": "webbridge",
@@ -242,25 +236,11 @@
       "note": "v4.13.33: 根因是后台标签页不渲染 Turnstile iframe（widget 仅空占位），并非自动点击无效。框架现于 CF 时启用焦点仿真 → 坐标点击复选框 → token 出现后提交 attendance 表单；2026-10-26 实测自动过盾并签到成功（签到已得15）。自动失败才落 CF_PENDING 人工兜底"
     },
     {
-      "name": "audiences",
-      "url": "https://audiences.me/attendance.php",
-      "strategy": "webbridge",
-      "display_name": "Audiences",
-      "note": "v4.13.33: CF 站点改为焦点仿真 + 坐标点击/CDP 兜底，重试收敛为 3×20s 自适应轮询；2026-10-26 复测已签到（当日 CF 未触发）"
-    },
-    {
       "name": "huan666",
       "url": "https://ai.huan666.de/dashboard",
       "strategy": "webbridge",
       "display_name": "幻666 AI",
       "note": "v4.13.26: 站点改版为 SPA 客户端路由，旧 /console/personal 现 404；改用 /dashboard（登录态正常）"
-    },
-    {
-      "name": "xt-url",
-      "url": "https://checkin.new-api.xt-url.com/",
-      "strategy": "webbridge",
-      "display_name": "NewAPI(xt-url)",
-      "note": "v4.13.30 接入自动化：LinuxDO OAuth 登录态有效后点「立即签到」。⚠️ OAuth 授权落 connect.linux.do CF 质询（后台无法自动通过），需人工一次性登录；之后每跑自动点签到按钮"
     },
     {
       "name": "pbh-btn",
@@ -333,13 +313,6 @@
       "note": "auto: 书签同步新增"
     },
     {
-      "name": "42w",
-      "url": "https://api.42x.shop/dashboard",
-      "strategy": "browser-open",
-      "display_name": "42 API",
-      "note": "v4.13.34: URL 同步为 api.42x.shop/dashboard（与 WebSignInConfigs 一致；登录页 /sign-in），需人工一次性登录。⚠️ 若书签仍为旧域名 api.42w.shop，Sync-Bookmarks 可能把 URL 同步回旧值，需先更新书签"
-    },
-    {
       "name": "pting",
       "url": "https://pting.club/?sort=newest",
       "strategy": "browser-open",
@@ -352,6 +325,13 @@
       "strategy": "webbridge",
       "display_name": "SUNNYPT",
       "note": "v4.13.34: 自研 SPA 签到日历适配——检测「今日 未签到」+ 可用的「立即签到」按钮；点击后状态变「今日 已签到」、按钮变「已签到」并禁用。2026-11-02 实测签到成功（+16 魔力，连续 3 天）"
+    },
+    {
+      "name": "42w",
+      "url": "https://api.42w.shop/profile",
+      "strategy": "browser-open",
+      "display_name": "42 API",
+      "note": "v4.13.35: 书签同步仍指向旧域 api.42w.shop/profile；实际配置用 api.42x.shop/dashboard（登录页 /sign-in），需更新浏览器书签后同步才会保留新 URL"
     }
   ],
   "batch": {

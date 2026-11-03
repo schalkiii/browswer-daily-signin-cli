@@ -251,7 +251,7 @@ if (Test-Path $WebArticlesDir) {
     Get-ChildItem $WebArticlesDir -File | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-Write-Output "=== PT Sign-in v4.13.34 (self-iterating + baseline + forum click + cleanup + bookmark-sync) ==="
+Write-Output "=== PT Sign-in v4.13.35 (self-iterating + baseline + forum click + cleanup + bookmark-sync) ==="
 Write-Output "Started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 Write-Output "Sites: $($config.sites.Count)"
 Write-Output ""

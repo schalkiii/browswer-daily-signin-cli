@@ -165,12 +165,14 @@ PowerShell 侧按信号映射到 `SUCCESS` / `ALREADY_DONE` / `NO_DETECT` / `CF_
 
 1. `Wait-PostNavigate` 轮询，检测到 `cf-turnstile` 未过时进入 CF 处理；
 2. **焦点仿真**：`Page.bringToFront`（当前 daemon 实现为 focus emulation，不抢真实焦点）。后台标签页不渲染 Turnstile iframe（widget 只剩空占位 300×65），这是「自动点击一直无效、只能人工勾选」的根因；
-3. **多层点击**：① JS `Get-CfWidgetViewportRect` 读取可见 widget/iframe 视口坐标（过滤 0×0 与全屏容器）→ 坐标点击；② CDP `DOM.getFlattenedDocument(pierce=true)` 穿透 closed shadow 找到全屏挑战 iframe → `DOM.getBoxModel` 坐标点击；③ **键盘激活**：`DOM.focus(iframe)` → Tab → Space（V2EX 全屏 managed challenge 实测 token 成功填充）；④ iframe 中心兜底；
+3. **多层点击**：① JS `Get-CfWidgetViewportRect` 读取可见 widget/iframe 视口坐标（过滤 0×0 与全屏容器）→ 坐标点击；② CDP `DOM.getFlattenedDocument(pierce=true)` 穿透 closed shadow 找到全屏挑战 iframe → `DOM.getBoxModel` 坐标点击；③ **键盘激活**：`DOM.focus(iframe)` → Tab → Space（V2EX 全屏 managed challenge 实测 token 成功填充）；不再做 iframe 中心/标签点击；
 4. 每 2s 轮询 `Test-CfTurnstilePassed`（token 已填充 / 挑战消失），命中即退；过盾后若页面仍卡在「验证成功，正在等待源站响应」，用 `cf_clearance` 重新导航一次；
 5. 通过后提交 attendance 表单（`ClickEval` 点击签到），最多按 `CfRetryCount` 重试；
 6. 自动全部失败且站点声明 `CfFallbackPending=$true` → 返回 `CF_PENDING`（需人工勾选），不返回 `CF_CHALLENGE` 以免批处理反复重跑。
 
 > ⚠️ **对象信号必须 JSON 序列化**：evaluate 返回 JS 对象时 daemon 给的是结构化 `value`；`Get-ResultSignal` 必须 `ConvertTo-Json`，否则 `"$value"` 会变成 PowerShell 的 `@{x=...; y=...}`，下游 `ConvertFrom-Json` 必失败，CF rect 恒为 null（v4.13.33 修复的长期根因）。
+>
+> ⚠️ **不要误触 Cloudflare 外链**：Turnstile/全屏 challenge 内含 Cloudflare 徽标/隐私/帮助链接（均指向 cloudflare.com）。键盘兜底只发 `DOM.focus(iframe) → Tab → Space`，不要补 Enter/Tab+Tab+Space；坐标点击前用 `Test-CfClickPointSafe` 检查落点，命中 cloudflare.com 链接则跳过（v4.13.35）。
 
 ### ALTCHA / SLIDER
 
